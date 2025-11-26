@@ -4,5 +4,6 @@
 
 export * from './prisma';
 export * from './mongodb';
+export * from './redis';
 export * from './init';
 export * from './schemas';

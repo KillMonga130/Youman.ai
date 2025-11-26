@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { logger } from './utils/logger';
 import { initializeDatabases, checkDatabaseHealth } from './database';
+import { authRouter, handleAuthError } from './auth';
 
 const app: Express = express();
 
@@ -55,6 +56,7 @@ app.get('/health', ((_req: Request, res: Response) => {
         databases: {
           postgres: dbHealth.postgres ? 'connected' : 'disconnected',
           mongodb: dbHealth.mongodb ? 'connected' : 'disconnected',
+          redis: dbHealth.redis ? 'connected' : 'disconnected',
         },
       });
     })
@@ -71,10 +73,16 @@ app.get('/api/v1', (_req: Request, res: Response) => {
   res.json({ message: 'AI Humanizer API v1', version: '1.0.0' });
 });
 
+// Authentication routes
+app.use('/api/v1/auth', authRouter);
+
 // 404 handler
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+// Auth error handler
+app.use(handleAuthError);
 
 // Error handler
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {

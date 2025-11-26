@@ -4,11 +4,13 @@
 
 import { connectPostgres, disconnectPostgres, checkPostgresHealth } from './prisma';
 import { connectMongoDB, disconnectMongoDB, checkMongoDBHealth, getMongoDBState } from './mongodb';
+import { connectRedis, disconnectRedis, checkRedisHealth } from './redis';
 import { logger } from '../utils/logger';
 
 export interface DatabaseHealth {
   postgres: boolean;
   mongodb: boolean;
+  redis: boolean;
   overall: boolean;
 }
 
@@ -19,10 +21,11 @@ export async function initializeDatabases(): Promise<void> {
   logger.info('Initializing database connections...');
 
   try {
-    // Connect to both databases in parallel
+    // Connect to all databases in parallel
     await Promise.all([
       connectPostgres(),
       connectMongoDB(),
+      connectRedis(),
     ]);
 
     logger.info('All database connections established successfully');
@@ -42,6 +45,7 @@ export async function shutdownDatabases(): Promise<void> {
     await Promise.all([
       disconnectPostgres(),
       disconnectMongoDB(),
+      disconnectRedis(),
     ]);
 
     logger.info('All database connections closed successfully');
@@ -55,15 +59,17 @@ export async function shutdownDatabases(): Promise<void> {
  * Check health of all database connections
  */
 export async function checkDatabaseHealth(): Promise<DatabaseHealth> {
-  const [postgresHealth, mongodbHealth] = await Promise.all([
+  const [postgresHealth, mongodbHealth, redisHealth] = await Promise.all([
     checkPostgresHealth(),
     checkMongoDBHealth(),
+    checkRedisHealth(),
   ]);
 
   return {
     postgres: postgresHealth,
     mongodb: mongodbHealth,
-    overall: postgresHealth && mongodbHealth,
+    redis: redisHealth,
+    overall: postgresHealth && mongodbHealth && redisHealth,
   };
 }
 
@@ -73,6 +79,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealth> {
 export async function getDatabaseStatus(): Promise<{
   postgres: { connected: boolean; latency: number | null };
   mongodb: { connected: boolean; state: string; latency: number | null };
+  redis: { connected: boolean; latency: number | null };
 }> {
   // Check PostgreSQL
   const pgStart = Date.now();
@@ -84,6 +91,11 @@ export async function getDatabaseStatus(): Promise<{
   const mongoConnected = await checkMongoDBHealth();
   const mongoLatency = Date.now() - mongoStart;
 
+  // Check Redis
+  const redisStart = Date.now();
+  const redisConnected = await checkRedisHealth();
+  const redisLatency = Date.now() - redisStart;
+
   return {
     postgres: {
       connected: pgConnected,
@@ -93,6 +105,10 @@ export async function getDatabaseStatus(): Promise<{
       connected: mongoConnected,
       state: getMongoDBState(),
       latency: mongoConnected ? mongoLatency : null,
+    },
+    redis: {
+      connected: redisConnected,
+      latency: redisConnected ? redisLatency : null,
     },
   };
 }

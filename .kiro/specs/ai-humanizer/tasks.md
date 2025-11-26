@@ -97,7 +97,10 @@ const configPath = __dirname + '/config/env.ts';
   - **Git Commit:** `git add .; git commit -m "feat(database): implement PostgreSQL and MongoDB schemas with migrations"`
   - _Requirements: 83, 14, 16_
 
-- [ ] 3. Set up authentication and user management
+- [-] 3. Set up authentication and user management
+
+
+
   - Implement JWT-based authentication system
   - Create user registration and login endpoints
   - Implement password hashing with bcrypt
