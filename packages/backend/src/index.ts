@@ -5,6 +5,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { logger } from './utils/logger';
+import { initializeDatabases, checkDatabaseHealth } from './database';
 
 const app: Express = express();
 
@@ -42,9 +43,28 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 });
 
 // Health check endpoint
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
-});
+app.get('/health', ((_req: Request, res: Response) => {
+  checkDatabaseHealth()
+    .then((dbHealth) => {
+      const status = dbHealth.overall ? 'healthy' : 'degraded';
+      const statusCode = dbHealth.overall ? 200 : 503;
+      
+      res.status(statusCode).json({
+        status,
+        timestamp: new Date().toISOString(),
+        databases: {
+          postgres: dbHealth.postgres ? 'connected' : 'disconnected',
+          mongodb: dbHealth.mongodb ? 'connected' : 'disconnected',
+        },
+      });
+    })
+    .catch(() => {
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+      });
+    });
+}) as express.RequestHandler);
 
 // API routes placeholder
 app.get('/api/v1', (_req: Request, res: Response) => {
@@ -64,8 +84,22 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 const PORT = config.port;
 
-app.listen(PORT, () => {
-  logger.info(`Server running on port ${PORT}`);
-});
+// Initialize databases and start server
+async function startServer(): Promise<void> {
+  try {
+    // Initialize database connections
+    await initializeDatabases();
+    
+    // Start the server
+    app.listen(PORT, () => {
+      logger.info(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+void startServer();
 
 export { app };

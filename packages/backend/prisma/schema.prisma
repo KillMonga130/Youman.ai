@@ -1,0 +1,438 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Management
+// ============================================
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String    @map("password_hash")
+  firstName         String?   @map("first_name")
+  lastName          String?   @map("last_name")
+  avatarUrl         String?   @map("avatar_url")
+  emailVerified     Boolean   @default(false) @map("email_verified")
+  emailVerifiedAt   DateTime? @map("email_verified_at")
+  mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
+  mfaSecret         String?   @map("mfa_secret")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+
+  // Relations
+  subscription      Subscription?
+  projects          Project[]
+  collaborations    ProjectCollaborator[]
+  sessions          Session[]
+  apiKeys           ApiKey[]
+  learningProfile   LearningProfile?
+  usageRecords      UsageRecord[]
+  webhooks          Webhook[]
+  preferences       UserPreference?
+
+  @@index([email])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model UserPreference {
+  id                    String   @id @default(uuid())
+  userId                String   @unique @map("user_id")
+  defaultLevel          Int      @default(3) @map("default_level")
+  defaultStrategy       String   @default("auto") @map("default_strategy")
+  defaultLanguage       String   @default("en") @map("default_language")
+  autoSaveEnabled       Boolean  @default(true) @map("auto_save_enabled")
+  autoSaveIntervalSecs  Int      @default(120) @map("auto_save_interval_secs")
+  darkModeEnabled       Boolean  @default(false) @map("dark_mode_enabled")
+  keyboardShortcuts     Json?    @map("keyboard_shortcuts")
+  customDictionary      Json?    @map("custom_dictionary")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Session {
+  id           String    @id @default(uuid())
+  userId       String    @map("user_id")
+  token        String    @unique
+  ipAddress    String?   @map("ip_address")
+  userAgent    String?   @map("user_agent")
+  expiresAt    DateTime  @map("expires_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  revokedAt    DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model ApiKey {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  name        String
+  keyHash     String    @unique @map("key_hash")
+  keyPrefix   String    @map("key_prefix")
+  scopes      String[]  @default([])
+  lastUsedAt  DateTime? @map("last_used_at")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  revokedAt   DateTime? @map("revoked_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@index([userId])
+  @@map("api_keys")
+}
+
+// ============================================
+// Subscription & Billing
+// ============================================
+
+model Subscription {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  tier                  SubscriptionTier @default(FREE)
+  status                SubscriptionStatus @default(ACTIVE)
+  stripeCustomerId      String?   @unique @map("stripe_customer_id")
+  stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
+  monthlyWordLimit      Int       @map("monthly_word_limit")
+  monthlyApiCallLimit   Int       @map("monthly_api_call_limit")
+  storageLimit          BigInt    @map("storage_limit") // in bytes
+  currentPeriodStart    DateTime  @map("current_period_start")
+  currentPeriodEnd      DateTime  @map("current_period_end")
+  cancelAtPeriodEnd     Boolean   @default(false) @map("cancel_at_period_end")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stripeCustomerId])
+  @@map("subscriptions")
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+model UsageRecord {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  resourceType  String    @map("resource_type") // words, api_calls, storage
+  amount        BigInt
+  periodStart   DateTime  @map("period_start")
+  periodEnd     DateTime  @map("period_end")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, resourceType, periodStart])
+  @@map("usage_records")
+}
+
+// ============================================
+// Projects
+// ============================================
+
+model Project {
+  id              String    @id @default(uuid())
+  ownerId         String    @map("owner_id")
+  name            String
+  description     String?
+  status          ProjectStatus @default(ACTIVE)
+  wordCount       Int       @default(0) @map("word_count")
+  documentId      String?   @map("document_id") // MongoDB document reference
+  settings        Json?     // Project-specific transformation settings
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  // Relations
+  owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  collaborators   ProjectCollaborator[]
+  versions        Version[]
+  transformations Transformation[]
+  branches        Branch[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([name])
+  @@map("projects")
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+model ProjectCollaborator {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  userId      String    @map("user_id")
+  role        CollaboratorRole @default(VIEWER)
+  invitedBy   String?   @map("invited_by")
+  invitedAt   DateTime  @default(now()) @map("invited_at")
+  acceptedAt  DateTime? @map("accepted_at")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_collaborators")
+}
+
+enum CollaboratorRole {
+  VIEWER
+  EDITOR
+  ADMIN
+}
+
+// ============================================
+// Version Control
+// ============================================
+
+model Version {
+  id              String    @id @default(uuid())
+  projectId       String    @map("project_id")
+  branchId        String?   @map("branch_id")
+  versionNumber   Int       @map("version_number")
+  documentId      String    @map("document_id") // MongoDB document reference
+  contentHash     String    @map("content_hash")
+  wordCount       Int       @map("word_count")
+  changesSummary  String?   @map("changes_summary")
+  isAutoSave      Boolean   @default(false) @map("is_auto_save")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  createdBy       String?   @map("created_by")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  branch  Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([projectId, branchId, versionNumber])
+  @@index([projectId])
+  @@index([branchId])
+  @@index([createdAt])
+  @@map("versions")
+}
+
+model Branch {
+  id            String    @id @default(uuid())
+  projectId     String    @map("project_id")
+  name          String
+  parentBranchId String?  @map("parent_branch_id")
+  baseVersionId String?   @map("base_version_id")
+  isDefault     Boolean   @default(false) @map("is_default")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  createdBy     String?   @map("created_by")
+  mergedAt      DateTime? @map("merged_at")
+  mergedInto    String?   @map("merged_into")
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentBranch  Branch?   @relation("BranchHierarchy", fields: [parentBranchId], references: [id])
+  childBranches Branch[]  @relation("BranchHierarchy")
+  versions      Version[]
+
+  @@unique([projectId, name])
+  @@index([projectId])
+  @@map("branches")
+}
+
+// ============================================
+// Transformations
+// ============================================
+
+model Transformation {
+  id                  String    @id @default(uuid())
+  projectId           String    @map("project_id")
+  inputDocumentId     String    @map("input_document_id") // MongoDB reference
+  outputDocumentId    String?   @map("output_document_id") // MongoDB reference
+  status              TransformationStatus @default(PENDING)
+  level               Int       @default(3)
+  strategy            TransformationStrategy @default(AUTO)
+  language            String    @default("en")
+  protectedSegments   Json?     @map("protected_segments")
+  
+  // Metrics
+  inputWordCount      Int       @map("input_word_count")
+  outputWordCount     Int?      @map("output_word_count")
+  modifiedPercentage  Float?    @map("modified_percentage")
+  
+  // Detection scores
+  inputDetectionScore   Float?  @map("input_detection_score")
+  outputDetectionScore  Float?  @map("output_detection_score")
+  detectionResults      Json?   @map("detection_results") // Detailed results from multiple detectors
+  
+  // Quality metrics
+  inputPerplexity     Float?    @map("input_perplexity")
+  outputPerplexity    Float?    @map("output_perplexity")
+  inputBurstiness     Float?    @map("input_burstiness")
+  outputBurstiness    Float?    @map("output_burstiness")
+  
+  // Processing info
+  processingTimeMs    Int?      @map("processing_time_ms")
+  chunksProcessed     Int?      @map("chunks_processed")
+  errorMessage        String?   @map("error_message")
+  
+  createdAt           DateTime  @default(now()) @map("created_at")
+  completedAt         DateTime? @map("completed_at")
+  createdBy           String?   @map("created_by")
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("transformations")
+}
+
+enum TransformationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum TransformationStrategy {
+  AUTO
+  CASUAL
+  PROFESSIONAL
+  ACADEMIC
+}
+
+// ============================================
+// Learning & Personalization
+// ============================================
+
+model LearningProfile {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  preferredStrategies   Json?     @map("preferred_strategies")
+  vocabularyPreferences Json?     @map("vocabulary_preferences")
+  tonePreferences       Json?     @map("tone_preferences")
+  feedbackHistory       Json?     @map("feedback_history")
+  totalFeedbackCount    Int       @default(0) @map("total_feedback_count")
+  lastUpdatedAt         DateTime  @default(now()) @map("last_updated_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("learning_profiles")
+}
+
+// ============================================
+// Webhooks & Integrations
+// ============================================
+
+model Webhook {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  url         String
+  secret      String
+  events      String[]
+  isActive    Boolean   @default(true) @map("is_active")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+  failureCount Int      @default(0) @map("failure_count")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries WebhookDelivery[]
+
+  @@index([userId])
+  @@map("webhooks")
+}
+
+model WebhookDelivery {
+  id            String    @id @default(uuid())
+  webhookId     String    @map("webhook_id")
+  event         String
+  payload       Json
+  responseCode  Int?      @map("response_code")
+  responseBody  String?   @map("response_body")
+  deliveredAt   DateTime? @map("delivered_at")
+  attempts      Int       @default(0)
+  nextRetryAt   DateTime? @map("next_retry_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
+// ============================================
+// Templates
+// ============================================
+
+model Template {
+  id            String    @id @default(uuid())
+  name          String
+  description   String?
+  category      String
+  isPublic      Boolean   @default(false) @map("is_public")
+  createdBy     String?   @map("created_by")
+  settings      Json      // Transformation settings
+  usageCount    Int       @default(0) @map("usage_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isPublic])
+  @@index([createdBy])
+  @@map("templates")
+}
+
+// ============================================
+// Audit Log
+// ============================================
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")
+  action      String
+  entityType  String    @map("entity_type")
+  entityId    String?   @map("entity_id")
+  metadata    Json?
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

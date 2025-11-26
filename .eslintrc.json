@@ -46,6 +46,10 @@
     "coverage",
     "*.js",
     "vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.ts",
+    "**/generated/**",
+    "**/prisma/seed.ts",
+    "**/*.test.ts",
+    "**/prisma.config.ts"
   ]
 }
