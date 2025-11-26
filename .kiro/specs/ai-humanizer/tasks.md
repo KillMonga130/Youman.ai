@@ -8,22 +8,22 @@ This implementation plan breaks down the AI Humanizer into discrete, manageable 
 
 ### Windows Command Reference
 
-| Operation | PowerShell Command | CMD Command |
-|-----------|-------------------|-------------|
-| Install dependencies | `npm install` | `npm install` |
-| Run dev server | `npm run dev` | `npm run dev` |
-| Run tests | `npm run test` | `npm run test` |
-| Build project | `npm run build` | `npm run build` |
-| Lint code | `npm run lint` | `npm run lint` |
-| Format code | `npm run format` | `npm run format` |
-| Type check | `npm run typecheck` | `npm run typecheck` |
-| Start Docker | `docker-compose up -d` | `docker-compose up -d` |
-| Stop Docker | `docker-compose down` | `docker-compose down` |
-| View Docker logs | `docker-compose logs -f` | `docker-compose logs -f` |
-| Create directory | `New-Item -ItemType Directory -Path "dir"` | `mkdir dir` |
-| Remove directory | `Remove-Item -Recurse -Force "dir"` | `rmdir /s /q dir` |
-| Copy file | `Copy-Item "src" "dest"` | `copy src dest` |
-| Set env variable | `$env:VAR="value"` | `set VAR=value` |
+| Operation            | PowerShell Command                         | CMD Command              |
+| -------------------- | ------------------------------------------ | ------------------------ |
+| Install dependencies | `npm install`                              | `npm install`            |
+| Run dev server       | `npm run dev`                              | `npm run dev`            |
+| Run tests            | `npm run test`                             | `npm run test`           |
+| Build project        | `npm run build`                            | `npm run build`          |
+| Lint code            | `npm run lint`                             | `npm run lint`           |
+| Format code          | `npm run format`                           | `npm run format`         |
+| Type check           | `npm run typecheck`                        | `npm run typecheck`      |
+| Start Docker         | `docker-compose up -d`                     | `docker-compose up -d`   |
+| Stop Docker          | `docker-compose down`                      | `docker-compose down`    |
+| View Docker logs     | `docker-compose logs -f`                   | `docker-compose logs -f` |
+| Create directory     | `New-Item -ItemType Directory -Path "dir"` | `mkdir dir`              |
+| Remove directory     | `Remove-Item -Recurse -Force "dir"`        | `rmdir /s /q dir`        |
+| Copy file            | `Copy-Item "src" "dest"`                   | `copy src dest`          |
+| Set env variable     | `$env:VAR="value"`                         | `set VAR=value`          |
 
 ### Git Commit Convention
 

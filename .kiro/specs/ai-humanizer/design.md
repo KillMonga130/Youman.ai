@@ -15,18 +15,18 @@ This project is developed on **Windows** operating system. All shell commands, s
 
 ### Command Reference (Windows vs Unix)
 
-| Operation | Windows (PowerShell) | Windows (CMD) | Unix/Linux |
-|-----------|---------------------|---------------|------------|
-| List files | `Get-ChildItem` or `dir` | `dir` | `ls` |
-| Remove file | `Remove-Item file.txt` | `del file.txt` | `rm file.txt` |
-| Remove directory | `Remove-Item -Recurse -Force dir` | `rmdir /s /q dir` | `rm -rf dir` |
-| Copy file | `Copy-Item src dest` | `copy src dest` | `cp src dest` |
-| Create directory | `New-Item -ItemType Directory -Path dir` | `mkdir dir` | `mkdir dir` |
-| View file | `Get-Content file.txt` | `type file.txt` | `cat file.txt` |
-| Find in files | `Select-String -Path *.txt -Pattern "search"` | `findstr "search" *.txt` | `grep "search" *.txt` |
-| Environment variable | `$env:VAR_NAME` | `%VAR_NAME%` | `$VAR_NAME` |
-| Command separator | `;` | `&` | `&&` |
-| Set env variable | `$env:VAR="value"` | `set VAR=value` | `export VAR=value` |
+| Operation            | Windows (PowerShell)                          | Windows (CMD)            | Unix/Linux            |
+| -------------------- | --------------------------------------------- | ------------------------ | --------------------- |
+| List files           | `Get-ChildItem` or `dir`                      | `dir`                    | `ls`                  |
+| Remove file          | `Remove-Item file.txt`                        | `del file.txt`           | `rm file.txt`         |
+| Remove directory     | `Remove-Item -Recurse -Force dir`             | `rmdir /s /q dir`        | `rm -rf dir`          |
+| Copy file            | `Copy-Item src dest`                          | `copy src dest`          | `cp src dest`         |
+| Create directory     | `New-Item -ItemType Directory -Path dir`      | `mkdir dir`              | `mkdir dir`           |
+| View file            | `Get-Content file.txt`                        | `type file.txt`          | `cat file.txt`        |
+| Find in files        | `Select-String -Path *.txt -Pattern "search"` | `findstr "search" *.txt` | `grep "search" *.txt` |
+| Environment variable | `$env:VAR_NAME`                               | `%VAR_NAME%`             | `$VAR_NAME`           |
+| Command separator    | `;`                                           | `&`                      | `&&`                  |
+| Set env variable     | `$env:VAR="value"`                            | `set VAR=value`          | `export VAR=value`    |
 
 ### Git Workflow
 
