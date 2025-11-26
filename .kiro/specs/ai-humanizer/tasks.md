@@ -112,13 +112,22 @@ const configPath = __dirname + '/config/env.ts';
   - **Git Commit:** `git add .; git commit -m "feat(auth): implement JWT authentication with bcrypt and Redis sessions"`
   - _Requirements: 14, 84_
 
-- [ ]\* 3.1 Write property test for authentication
+- [x] 3.1 Write property test for authentication
+
+
+
+
+
+
   - **Property 20: API authentication**
   - **Validates: Requirements 7.1**
   - **Windows Command:** `npm run test --workspace=@ai-humanizer/backend`
   - **Git Commit:** `git add .; git commit -m "test(auth): add property test for API authentication"`
 
-- [ ] 4. Implement API Gateway and routing
+- [-] 4. Implement API Gateway and routing
+
+
+
   - Set up Express.js API gateway with rate limiting
   - Implement request routing to microservices
   - Add request/response logging middleware

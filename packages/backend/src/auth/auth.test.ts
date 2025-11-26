@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import * as fc from 'fast-check';
 import {
   hashPassword,
   verifyPassword,
@@ -184,6 +185,109 @@ describe('Authentication Module', () => {
         
         const result = loginSchema.safeParse(invalidData);
         expect(result.success).toBe(false);
+      });
+    });
+  });
+
+  /**
+   * Property-Based Tests
+   * Feature: ai-humanizer, Property 20: API authentication
+   * Validates: Requirements 7.1
+   * 
+   * Property: For any valid user credentials (userId, email, sessionId),
+   * generating a JWT token and verifying it should return the same credentials.
+   * For any arbitrary string that is not a valid JWT, verification should fail.
+   */
+  describe('Property-Based Tests', () => {
+    // Feature: ai-humanizer, Property 20: API authentication
+    // Validates: Requirements 7.1
+    describe('Property 20: API authentication', () => {
+      it('should authenticate valid tokens and return correct user data for any valid credentials', () => {
+        fc.assert(
+          fc.property(
+            // Generate valid user credentials
+            fc.record({
+              userId: fc.uuid(),
+              email: fc.emailAddress(),
+              sessionId: fc.uuid(),
+            }),
+            ({ userId, email, sessionId }) => {
+              // Generate tokens with the credentials
+              const tokens = generateTokens(userId, email, sessionId);
+              
+              // Verify access token returns correct payload
+              const accessPayload = verifyToken(tokens.accessToken);
+              expect(accessPayload).not.toBeNull();
+              expect(accessPayload?.userId).toBe(userId);
+              expect(accessPayload?.email).toBe(email);
+              expect(accessPayload?.sessionId).toBe(sessionId);
+              expect(accessPayload?.type).toBe('access');
+              
+              // Verify refresh token returns correct payload
+              const refreshPayload = verifyToken(tokens.refreshToken);
+              expect(refreshPayload).not.toBeNull();
+              expect(refreshPayload?.userId).toBe(userId);
+              expect(refreshPayload?.email).toBe(email);
+              expect(refreshPayload?.sessionId).toBe(sessionId);
+              expect(refreshPayload?.type).toBe('refresh');
+            }
+          ),
+          { numRuns: 100 }
+        );
+      });
+
+      it('should reject any arbitrary string that is not a valid JWT token', () => {
+        fc.assert(
+          fc.property(
+            // Generate arbitrary strings that are not valid JWTs
+            fc.string().filter((s) => {
+              // Filter out strings that could accidentally be valid JWTs
+              // Valid JWTs have 3 base64url-encoded parts separated by dots
+              const parts = s.split('.');
+              return parts.length !== 3;
+            }),
+            (invalidToken) => {
+              // Verification should return null for invalid tokens
+              const payload = verifyToken(invalidToken);
+              expect(payload).toBeNull();
+            }
+          ),
+          { numRuns: 100 }
+        );
+      });
+
+      it('should reject tampered tokens', () => {
+        fc.assert(
+          fc.property(
+            fc.record({
+              userId: fc.uuid(),
+              email: fc.emailAddress(),
+              sessionId: fc.uuid(),
+            }),
+            fc.integer({ min: 0, max: 100 }),
+            ({ userId, email, sessionId }, tamperPosition) => {
+              // Generate a valid token
+              const tokens = generateTokens(userId, email, sessionId);
+              const originalToken = tokens.accessToken;
+              
+              // Tamper with the token by modifying a character
+              if (originalToken.length > 0) {
+                const position = tamperPosition % originalToken.length;
+                const chars = originalToken.split('');
+                // Change the character at the position
+                chars[position] = chars[position] === 'a' ? 'b' : 'a';
+                const tamperedToken = chars.join('');
+                
+                // If the token was actually modified, verification should fail
+                if (tamperedToken !== originalToken) {
+                  const payload = verifyToken(tamperedToken);
+                  expect(payload).toBeNull();
+                }
+              }
+            }
+          ),
+          { numRuns: 100 }
+        );
       });
     });
   });
