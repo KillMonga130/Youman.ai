@@ -1,5 +1,102 @@
 # AI Humanizer Design Document
 
+## Development Environment
+
+### Target Platform: Windows
+
+This project is developed on **Windows** operating system. All shell commands, scripts, and development workflows are designed for Windows compatibility.
+
+### Windows-Specific Requirements
+
+- **Shell**: PowerShell or Command Prompt (cmd.exe)
+- **Path Separators**: Use backslash (`\`) for Windows paths, forward slash (`/`) for URLs and Docker
+- **Line Endings**: Configure Git to handle CRLF/LF conversion (`git config core.autocrlf true`)
+- **Docker Desktop**: Required for containerized development (Windows with WSL2 backend recommended)
+
+### Command Reference (Windows vs Unix)
+
+| Operation | Windows (PowerShell) | Windows (CMD) | Unix/Linux |
+|-----------|---------------------|---------------|------------|
+| List files | `Get-ChildItem` or `dir` | `dir` | `ls` |
+| Remove file | `Remove-Item file.txt` | `del file.txt` | `rm file.txt` |
+| Remove directory | `Remove-Item -Recurse -Force dir` | `rmdir /s /q dir` | `rm -rf dir` |
+| Copy file | `Copy-Item src dest` | `copy src dest` | `cp src dest` |
+| Create directory | `New-Item -ItemType Directory -Path dir` | `mkdir dir` | `mkdir dir` |
+| View file | `Get-Content file.txt` | `type file.txt` | `cat file.txt` |
+| Find in files | `Select-String -Path *.txt -Pattern "search"` | `findstr "search" *.txt` | `grep "search" *.txt` |
+| Environment variable | `$env:VAR_NAME` | `%VAR_NAME%` | `$VAR_NAME` |
+| Command separator | `;` | `&` | `&&` |
+| Set env variable | `$env:VAR="value"` | `set VAR=value` | `export VAR=value` |
+
+### Git Workflow
+
+Every feature or functionality addition MUST include a git commit for traceability:
+
+```powershell
+# Stage changes
+git add .
+
+# Commit with descriptive message
+git commit -m "feat(component): description of changes"
+
+# Commit message format:
+# feat: new feature
+# fix: bug fix
+# docs: documentation
+# style: formatting
+# refactor: code restructuring
+# test: adding tests
+# chore: maintenance
+```
+
+### NPM Scripts (Windows Compatible)
+
+All npm scripts in `package.json` are cross-platform compatible:
+
+```json
+{
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint . --ext .ts,.tsx",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\""
+  }
+}
+```
+
+### Docker on Windows
+
+Docker commands work the same on Windows with Docker Desktop:
+
+```powershell
+# Start services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Rebuild images
+docker-compose build --no-cache
+```
+
+### File Path Handling in Code
+
+Always use `path.join()` or `path.resolve()` for cross-platform path handling:
+
+```typescript
+import path from 'path';
+
+// Good - cross-platform
+const filePath = path.join(__dirname, 'config', 'env.ts');
+
+// Bad - Unix only
+const filePath = __dirname + '/config/env.ts';
+```
+
 ## Overview
 
 The AI Humanizer is an enterprise-grade platform designed to transform AI-generated text into natural, human-like content that evades AI detection while maintaining semantic integrity. The system employs advanced natural language processing, machine learning models, and sophisticated transformation algorithms to introduce human writing characteristics including varied sentence structures, natural imperfections, contextual nuances, and stylistic variations.
