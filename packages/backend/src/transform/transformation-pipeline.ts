@@ -29,6 +29,7 @@ import { calculateMetrics } from '../analysis/metrics-calculator';
 import { parseProtectedSegments } from '../analysis/protected-segment-parser';
 import { countWords } from '../analysis/document-parser';
 import { TextMetrics } from '../analysis/types';
+import { StrategySelector, createStrategySelector, ITransformationStrategy } from './strategies';
 
 /** Default humanization level */
 const DEFAULT_LEVEL: HumanizationLevel = 3;
@@ -58,6 +59,7 @@ export class TransformationPipeline implements ITransformationPipeline {
   private options: Required<TransformPipelineOptions>;
   private chunkProcessor: ChunkProcessor;
   private textAnalyzer: TextAnalyzer;
+  private strategySelector: StrategySelector;
   private activeJobs: Map<string, ActiveJob> = new Map();
   private pausedJobs: Map<string, ResumableJobState> = new Map();
 
@@ -75,6 +77,7 @@ export class TransformationPipeline implements ITransformationPipeline {
 
     this.chunkProcessor = createChunkProcessor(this.options);
     this.textAnalyzer = createTextAnalyzer();
+    this.strategySelector = createStrategySelector();
   }
 
   /**
@@ -316,24 +319,52 @@ export class TransformationPipeline implements ITransformationPipeline {
   }
 
   /**
-   * Applies transformation to text
-   * This is a placeholder - actual transformation logic would be implemented here
+   * Applies transformation to text using the selected strategy
+   * Requirements: 6
    */
   private applyTransformation(
     text: string,
-    _strategy: TransformStrategy,
-    _level: HumanizationLevel,
-    _context: ChunkContext
+    strategyName: TransformStrategy,
+    level: HumanizationLevel,
+    context: ChunkContext
   ): string {
-    // Placeholder transformation - in a real implementation, this would:
-    // 1. Apply strategy-specific transformations
-    // 2. Adjust intensity based on level
-    // 3. Preserve protected segments
-    // 4. Maintain context consistency
+    // Get the appropriate strategy
+    let strategy: ITransformationStrategy;
     
-    // For now, return the original text
-    // The actual transformation logic will be implemented in task 7 (transformation strategies)
-    return text;
+    if (strategyName === 'auto') {
+      // Auto-select based on content type from context
+      const contentType = context.styleProfile?.tone === 'casual' ? 'casual' :
+                         context.styleProfile?.tone === 'formal' ? 'business' :
+                         context.styleProfile?.formality && context.styleProfile.formality > 70 ? 'academic' :
+                         'business';
+      strategy = this.strategySelector.selectStrategy(contentType);
+    } else {
+      strategy = this.strategySelector.getStrategy(strategyName);
+    }
+
+    // Extract protected segments from context
+    const protectedSegments = context.protectedSegments || [];
+    
+    // Create placeholders for protected segments
+    const placeholders: Map<string, string> = new Map();
+    let processedText = text;
+    
+    protectedSegments.forEach((segment, index) => {
+      const placeholder = `__PROTECTED_${index}__`;
+      placeholders.set(placeholder, segment.original);
+      processedText = processedText.replace(segment.original, placeholder);
+    });
+
+    // Apply the strategy transformation
+    const result = strategy.transform(processedText, level, context);
+
+    // Restore protected segments
+    let finalText = result.text;
+    placeholders.forEach((original, placeholder) => {
+      finalText = finalText.replace(placeholder, original);
+    });
+
+    return finalText;
   }
 
   /**
