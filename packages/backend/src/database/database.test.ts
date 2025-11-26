@@ -2,7 +2,23 @@
  * Database module tests
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Mock mongoose schemas before importing
+vi.mock('./schemas/document.schema', () => ({
+  DocumentModel: { modelName: 'Document' },
+  DocumentSchema: {},
+}));
+
+vi.mock('./schemas/chunk.schema', () => ({
+  ChunkModel: { modelName: 'Chunk' },
+  ChunkSchema: {},
+}));
+
+vi.mock('./schemas/style-profile.schema', () => ({
+  StyleProfileModel: { modelName: 'StyleProfile' },
+  StyleProfileSchema: {},
+}));
 
 describe('Database Module', () => {
   describe('Prisma Schema', () => {
