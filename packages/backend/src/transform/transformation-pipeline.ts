@@ -30,9 +30,10 @@ import { parseProtectedSegments } from '../analysis/protected-segment-parser';
 import { countWords } from '../analysis/document-parser';
 import { TextMetrics } from '../analysis/types';
 import { StrategySelector, createStrategySelector, ITransformationStrategy } from './strategies';
-
-/** Default humanization level */
-const DEFAULT_LEVEL: HumanizationLevel = 3;
+import {
+  createHumanizationLevelController,
+  DEFAULT_HUMANIZATION_LEVEL,
+} from './humanization-level';
 
 /** Memory check interval in chunks */
 const MEMORY_CHECK_INTERVAL = 5;
@@ -120,7 +121,10 @@ export class TransformationPipeline implements ITransformationPipeline {
 
       // Determine strategy
       const strategy = this.determineStrategy(request, analysis.contentType);
-      const level = request.level ?? DEFAULT_LEVEL;
+      
+      // Initialize humanization level controller (Requirements 3.1, 3.4)
+      const levelController = createHumanizationLevelController(request.level);
+      const level = levelController.getLevel();
 
       // Build style profile for consistency
       contextPreserver.buildStyleProfile(request.text);
@@ -171,13 +175,14 @@ export class TransformationPipeline implements ITransformationPipeline {
       tracker.updateStatus('assembling', 'Assembling final document');
       const humanizedText = this.chunkProcessor.assembleChunks(processedChunks);
 
-      // Calculate final metrics
+      // Calculate final metrics with level-aware tracking (Requirements 3.2, 3.3)
       const afterMetrics = calculateMetrics(humanizedText);
       const metrics = this.calculateTransformMetrics(
         analysis.metrics,
         afterMetrics,
         request.text,
-        humanizedText
+        humanizedText,
+        level
       );
 
       // Mark complete
@@ -395,14 +400,20 @@ export class TransformationPipeline implements ITransformationPipeline {
 
   /**
    * Validates the transform request
+   * Requirements: 3.1, 3.4
    */
   private validateRequest(request: TransformRequest): void {
     if (!request.text || request.text.trim().length === 0) {
       throw new Error('Input text cannot be empty');
     }
 
-    if (request.level !== undefined && (request.level < 1 || request.level > 5)) {
-      throw new Error('Humanization level must be between 1 and 5');
+    // Validate humanization level using the controller (Requirements 3.1, 3.4)
+    if (request.level !== undefined) {
+      const levelController = createHumanizationLevelController();
+      const validationResult = levelController.validateLevel(request.level);
+      if (!validationResult.isValid) {
+        throw new Error(validationResult.errorMessage || 'Humanization level must be between 1 and 5');
+      }
     }
 
     const validStrategies: TransformStrategy[] = ['casual', 'professional', 'academic', 'auto'];
@@ -413,12 +424,14 @@ export class TransformationPipeline implements ITransformationPipeline {
 
   /**
    * Calculates transformation metrics
+   * Requirements: 3.2, 3.3 - Tracks modification percentage based on level
    */
   private calculateTransformMetrics(
     before: TextMetrics,
     after: TextMetrics,
     originalText: string,
-    transformedText: string
+    transformedText: string,
+    level?: HumanizationLevel
   ): TransformMetrics {
     // Calculate modification percentage
     const originalWords = originalText.toLowerCase().split(/\s+/);
@@ -438,11 +451,23 @@ export class TransformationPipeline implements ITransformationPipeline {
     
     const modificationPercentage = (modifiedCount / originalWords.length) * 100;
 
-    // Calculate sentences modified
+    // Calculate sentences modified using level-aware tracking
     const originalSentences = before.sentenceLengths.length;
     const transformedSentences = after.sentenceLengths.length;
+    
+    // Use HumanizationLevelController for accurate sentence modification tracking
+    const levelController = createHumanizationLevelController(level ?? DEFAULT_HUMANIZATION_LEVEL);
+    
+    // Calculate actual sentences modified based on word changes
     const sentencesModified = Math.abs(originalSentences - transformedSentences) +
       Math.round(modificationPercentage / 100 * originalSentences);
+
+    // Track modification against level targets (Requirements 3.2, 3.3)
+    // This validates that the modification percentage aligns with level expectations
+    levelController.trackModification(
+      originalSentences,
+      Math.min(sentencesModified, originalSentences)
+    );
 
     return {
       before,
