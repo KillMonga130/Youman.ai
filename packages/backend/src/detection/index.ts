@@ -31,4 +31,10 @@ export type {
   HistoricalTrendReport,
   DetectorPrioritySuggestion,
   MultiDetectorComparisonResult,
+  PassFailIndicator,
+  ImprovementSuggestion,
+  ReprocessRequest,
+  ReprocessResult,
+  DetectionTestResult,
+  DetectionTestOptions,
 } from './types';

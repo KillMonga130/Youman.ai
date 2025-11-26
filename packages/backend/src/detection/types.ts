@@ -338,3 +338,129 @@ export interface MultiDetectorComparisonResult {
   /** Total processing time */
   totalProcessingTimeMs: number;
 }
+
+/**
+ * Pass/Fail indicator for detection results
+ * Requirement 26.2: Display individual scores with pass/fail indicators
+ */
+export interface PassFailIndicator {
+  /** Provider name */
+  provider: DetectionProvider;
+  /** Detection score (0-100) */
+  score: number;
+  /** Pass/fail status */
+  status: 'pass' | 'fail' | 'warning';
+  /** Status message */
+  message: string;
+  /** Color indicator for UI */
+  color: 'green' | 'yellow' | 'red';
+  /** Threshold used for evaluation */
+  threshold: number;
+}
+
+/**
+ * Detection score improvement suggestion
+ * Requirement 26.3: Suggest specific areas to re-humanize
+ */
+export interface ImprovementSuggestion {
+  /** Suggestion type */
+  type: 'sentence_variation' | 'vocabulary' | 'structure' | 'tone' | 'general';
+  /** Priority level (1 = highest) */
+  priority: number;
+  /** Suggestion description */
+  description: string;
+  /** Expected score improvement (percentage points) */
+  expectedImprovement: number;
+  /** Specific action to take */
+  action: string;
+  /** Affected text areas (if applicable) */
+  affectedAreas?: string[];
+}
+
+/**
+ * Re-processing request for high detection scores
+ * Requirement 26.3: One-click re-processing for high scores
+ */
+export interface ReprocessRequest {
+  /** Original text */
+  originalText: string;
+  /** Current detection score */
+  currentScore: number;
+  /** Target score to achieve */
+  targetScore: number;
+  /** Humanization level to apply (1-5) */
+  humanizationLevel: number;
+  /** Strategy to use */
+  strategy?: 'casual' | 'professional' | 'academic' | 'auto';
+  /** Maximum re-processing attempts */
+  maxAttempts?: number;
+  /** Timeout per attempt in milliseconds */
+  timeoutPerAttempt?: number;
+}
+
+/**
+ * Re-processing result
+ * Requirement 26.3: One-click re-processing for high scores
+ */
+export interface ReprocessResult {
+  /** Whether re-processing was successful */
+  success: boolean;
+  /** Re-processed text (if successful) */
+  reprocessedText?: string | undefined;
+  /** New detection score */
+  newScore: number;
+  /** Score improvement (positive = better) */
+  scoreImprovement: number;
+  /** Number of attempts made */
+  attemptsMade: number;
+  /** Total processing time in milliseconds */
+  totalProcessingTimeMs: number;
+  /** Improvement suggestions if still failing */
+  suggestions?: ImprovementSuggestion[] | undefined;
+  /** Error message if failed */
+  error?: string | undefined;
+}
+
+/**
+ * Detection test result with pass/fail indicators
+ * Requirement 26.2: Display individual scores with pass/fail indicators
+ */
+export interface DetectionTestResult {
+  /** Aggregated detection results */
+  aggregatedResult: AggregatedDetectionResult;
+  /** Pass/fail indicators for each provider */
+  passFailIndicators: PassFailIndicator[];
+  /** Overall pass/fail status */
+  overallStatus: 'pass' | 'fail' | 'partial';
+  /** Overall status message */
+  statusMessage: string;
+  /** Improvement suggestions */
+  suggestions: ImprovementSuggestion[];
+  /** Whether re-processing is recommended */
+  reprocessingRecommended: boolean;
+  /** Recommended humanization level for re-processing */
+  recommendedLevel?: number | undefined;
+  /** Whether timeout occurred */
+  timedOut: boolean;
+  /** Providers that timed out */
+  timedOutProviders: DetectionProvider[];
+}
+
+/**
+ * Detection testing workflow options
+ * Requirement 26.4: Complete all detection tests within 15 seconds
+ */
+export interface DetectionTestOptions {
+  /** Timeout for all detection tests (default: 15000ms) */
+  timeout?: number;
+  /** Pass threshold (default: 50) */
+  passThreshold?: number;
+  /** Warning threshold (default: 40) */
+  warningThreshold?: number;
+  /** Whether to generate improvement suggestions */
+  generateSuggestions?: boolean;
+  /** Whether to include re-processing recommendation */
+  includeReprocessingRecommendation?: boolean;
+  /** Providers to test against */
+  providers?: DetectionProvider[];
+}

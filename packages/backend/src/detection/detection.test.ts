@@ -533,3 +533,327 @@ describe('Multi-Detector Comparison (Requirement 52)', () => {
     });
   });
 });
+
+/**
+ * Detection Testing Workflow Tests
+ * Requirement 26: Real-time AI detection testing
+ */
+describe('Detection Testing Workflow (Requirement 26)', () => {
+  let service: DetectionService;
+
+  beforeEach(() => {
+    service = createDetectionService();
+  });
+
+  describe('runDetectionTest()', () => {
+    it('should run detection test with pass/fail indicators', async () => {
+      const text = 'This is a test sentence for detection testing. It should generate pass/fail indicators for each detector.';
+
+      const result = await service.runDetectionTest(text);
+
+      expect(result.aggregatedResult).toBeDefined();
+      expect(result.passFailIndicators).toBeDefined();
+      expect(result.passFailIndicators.length).toBeGreaterThan(0);
+      expect(result.overallStatus).toBeDefined();
+      expect(['pass', 'fail', 'partial']).toContain(result.overallStatus);
+      expect(result.statusMessage).toBeDefined();
+      expect(result.statusMessage.length).toBeGreaterThan(0);
+    });
+
+    it('should complete within 15-second timeout (Requirement 26.4)', async () => {
+      const text = 'Testing timeout compliance for detection workflow.';
+      const timeout = 15000;
+
+      const startTime = Date.now();
+      const result = await service.runDetectionTest(text, { timeout });
+      const elapsed = Date.now() - startTime;
+
+      expect(elapsed).toBeLessThan(timeout + 1000); // Allow 1s buffer
+      expect(result.timedOut).toBe(false);
+    });
+
+    it('should generate improvement suggestions when failing', async () => {
+      // AI-like text with uniform sentences
+      const aiLikeText = 'This is a sentence. This is another sentence. This is yet another sentence. This is one more sentence.';
+
+      const result = await service.runDetectionTest(aiLikeText, {
+        passThreshold: 30, // Low threshold to trigger suggestions
+        generateSuggestions: true,
+      });
+
+      // If the text fails, suggestions should be generated
+      if (result.overallStatus !== 'pass') {
+        expect(result.suggestions.length).toBeGreaterThan(0);
+        expect(result.suggestions[0]?.type).toBeDefined();
+        expect(result.suggestions[0]?.description).toBeDefined();
+        expect(result.suggestions[0]?.action).toBeDefined();
+      }
+    });
+
+    it('should include re-processing recommendation when failing', async () => {
+      const text = 'This is a test sentence. Another test sentence here.';
+
+      const result = await service.runDetectionTest(text, {
+        passThreshold: 20, // Very low threshold to ensure failure
+        includeReprocessingRecommendation: true,
+      });
+
+      if (result.overallStatus !== 'pass') {
+        expect(result.reprocessingRecommended).toBe(true);
+        expect(result.recommendedLevel).toBeDefined();
+        expect(result.recommendedLevel).toBeGreaterThanOrEqual(1);
+        expect(result.recommendedLevel).toBeLessThanOrEqual(5);
+      }
+    });
+
+    it('should respect custom thresholds', async () => {
+      const text = 'Testing with custom thresholds for pass/fail indicators.';
+
+      const result = await service.runDetectionTest(text, {
+        passThreshold: 60,
+        warningThreshold: 50,
+      });
+
+      // All indicators should use the custom threshold
+      result.passFailIndicators.forEach(indicator => {
+        expect(indicator.threshold).toBe(60);
+      });
+    });
+  });
+
+  describe('generatePassFailIndicators()', () => {
+    it('should generate correct pass indicators for low scores', () => {
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 25, passed: true, confidence: 80, processingTimeMs: 50 },
+      ];
+
+      const indicators = service.generatePassFailIndicators(results, 50, 40);
+
+      expect(indicators.length).toBe(1);
+      expect(indicators[0]?.status).toBe('pass');
+      expect(indicators[0]?.color).toBe('green');
+      expect(indicators[0]?.message).toContain('Passed');
+    });
+
+    it('should generate warning indicators for borderline scores', () => {
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 45, passed: true, confidence: 80, processingTimeMs: 50 },
+      ];
+
+      const indicators = service.generatePassFailIndicators(results, 50, 40);
+
+      expect(indicators.length).toBe(1);
+      expect(indicators[0]?.status).toBe('warning');
+      expect(indicators[0]?.color).toBe('yellow');
+      expect(indicators[0]?.message).toContain('Warning');
+    });
+
+    it('should generate fail indicators for high scores', () => {
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 65, passed: false, confidence: 80, processingTimeMs: 50 },
+      ];
+
+      const indicators = service.generatePassFailIndicators(results, 50, 40);
+
+      expect(indicators.length).toBe(1);
+      expect(indicators[0]?.status).toBe('fail');
+      expect(indicators[0]?.color).toBe('red');
+      expect(indicators[0]?.message).toContain('Failed');
+    });
+
+    it('should handle multiple providers', () => {
+      const results: DetectionResult[] = [
+        { provider: 'gptzero', score: 30, passed: true, confidence: 80, processingTimeMs: 100 },
+        { provider: 'originality', score: 55, passed: false, confidence: 75, processingTimeMs: 150 },
+        { provider: 'internal', score: 42, passed: true, confidence: 60, processingTimeMs: 50 },
+      ];
+
+      const indicators = service.generatePassFailIndicators(results, 50, 40);
+
+      expect(indicators.length).toBe(3);
+      expect(indicators.filter(i => i.status === 'pass').length).toBe(1);
+      expect(indicators.filter(i => i.status === 'warning').length).toBe(1);
+      expect(indicators.filter(i => i.status === 'fail').length).toBe(1);
+    });
+  });
+
+  describe('generateImprovementSuggestions()', () => {
+    it('should suggest sentence variation for low burstiness', () => {
+      // Text with uniform sentence lengths
+      const uniformText = 'This is a sentence. This is another one. This is yet another. This is one more here.';
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 60, passed: false, confidence: 70, processingTimeMs: 50 },
+      ];
+
+      const suggestions = service.generateImprovementSuggestions(uniformText, results, 50);
+
+      const sentenceVariationSuggestion = suggestions.find(s => s.type === 'sentence_variation');
+      expect(sentenceVariationSuggestion).toBeDefined();
+      expect(sentenceVariationSuggestion?.action).toContain('sentence');
+    });
+
+    it('should suggest vocabulary diversity for low perplexity', () => {
+      // Repetitive text
+      const repetitiveText = 'The cat sat. The cat ran. The cat jumped. The cat slept. The cat ate.';
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 65, passed: false, confidence: 70, processingTimeMs: 50 },
+      ];
+
+      const suggestions = service.generateImprovementSuggestions(repetitiveText, results, 50);
+
+      expect(suggestions.length).toBeGreaterThan(0);
+      // Should have some vocabulary-related suggestion
+      const vocabSuggestion = suggestions.find(s => s.type === 'vocabulary');
+      if (vocabSuggestion) {
+        expect(vocabSuggestion.action).toBeDefined();
+      }
+    });
+
+    it('should prioritize suggestions correctly', () => {
+      const text = 'Simple test text for suggestion priority testing.';
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 70, passed: false, confidence: 70, processingTimeMs: 50 },
+      ];
+
+      const suggestions = service.generateImprovementSuggestions(text, results, 50);
+
+      // Suggestions should be sorted by priority
+      for (let i = 1; i < suggestions.length; i++) {
+        const prev = suggestions[i - 1];
+        const curr = suggestions[i];
+        if (prev && curr) {
+          expect(prev.priority).toBeLessThanOrEqual(curr.priority);
+        }
+      }
+    });
+
+    it('should include expected improvement estimates', () => {
+      const text = 'Test text for improvement estimation.';
+      const results: DetectionResult[] = [
+        { provider: 'internal', score: 60, passed: false, confidence: 70, processingTimeMs: 50 },
+      ];
+
+      const suggestions = service.generateImprovementSuggestions(text, results, 50);
+
+      suggestions.forEach(suggestion => {
+        expect(suggestion.expectedImprovement).toBeGreaterThanOrEqual(0);
+        expect(suggestion.expectedImprovement).toBeLessThanOrEqual(20);
+      });
+    });
+  });
+
+  describe('reprocessForLowerScore()', () => {
+    it('should attempt re-processing with transform function', async () => {
+      let transformCalled = false;
+      const mockTransform = async (text: string, _level: number): Promise<string> => {
+        transformCalled = true;
+        // Simulate transformation by adding variation
+        return text + ' This adds some variation. Short. And a longer sentence with more words.';
+      };
+
+      const result = await service.reprocessForLowerScore(
+        {
+          originalText: 'Simple test text.',
+          currentScore: 60,
+          targetScore: 50,
+          humanizationLevel: 3,
+          maxAttempts: 1,
+          timeoutPerAttempt: 5000,
+        },
+        mockTransform
+      );
+
+      expect(transformCalled).toBe(true);
+      expect(result.attemptsMade).toBeGreaterThanOrEqual(1);
+      expect(result.totalProcessingTimeMs).toBeGreaterThan(0);
+    });
+
+    it('should track score improvement', async () => {
+      const mockTransform = async (text: string): Promise<string> => {
+        return text + ' Added variation here. Short. And longer sentences with more complexity and variation.';
+      };
+
+      const result = await service.reprocessForLowerScore(
+        {
+          originalText: 'Test text.',
+          currentScore: 70,
+          targetScore: 50,
+          humanizationLevel: 4,
+          maxAttempts: 2,
+          timeoutPerAttempt: 5000,
+        },
+        mockTransform
+      );
+
+      expect(result.newScore).toBeDefined();
+      expect(result.scoreImprovement).toBeDefined();
+      // Score improvement = original - new (positive means improvement)
+      expect(result.scoreImprovement).toBe(70 - result.newScore);
+    });
+
+    it('should respect max attempts', async () => {
+      const mockTransform = async (text: string): Promise<string> => text;
+
+      const result = await service.reprocessForLowerScore(
+        {
+          originalText: 'Test text.',
+          currentScore: 80,
+          targetScore: 30, // Very low target, unlikely to achieve
+          humanizationLevel: 3,
+          maxAttempts: 2,
+          timeoutPerAttempt: 5000,
+        },
+        mockTransform
+      );
+
+      expect(result.attemptsMade).toBeLessThanOrEqual(2);
+    });
+
+    it('should generate suggestions when failing to achieve target', async () => {
+      const mockTransform = async (text: string): Promise<string> => text;
+
+      const result = await service.reprocessForLowerScore(
+        {
+          originalText: 'Test text.',
+          currentScore: 80,
+          targetScore: 20, // Very low target
+          humanizationLevel: 5,
+          maxAttempts: 1,
+          timeoutPerAttempt: 5000,
+        },
+        mockTransform
+      );
+
+      if (!result.success) {
+        expect(result.suggestions).toBeDefined();
+        expect(result.error).toBeDefined();
+      }
+    });
+  });
+
+  describe('oneClickReprocess()', () => {
+    it('should use recommended level based on current score', async () => {
+      let usedLevel = 0;
+      const mockTransform = async (text: string, level: number): Promise<string> => {
+        usedLevel = level;
+        return text + ' Added variation.';
+      };
+
+      await service.oneClickReprocess('Test text.', 70, mockTransform);
+
+      // For score 70 (20 points above 50 threshold), should use level 4 or 5
+      expect(usedLevel).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should target score below threshold', async () => {
+      const mockTransform = async (text: string): Promise<string> => {
+        return text + ' Short. And a much longer sentence with lots of variation and complexity.';
+      };
+
+      const result = await service.oneClickReprocess('Test text.', 60, mockTransform);
+
+      // Should attempt to get below 45 (50 - 5)
+      expect(result.attemptsMade).toBeGreaterThanOrEqual(1);
+    });
+  });
+});

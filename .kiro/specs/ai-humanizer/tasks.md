@@ -374,7 +374,9 @@ npx vitest run --reporter=verbose
   - **Git Commit:** `git add .; git commit -m "feat(detection): implement detection service with GPTZero, Originality.ai, and Turnitin integrations"`
   - _Requirements: 26, 52_
 
-- [-] 13. Build multi-detector comparison
+- [x] 13. Build multi-detector comparison
+
+
 
 
 
@@ -385,7 +387,10 @@ npx vitest run --reporter=verbose
   - **Git Commit:** `git add .; git commit -m "feat(detection): implement multi-detector comparison with discrepancy highlighting"`
   - _Requirements: 52_
 
-- [ ] 14. Implement detection testing workflow
+- [-] 14. Implement detection testing workflow
+
+
+
   - Add one-click re-processing for high scores
   - Build detection score improvement suggestions
   - Create pass/fail indicators

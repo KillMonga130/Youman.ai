@@ -29,6 +29,12 @@ import {
   HistoricalTrendReport,
   DetectorPrioritySuggestion,
   MultiDetectorComparisonResult,
+  PassFailIndicator,
+  ImprovementSuggestion,
+  ReprocessRequest,
+  ReprocessResult,
+  DetectionTestResult,
+  DetectionTestOptions,
 } from './types';
 
 /** Default timeout for detection requests (15 seconds per Requirement 26.4) */
@@ -951,6 +957,411 @@ export class DetectionService {
       default:
         return { enabled: false, timeout: this.config.defaultTimeout };
     }
+  }
+
+  /**
+   * Runs detection tests with pass/fail indicators and improvement suggestions
+   * Requirement 26.2: Display individual scores with pass/fail indicators
+   * Requirement 26.3: Suggest specific areas to re-humanize
+   * Requirement 26.4: Complete all detection tests within 15 seconds
+   */
+  async runDetectionTest(
+    text: string,
+    options?: DetectionTestOptions
+  ): Promise<DetectionTestResult> {
+    const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
+    const passThreshold = options?.passThreshold ?? DEFAULT_PASS_THRESHOLD;
+    const warningThreshold = options?.warningThreshold ?? 40;
+    const generateSuggestions = options?.generateSuggestions ?? true;
+    const includeReprocessingRecommendation = options?.includeReprocessingRecommendation ?? true;
+
+    const timedOutProviders: DetectionProvider[] = [];
+    let timedOut = false;
+
+    // Run detection with timeout
+    const detectionOptions: DetectionOptions = {
+      timeout,
+      passThreshold,
+      useFallback: true,
+      parallel: true,
+    };
+    if (options?.providers) {
+      detectionOptions.providers = options.providers;
+    }
+    const aggregatedResult = await this.detect(text, detectionOptions);
+
+    // Check if we exceeded the 15-second timeout
+    if (aggregatedResult.totalProcessingTimeMs > timeout) {
+      timedOut = true;
+      logger.warn(`Detection tests exceeded ${timeout}ms timeout`);
+    }
+
+    // Track providers that timed out (those that were unavailable)
+    timedOutProviders.push(...aggregatedResult.unavailableProviders);
+
+    // Generate pass/fail indicators
+    const passFailIndicators = this.generatePassFailIndicators(
+      aggregatedResult.results,
+      passThreshold,
+      warningThreshold
+    );
+
+    // Determine overall status
+    const { overallStatus, statusMessage } = this.determineOverallStatus(
+      passFailIndicators,
+      aggregatedResult.overallPassed
+    );
+
+    // Generate improvement suggestions if needed
+    let suggestions: ImprovementSuggestion[] = [];
+    if (generateSuggestions && overallStatus !== 'pass') {
+      suggestions = this.generateImprovementSuggestions(
+        text,
+        aggregatedResult.results,
+        passThreshold
+      );
+    }
+
+    // Determine if re-processing is recommended
+    let reprocessingRecommended = false;
+    let recommendedLevel: number | undefined;
+
+    if (includeReprocessingRecommendation && overallStatus !== 'pass') {
+      const recommendation = this.calculateReprocessingRecommendation(
+        aggregatedResult.averageScore,
+        passThreshold
+      );
+      reprocessingRecommended = recommendation.recommended;
+      recommendedLevel = recommendation.level;
+    }
+
+    return {
+      aggregatedResult,
+      passFailIndicators,
+      overallStatus,
+      statusMessage,
+      suggestions,
+      reprocessingRecommended,
+      recommendedLevel,
+      timedOut,
+      timedOutProviders,
+    };
+  }
+
+  /**
+   * Generates pass/fail indicators for each detection result
+   * Requirement 26.2: Display individual scores with pass/fail indicators
+   */
+  generatePassFailIndicators(
+    results: DetectionResult[],
+    passThreshold: number,
+    warningThreshold: number
+  ): PassFailIndicator[] {
+    return results.map(result => {
+      let status: 'pass' | 'fail' | 'warning';
+      let color: 'green' | 'yellow' | 'red';
+      let message: string;
+
+      if (result.score < warningThreshold) {
+        status = 'pass';
+        color = 'green';
+        message = `Passed: Score ${result.score}% is below warning threshold`;
+      } else if (result.score < passThreshold) {
+        status = 'warning';
+        color = 'yellow';
+        message = `Warning: Score ${result.score}% is approaching threshold`;
+      } else {
+        status = 'fail';
+        color = 'red';
+        message = `Failed: Score ${result.score}% exceeds threshold of ${passThreshold}%`;
+      }
+
+      return {
+        provider: result.provider,
+        score: result.score,
+        status,
+        message,
+        color,
+        threshold: passThreshold,
+      };
+    });
+  }
+
+  /**
+   * Determines overall pass/fail status from indicators
+   */
+  private determineOverallStatus(
+    indicators: PassFailIndicator[],
+    overallPassed: boolean
+  ): { overallStatus: 'pass' | 'fail' | 'partial'; statusMessage: string } {
+    if (indicators.length === 0) {
+      return {
+        overallStatus: 'pass',
+        statusMessage: 'No detection results available',
+      };
+    }
+
+    const passCount = indicators.filter(i => i.status === 'pass').length;
+    const failCount = indicators.filter(i => i.status === 'fail').length;
+    const warningCount = indicators.filter(i => i.status === 'warning').length;
+
+    if (failCount === 0 && warningCount === 0) {
+      return {
+        overallStatus: 'pass',
+        statusMessage: `All ${passCount} detectors passed. Content appears human-written.`,
+      };
+    }
+
+    if (failCount === 0 && warningCount > 0) {
+      return {
+        overallStatus: 'partial',
+        statusMessage: `${passCount} passed, ${warningCount} warnings. Consider minor adjustments.`,
+      };
+    }
+
+    if (overallPassed) {
+      return {
+        overallStatus: 'partial',
+        statusMessage: `${passCount} passed, ${failCount} failed. Majority passed but some detectors flagged content.`,
+      };
+    }
+
+    return {
+      overallStatus: 'fail',
+      statusMessage: `${failCount} of ${indicators.length} detectors failed. Re-processing recommended.`,
+    };
+  }
+
+  /**
+   * Generates improvement suggestions based on detection results
+   * Requirement 26.3: Suggest specific areas to re-humanize
+   */
+  generateImprovementSuggestions(
+    text: string,
+    results: DetectionResult[],
+    passThreshold: number
+  ): ImprovementSuggestion[] {
+    const suggestions: ImprovementSuggestion[] = [];
+    const metrics = calculateMetrics(text);
+    const avgScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+    const scoreGap = avgScore - passThreshold;
+
+    // Analyze metrics and generate targeted suggestions
+    
+    // Burstiness suggestion
+    if (metrics.burstiness < 0.6) {
+      suggestions.push({
+        type: 'sentence_variation',
+        priority: 1,
+        description: 'Increase sentence length variation',
+        expectedImprovement: Math.min(15, scoreGap * 0.3),
+        action: 'Mix short, medium, and long sentences. Add some very short sentences (2-4 words) and longer complex sentences.',
+        affectedAreas: ['sentence structure'],
+      });
+    }
+
+    // Perplexity suggestion
+    if (metrics.perplexity < 40) {
+      suggestions.push({
+        type: 'vocabulary',
+        priority: 2,
+        description: 'Increase vocabulary diversity',
+        expectedImprovement: Math.min(12, scoreGap * 0.25),
+        action: 'Use more varied word choices, synonyms, and less predictable phrasing.',
+        affectedAreas: ['word choice'],
+      });
+    }
+
+    // Sentence length variation suggestion
+    if (metrics.sentenceLengthStdDev < 8) {
+      suggestions.push({
+        type: 'structure',
+        priority: 3,
+        description: 'Vary sentence structure more',
+        expectedImprovement: Math.min(10, scoreGap * 0.2),
+        action: 'Include a mix of simple, compound, and complex sentences. Vary paragraph lengths.',
+        affectedAreas: ['paragraph structure', 'sentence structure'],
+      });
+    }
+
+    // Lexical diversity suggestion
+    if (metrics.lexicalDiversity < 0.5) {
+      suggestions.push({
+        type: 'vocabulary',
+        priority: 4,
+        description: 'Reduce word repetition',
+        expectedImprovement: Math.min(8, scoreGap * 0.15),
+        action: 'Avoid repeating the same words. Use pronouns, synonyms, and varied references.',
+        affectedAreas: ['word choice'],
+      });
+    }
+
+    // General tone suggestion if score is very high
+    if (avgScore > 70) {
+      suggestions.push({
+        type: 'tone',
+        priority: 5,
+        description: 'Add more natural, conversational elements',
+        expectedImprovement: Math.min(10, scoreGap * 0.2),
+        action: 'Include contractions, colloquialisms, or rhetorical questions where appropriate.',
+        affectedAreas: ['overall tone'],
+      });
+    }
+
+    // General suggestion if no specific issues found
+    if (suggestions.length === 0 && avgScore > passThreshold) {
+      suggestions.push({
+        type: 'general',
+        priority: 1,
+        description: 'Apply higher humanization level',
+        expectedImprovement: Math.min(20, scoreGap * 0.4),
+        action: 'Re-process with a higher humanization level (4 or 5) for more aggressive transformation.',
+        affectedAreas: ['entire document'],
+      });
+    }
+
+    // Sort by priority
+    return suggestions.sort((a, b) => a.priority - b.priority);
+  }
+
+  /**
+   * Calculates re-processing recommendation based on score
+   * Requirement 26.3: One-click re-processing for high scores
+   */
+  private calculateReprocessingRecommendation(
+    averageScore: number,
+    passThreshold: number
+  ): { recommended: boolean; level: number } {
+    if (averageScore < passThreshold) {
+      return { recommended: false, level: 3 };
+    }
+
+    // Calculate recommended level based on how far above threshold
+    const scoreGap = averageScore - passThreshold;
+    let recommendedLevel: number;
+
+    if (scoreGap <= 10) {
+      recommendedLevel = 3; // Moderate transformation
+    } else if (scoreGap <= 20) {
+      recommendedLevel = 4; // Higher transformation
+    } else {
+      recommendedLevel = 5; // Maximum transformation
+    }
+
+    return {
+      recommended: true,
+      level: recommendedLevel,
+    };
+  }
+
+  /**
+   * Re-processes text to achieve lower detection score
+   * Requirement 26.3: One-click re-processing for high scores
+   */
+  async reprocessForLowerScore(
+    request: ReprocessRequest,
+    transformFn: (text: string, level: number, strategy?: string) => Promise<string>
+  ): Promise<ReprocessResult> {
+    const startTime = Date.now();
+    const maxAttempts = request.maxAttempts ?? 3;
+    const timeoutPerAttempt = request.timeoutPerAttempt ?? DEFAULT_TIMEOUT;
+
+    let currentText = request.originalText;
+    let currentScore = request.currentScore;
+    let attemptsMade = 0;
+    let lastError: string | undefined;
+
+    while (attemptsMade < maxAttempts && currentScore >= request.targetScore) {
+      attemptsMade++;
+
+      try {
+        // Apply transformation with timeout
+        const transformPromise = transformFn(
+          currentText,
+          request.humanizationLevel,
+          request.strategy
+        );
+
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Transformation timeout')), timeoutPerAttempt);
+        });
+
+        currentText = await Promise.race([transformPromise, timeoutPromise]);
+
+        // Run detection on transformed text
+        const detectionResult = await this.detect(currentText, {
+          timeout: timeoutPerAttempt,
+          passThreshold: request.targetScore,
+          useFallback: true,
+        });
+
+        currentScore = detectionResult.averageScore;
+
+        // If we achieved target, break early
+        if (currentScore < request.targetScore) {
+          break;
+        }
+
+        // Increase humanization level for next attempt
+        request.humanizationLevel = Math.min(5, request.humanizationLevel + 1);
+      } catch (error) {
+        lastError = (error as Error).message;
+        logger.warn(`Re-processing attempt ${attemptsMade} failed: ${lastError}`);
+      }
+    }
+
+    const success = currentScore < request.targetScore;
+    const scoreImprovement = request.currentScore - currentScore;
+
+    // Generate suggestions if still failing
+    let suggestions: ImprovementSuggestion[] | undefined;
+    if (!success) {
+      const detectionResults = await this.detect(currentText, {
+        timeout: timeoutPerAttempt,
+        useFallback: true,
+      });
+      suggestions = this.generateImprovementSuggestions(
+        currentText,
+        detectionResults.results,
+        request.targetScore
+      );
+    }
+
+    return {
+      success,
+      reprocessedText: success ? currentText : undefined,
+      newScore: currentScore,
+      scoreImprovement,
+      attemptsMade,
+      totalProcessingTimeMs: Date.now() - startTime,
+      suggestions,
+      error: success ? undefined : lastError ?? 'Failed to achieve target score',
+    };
+  }
+
+  /**
+   * Quick one-click re-process with default settings
+   * Requirement 26.3: One-click re-processing for high scores
+   */
+  async oneClickReprocess(
+    text: string,
+    currentScore: number,
+    transformFn: (text: string, level: number, strategy?: string) => Promise<string>
+  ): Promise<ReprocessResult> {
+    const recommendation = this.calculateReprocessingRecommendation(currentScore, DEFAULT_PASS_THRESHOLD);
+
+    return this.reprocessForLowerScore(
+      {
+        originalText: text,
+        currentScore,
+        targetScore: DEFAULT_PASS_THRESHOLD - 5, // Target 5 points below threshold
+        humanizationLevel: recommendation.level,
+        strategy: 'auto',
+        maxAttempts: 3,
+        timeoutPerAttempt: DEFAULT_TIMEOUT,
+      },
+      transformFn
+    );
   }
 }
 
