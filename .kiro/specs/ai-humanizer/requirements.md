@@ -15,6 +15,59 @@ The AI Humanizer is a system designed to transform AI-generated text into natura
 - **Perplexity**: A measure of text unpredictability and naturalness
 - **Burstiness**: Variation in sentence length and complexity throughout text
 
+## Development Environment Constraints
+
+### Target Platform: Windows
+
+This project is developed on **Windows** operating system. All shell commands, scripts, and development workflows MUST be Windows-compatible.
+
+### Version Control Requirements
+
+**CRITICAL:** Every feature implementation, bug fix, or significant change MUST include a git commit for traceability and rollback capability.
+
+#### Git Commit Convention
+
+```
+# Commit message format:
+git commit -m "type(scope): description"
+
+# Types:
+# feat     - New feature
+# fix      - Bug fix
+# docs     - Documentation
+# style    - Formatting, no code change
+# refactor - Code restructuring
+# test     - Adding tests
+# chore    - Maintenance tasks
+# perf     - Performance improvements
+
+# Examples:
+git commit -m "feat(auth): implement JWT authentication system"
+git commit -m "test(auth): add property tests for authentication"
+git commit -m "fix(api): resolve rate limiting edge case"
+```
+
+### Path Handling Requirements
+
+All code MUST use cross-platform path handling:
+- Use `path.join()` or `path.resolve()` for file paths
+- Never hardcode Unix-style paths (`/`) in code
+- Use forward slashes (`/`) only for URLs and Docker configurations
+
+### Windows Command Reference
+
+| Operation            | PowerShell Command                         | CMD Command              |
+| -------------------- | ------------------------------------------ | ------------------------ |
+| Install dependencies | `npm install`                              | `npm install`            |
+| Run dev server       | `npm run dev`                              | `npm run dev`            |
+| Run tests            | `npm run test`                             | `npm run test`           |
+| Build project        | `npm run build`                            | `npm run build`          |
+| Start Docker         | `docker-compose up -d`                     | `docker-compose up -d`   |
+| Stop Docker          | `docker-compose down`                      | `docker-compose down`    |
+| Create directory     | `New-Item -ItemType Directory -Path "dir"` | `mkdir dir`              |
+| Remove directory     | `Remove-Item -Recurse -Force "dir"`        | `rmdir /s /q dir`        |
+| Set env variable     | `$env:VAR="value"`                         | `set VAR=value`          |
+
 ## Requirements
 
 ### Requirement 1

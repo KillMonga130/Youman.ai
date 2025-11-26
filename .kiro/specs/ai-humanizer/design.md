@@ -30,24 +30,44 @@ This project is developed on **Windows** operating system. All shell commands, s
 
 ### Git Workflow
 
-Every feature or functionality addition MUST include a git commit for traceability:
+**CRITICAL:** Every feature or functionality addition MUST include a git commit for traceability and rollback capability. This ensures:
+- Version control for all changes
+- Ability to rollback if issues arise
+- Clear audit trail of development progress
+- Easy identification of when bugs were introduced
 
 ```powershell
 # Stage changes
 git add .
 
 # Commit with descriptive message
-git commit -m "feat(component): description of changes"
+git commit -m "type(scope): description"
 
-# Commit message format:
-# feat: new feature
-# fix: bug fix
-# docs: documentation
-# style: formatting
-# refactor: code restructuring
-# test: adding tests
-# chore: maintenance
+# Types:
+# feat     - New feature
+# fix      - Bug fix
+# docs     - Documentation
+# style    - Formatting, no code change
+# refactor - Code restructuring
+# test     - Adding tests
+# chore    - Maintenance tasks
+# perf     - Performance improvements
+
+# Examples:
+git commit -m "feat(auth): implement JWT authentication system"
+git commit -m "test(auth): add property tests for authentication"
+git commit -m "fix(api): resolve rate limiting edge case"
+git commit -m "docs(readme): update setup instructions for Windows"
+git commit -m "feat(database): implement PostgreSQL and MongoDB schemas"
 ```
+
+**Commit Frequency Guidelines:**
+- Commit after completing each logical unit of work
+- Commit after installing new dependencies
+- Commit after creating new schemas/models
+- Commit after implementing services/utilities
+- Commit after writing tests
+- Commit at the end of each task
 
 ### NPM Scripts (Windows Compatible)
 
