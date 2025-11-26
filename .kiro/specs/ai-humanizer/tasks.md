@@ -1,0 +1,745 @@
+# Implementation Plan
+
+This implementation plan breaks down the AI Humanizer into discrete, manageable coding tasks. Each task builds incrementally on previous work, with checkpoints to ensure quality. All context documents (requirements, design) are available during implementation.
+
+## Phase 1: Foundation & Core Infrastructure
+
+- [-] 1. Set up project structure and development environment
+  - Initialize monorepo with TypeScript/Node.js backend and React frontend
+  - Configure ESLint, Prettier, and TypeScript strict mode
+  - Set up Docker and Docker Compose for local development
+  - Configure environment variables and secrets management
+  - _Requirements: 81, 100_
+
+- [ ] 2. Implement database schemas and migrations
+  - Create PostgreSQL schemas for users, projects, versions, transformations tables
+  - Set up MongoDB collections for document storage
+  - Implement database migration system
+  - Create database indexes for performance
+  - _Requirements: 83, 14, 16_
+
+- [ ] 3. Set up authentication and user management
+  - Implement JWT-based authentication system
+  - Create user registration and login endpoints
+  - Implement password hashing with bcrypt
+  - Set up session management with Redis
+  - _Requirements: 14, 84_
+
+- [ ]\* 3.1 Write property test for authentication
+  - **Property 20: API authentication**
+  - **Validates: Requirements 7.1**
+
+- [ ] 4. Implement API Gateway and routing
+  - Set up Express.js API gateway with rate limiting
+  - Implement request routing to microservices
+  - Add request/response logging middleware
+  - Configure CORS and security headers
+  - _Requirements: 7, 81, 84_
+
+- [ ]\* 4.1 Write property test for rate limiting
+  - **Property 22: Rate limiting**
+  - **Validates: Requirements 7.4**
+
+- [ ]\* 4.2 Write property test for API error messages
+  - **Property 23: API error messages**
+  - **Validates: Requirements 7.5**
+
+## Phase 2: Core Transformation Engine
+
+- [ ] 5. Implement text analysis components
+  - Create TextAnalyzer for language detection and content type classification
+  - Implement document structure parsing (chapters, paragraphs, sentences)
+  - Build metrics calculation (perplexity, burstiness, lexical diversity)
+  - Implement protected segment identification
+  - _Requirements: 1, 2, 8, 4_
+
+- [ ]\* 5.1 Write property test for language detection
+  - **Property 24: Language detection**
+  - **Validates: Requirements 8.1, 8.4**
+
+- [ ]\* 5.2 Write property test for unsupported language handling
+  - **Property 26: Unsupported language handling**
+  - **Validates: Requirements 8.3**
+
+- [ ]\* 5.3 Write property test for ambiguous language handling
+  - **Property 27: Ambiguous language handling**
+  - **Validates: Requirements 8.5**
+
+- [ ] 6. Build transformation pipeline core
+  - Implement TransformationPipeline interface
+  - Create chunk processing system for large documents
+  - Build context preservation mechanism across chunks
+  - Implement progress tracking and reporting
+  - _Requirements: 1, 11, 12, 57_
+
+- [ ]\* 6.1 Write property test for input length validation
+  - **Property 1: Input length validation**
+  - **Validates: Requirements 1.1, 1.4**
+
+- [ ]\* 6.2 Write property test for progress reporting
+  - **Property 3: Progress reporting for large documents**
+  - **Validates: Requirements 1.3**
+
+- [ ]\* 6.3 Write property test for format preservation
+  - **Property 4: Format preservation**
+  - **Validates: Requirements 1.5**
+
+- [ ]\* 6.4 Write property test for contextual consistency
+  - **Property 5: Contextual consistency in long documents**
+  - **Validates: Requirements 1.6**
+
+- [ ] 7. Implement transformation strategies
+  - Create CasualStrategy with contractions and colloquialisms
+  - Build ProfessionalStrategy maintaining formality
+  - Implement AcademicStrategy with scholarly patterns
+  - Add automatic strategy selection based on input tone
+  - _Requirements: 6_
+
+- [ ]\* 7.1 Write property test for casual strategy
+  - **Property 16: Casual strategy characteristics**
+  - **Validates: Requirements 6.2**
+
+- [ ]\* 7.2 Write property test for professional strategy
+  - **Property 17: Professional strategy formality**
+  - **Validates: Requirements 6.3**
+
+- [ ]\* 7.3 Write property test for academic strategy
+  - **Property 18: Academic strategy characteristics**
+  - **Validates: Requirements 6.4**
+
+- [ ]\* 7.4 Write property test for automatic strategy selection
+  - **Property 19: Automatic strategy selection**
+  - **Validates: Requirements 6.5**
+
+- [ ] 8. Implement humanization level controls
+  - Create level adjustment system (1-5 scale)
+  - Implement transformation intensity calculation
+  - Build modification percentage tracking
+  - Add level validation
+  - _Requirements: 3_
+
+- [ ]\* 8.1 Write property test for level validation
+  - **Property 9: Humanization level validation**
+  - **Validates: Requirements 3.1**
+
+- [ ]\* 8.2 Write property test for level 1 intensity
+  - **Property 10: Level 1 transformation intensity**
+  - **Validates: Requirements 3.2**
+
+- [ ]\* 8.3 Write property test for level 5 intensity
+  - **Property 11: Level 5 transformation intensity**
+  - **Validates: Requirements 3.3**
+
+- [ ] 9. Build protected segment handling
+  - Implement delimiter parsing for protected segments
+  - Create segment preservation logic
+  - Add validation for protected segment integrity
+  - _Requirements: 4_
+
+- [ ]\* 9.1 Write property test for protected segment preservation
+  - **Property 12: Protected segment preservation**
+  - **Validates: Requirements 4.1, 4.3, 4.4**
+
+- [ ]\* 9.2 Write property test for delimiter parsing
+  - **Property 13: Delimiter parsing**
+  - **Validates: Requirements 4.2**
+
+- [ ] 10. Implement metrics calculation and reporting
+  - Build perplexity score calculator
+  - Create burstiness measurement system
+  - Implement sentence length variation analysis
+  - Add metrics completeness validation
+  - Optimize metrics calculation for performance
+  - _Requirements: 2, 5_
+
+- [ ]\* 10.1 Write property test for burstiness threshold
+  - **Property 6: Burstiness threshold**
+  - **Validates: Requirements 2.1**
+
+- [ ]\* 10.2 Write property test for sentence length variation
+  - **Property 7: Sentence length variation**
+  - **Validates: Requirements 2.3**
+
+- [ ]\* 10.3 Write property test for perplexity range
+  - **Property 8: Perplexity range**
+  - **Validates: Requirements 2.4**
+
+- [ ]\* 10.4 Write property test for metrics completeness
+  - **Property 14: Metrics completeness**
+  - **Validates: Requirements 5.1, 5.2, 5.3, 5.4**
+
+- [ ]\* 10.5 Write property test for metrics performance
+  - **Property 15: Metrics calculation performance**
+  - **Validates: Requirements 5.5**
+
+- [ ] 11. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Phase 3: AI Detection Integration
+
+- [ ] 12. Implement detection service
+  - Create DetectionService with external API integrations
+  - Integrate GPTZero API
+  - Integrate Originality.ai API
+  - Integrate Turnitin API
+  - Build internal detection model as fallback
+  - Implement detection score aggregation
+  - _Requirements: 26, 52_
+
+- [ ] 13. Build multi-detector comparison
+  - Create comparison matrix display
+  - Implement discrepancy highlighting
+  - Add historical trend tracking
+  - Build detector priority suggestions
+  - _Requirements: 52_
+
+- [ ] 14. Implement detection testing workflow
+  - Add one-click re-processing for high scores
+  - Build detection score improvement suggestions
+  - Create pass/fail indicators
+  - Implement 15-second timeout for detection tests
+  - _Requirements: 26_
+
+## Phase 4: Project Management & Storage
+
+- [ ] 15. Implement project CRUD operations
+  - Create project creation endpoint
+  - Build project listing with filtering
+  - Implement project update functionality
+  - Add project deletion with confirmation
+  - Create project metadata management
+  - _Requirements: 14, 15_
+
+- [ ] 16. Build version control system
+  - Implement version creation and storage
+  - Create version history display
+  - Build version comparison (diff view)
+  - Add version restoration capability
+  - Implement auto-save every 2 minutes
+  - _Requirements: 16, 102_
+
+- [ ] 17. Implement branching system
+  - Create branch creation from any version
+  - Build visual branch tree display
+  - Implement branch switching
+  - Add branch merging with conflict resolution
+  - Create branch comparison tools
+  - _Requirements: 56_
+
+- [ ] 18. Build document storage system
+  - Implement S3-compatible storage for documents
+  - Create MongoDB document schema
+  - Build chunk storage and retrieval
+  - Add content hash calculation for deduplication
+  - Implement storage quota tracking
+  - _Requirements: 12, 15, 63_
+
+## Phase 5: Collaboration Features
+
+- [ ] 19. Implement collaboration service
+  - Create invitation system with email notifications
+  - Build permission management (viewer, editor, admin)
+  - Implement role-based access control
+  - Add activity logging for team actions
+  - Create collaborator management UI
+  - _Requirements: 21_
+
+- [ ] 20. Build real-time collaboration
+  - Implement WebSocket server for real-time updates
+  - Create operational transformation for conflict resolution
+  - Build cursor position broadcasting
+  - Add active user display
+  - Implement change synchronization within 200ms
+  - Handle offline mode with local queuing
+  - _Requirements: 43_
+
+## Phase 6: Subscription & Billing
+
+- [ ] 21. Implement subscription management
+  - Integrate Stripe payment processing
+  - Create subscription tier enforcement
+  - Build usage tracking system
+  - Implement quota checking
+  - Add upgrade/downgrade flows
+  - Create billing dashboard
+  - _Requirements: 20, 86_
+
+- [ ] 22. Build usage metering
+  - Track words processed per user
+  - Monitor API call counts
+  - Measure storage usage
+  - Implement monthly quota resets
+  - Create usage statistics display
+  - _Requirements: 20, 66, 80_
+
+- [ ] 23. Implement invoice generation
+  - Create automated invoice generation
+  - Build invoice email delivery
+  - Add payment retry logic
+  - Implement refund processing
+  - Generate revenue analytics (MRR, churn, LTV)
+  - _Requirements: 86_
+
+## Phase 7: Advanced Features
+
+- [ ] 24. Implement SEO preservation
+  - Create keyword extraction system
+  - Build keyword density validation
+  - Implement meta tag preservation
+  - Add heading hierarchy maintenance
+  - Preserve link structures and anchor text
+  - _Requirements: 27_
+
+- [ ] 25. Build plagiarism detection
+  - Integrate plagiarism checking APIs
+  - Create match highlighting system
+  - Implement rephrasing suggestions
+  - Generate originality reports
+  - Add plagiarism-free certificates for premium users
+  - _Requirements: 31, 118_
+
+- [ ] 26. Implement tone and sentiment analysis
+  - Build sentiment analysis engine
+  - Create tone adjustment system
+  - Implement emotional dimension detection
+  - Add tone consistency validation
+  - Build sentiment targeting controls
+  - _Requirements: 32, 47, 108, 116_
+
+- [ ] 27. Build citation management
+  - Implement citation format detection (APA, MLA, Chicago, Harvard)
+  - Create citation preservation system
+  - Add bibliography validation
+  - Implement citation standardization
+  - Preserve DOIs and URLs
+  - _Requirements: 33_
+
+- [ ] 28. Implement A/B testing
+  - Create variation generation system
+  - Build side-by-side comparison display
+  - Implement performance tracking
+  - Add winner selection analytics
+  - Create test result reports
+  - _Requirements: 34, 121_
+
+- [ ] 29. Build scheduling and automation
+  - Implement recurring schedule creation
+  - Create automated content import
+  - Build email notification system
+  - Add retry logic for failed jobs
+  - Display upcoming scheduled tasks
+  - _Requirements: 35_
+
+- [ ] 30. Implement template system
+  - Create pre-configured templates for common use cases
+  - Build custom template creation
+  - Implement template sharing and import/export
+  - Add template application with override capability
+  - _Requirements: 25_
+
+- [ ] 31. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Phase 8: Cloud Integration & Extensions
+
+- [ ] 32. Implement cloud storage integration
+  - Integrate Google Drive OAuth and file operations
+  - Add Dropbox integration
+  - Implement OneDrive integration
+  - Create cloud file browser
+  - Build automatic project backup to cloud
+  - _Requirements: 22_
+
+- [ ] 33. Build webhook system
+  - Create webhook registration
+  - Implement webhook delivery with retry logic
+  - Add HMAC signature verification
+  - Build webhook event filtering
+  - Create webhook logs and monitoring
+  - _Requirements: 51_
+
+- [ ] 34. Implement learning profile system
+  - Create feedback recording system
+  - Build preference learning algorithm
+  - Implement personalized recommendations
+  - Add profile reset capability
+  - Apply learned preferences automatically
+  - _Requirements: 28_
+
+- [ ] 35. Build content analysis suite
+  - Implement writing style analysis
+  - Create gap analysis system
+  - Build audience analysis
+  - Add competitive analysis
+  - Implement performance prediction
+  - Create credibility assessment
+  - Add controversy detection
+  - Build freshness optimization
+  - _Requirements: 54, 62, 122-130_
+
+## Phase 9: Compliance & Security
+
+- [ ] 36. Implement compliance checking
+  - Create HIPAA compliance validator
+  - Build GDPR compliance checker
+  - Add FERPA compliance validation
+  - Implement SEC financial content checker
+  - Generate compliance certification documents
+  - _Requirements: 58, 115_
+
+- [ ] 37. Build multi-factor authentication
+  - Implement SMS-based MFA
+  - Add authenticator app support
+  - Create hardware key integration
+  - Generate backup codes
+  - Build device management
+  - Implement suspicious login detection
+  - _Requirements: 74_
+
+- [ ] 38. Implement content expiration
+  - Create expiration date setting
+  - Build reminder notification system (7, 3, 1 days)
+  - Implement automatic deletion
+  - Add expiration extension capability
+  - _Requirements: 75_
+
+- [ ] 39. Build watermarking system
+  - Implement invisible watermark embedding
+  - Create watermark detection tool
+  - Add watermark configuration
+  - Build watermark verification
+  - Ensure watermarks don't affect detection scores
+  - _Requirements: 76_
+
+- [ ] 40. Implement data retention policies
+  - Create retention policy configuration
+  - Build automatic deletion scheduler
+  - Add archival system
+  - Implement deletion notifications
+  - Create audit logs for deletions
+  - _Requirements: 63_
+
+## Phase 10: Additional Transformation Features
+
+- [ ] 41. Implement grammar style preferences
+  - Create Oxford comma preference handling
+  - Build quote style configuration (single/double)
+  - Add date and number format preferences
+  - Implement regional variant support (US, UK, CA, AU)
+  - _Requirements: 103_
+
+- [ ] 42. Build content anonymization
+  - Implement PII detection (names, emails, phones, addresses)
+  - Create realistic replacement generation
+  - Build de-anonymization mapping
+  - Add HIPAA-compliant medical record anonymization
+  - _Requirements: 104_
+
+- [ ] 43. Implement content enrichment
+  - Create opportunity identification for examples/data
+  - Build citation addition system
+  - Implement statistics insertion with verification
+  - Add content marking for user review
+  - _Requirements: 105_
+
+- [ ] 44. Build content simplification
+  - Implement jargon replacement
+  - Create sentence simplification
+  - Add inline definitions
+  - Build reading level targeting
+  - _Requirements: 106_
+
+- [ ] 45. Implement content formalization
+  - Create contraction expansion
+  - Build slang replacement
+  - Implement sentence restructuring for sophistication
+  - Add hedging language for academic writing
+  - _Requirements: 107_
+
+- [ ] 46. Build content repurposing
+  - Implement platform-specific formatting (Twitter, LinkedIn, Facebook, Medium)
+  - Create length adjustment for platform limits
+  - Build tone adaptation for different channels
+  - Add hashtag and formatting rule enforcement
+  - _Requirements: 109_
+
+- [ ] 47. Implement fact-checking
+  - Create factual claim verification against sources
+  - Build inaccuracy flagging
+  - Add correction suggestions with citations
+  - Generate verification reports with confidence scores
+  - _Requirements: 110_
+
+- [ ] 48. Build content localization
+  - Implement idiom and metaphor adaptation
+  - Create cultural reference localization
+  - Add unit and currency conversion
+  - Build cultural sensitivity checking
+  - Generate cultural appropriateness scores
+  - _Requirements: 111_
+
+- [ ] 49. Implement translation integration
+  - Create translation service integration
+  - Build batch translation to multiple languages
+  - Implement translation with humanization
+  - Add translation quality assessment
+  - _Requirements: 77_
+
+- [ ] 50. Build summarization service
+  - Implement extractive summarization
+  - Create abstractive summarization
+  - Add length control (short, medium, long)
+  - Build humanization for summaries
+  - _Requirements: 78_
+
+- [ ] 51. Implement content expansion
+  - Create outline expansion system
+  - Build bullet point elaboration
+  - Implement coherence maintenance
+  - Add expansion level control
+  - _Requirements: 79_
+
+- [ ] 52. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Phase 11: User Interface
+
+- [ ] 53. Build web application frontend
+  - Create React application with TypeScript
+  - Implement responsive design (desktop, tablet, mobile)
+  - Build dashboard with project list and quick stats
+  - Create editor interface with split-pane view
+  - Implement comparison view with diff highlighting
+  - Add settings panel
+  - _Requirements: 15, 10, 17_
+
+- [ ] 54. Implement UI design system
+  - Create color palette (NO PURPLE - use blue, gray, green, amber, red, teal)
+  - Build typography system (Inter font family)
+  - Implement component library
+  - Add dark mode support
+  - Ensure WCAG AAA accessibility compliance
+  - _Requirements: 65, 112_
+
+- [ ] 55. Build drag-and-drop file upload
+  - Implement file upload component
+  - Add format validation (DOCX, PDF, TXT, EPUB)
+  - Create progress bar with time estimation
+  - Build download buttons for multiple formats
+  - _Requirements: 15_
+
+- [ ] 56. Implement keyboard shortcuts
+  - Create shortcut system for common actions
+  - Build customizable key bindings
+  - Add visual feedback for shortcuts
+  - Create shortcut reference guide
+  - Ensure full keyboard accessibility
+  - _Requirements: 64_
+
+- [ ] 57. Build search and filtering
+  - Implement full-text search across projects
+  - Create advanced filtering (date, word count, level, strategy, status, tags)
+  - Add saved searches
+  - Build search result highlighting
+  - Implement sorting options
+  - _Requirements: 61_
+
+- [ ] 58. Implement bulk operations
+  - Create multi-select for projects
+  - Build bulk actions (delete, export, archive, re-process)
+  - Add progress tracking for bulk operations
+  - Create summary reports
+  - Generate ZIP archives for bulk export
+  - _Requirements: 55_
+
+## Phase 12: Admin & Monitoring
+
+- [ ] 59. Build admin panel
+  - Create system metrics dashboard
+  - Implement user activity monitoring
+  - Add error log viewing
+  - Build performance tracking
+  - Create alert configuration
+  - _Requirements: 19_
+
+- [ ] 60. Implement logging and monitoring
+  - Set up structured logging with ELK stack
+  - Create distributed tracing with Jaeger
+  - Build custom metrics with Prometheus/Grafana
+  - Implement alerting via email, Slack, PagerDuty
+  - Add automatic diagnostic report generation
+  - _Requirements: 82_
+
+- [ ] 61. Build support and diagnostics tools
+  - Implement user impersonation with audit logging
+  - Create error context capture
+  - Build request inspection tools
+  - Add operation retry capability
+  - Generate diagnostic reports
+  - _Requirements: 94_
+
+## Phase 13: Infrastructure & DevOps
+
+- [ ] 62. Set up Kubernetes deployment
+  - Create Kubernetes manifests for all services
+  - Implement service discovery
+  - Build health check endpoints
+  - Add horizontal pod autoscaling
+  - Configure resource limits
+  - _Requirements: 81, 91_
+
+- [ ] 63. Implement CI/CD pipeline
+  - Set up GitHub Actions workflows
+  - Create automated testing pipeline
+  - Build Docker image creation
+  - Implement blue-green deployment
+  - Add automated rollback on failure
+  - _Requirements: 93, 100_
+
+- [ ] 64. Build auto-scaling system
+  - Implement CPU and memory-based scaling
+  - Create queue depth monitoring
+  - Add predictive scaling
+  - Build cost optimization
+  - Configure scaling policies
+  - _Requirements: 91_
+
+- [ ] 65. Implement disaster recovery
+  - Create automated backup system
+  - Build point-in-time recovery
+  - Implement cross-region replication
+  - Add failover automation
+  - Create recovery testing procedures
+  - _Requirements: 92_
+
+- [ ] 66. Set up CDN and caching
+  - Configure CloudFront CDN
+  - Implement multi-level caching strategy
+  - Build cache invalidation system
+  - Add geo-routing
+  - Configure cache TTLs
+  - _Requirements: 90_
+
+## Phase 14: Advanced Services
+
+- [ ] 67. Implement feature flag system
+  - Create experiment management
+  - Build user bucketing
+  - Implement conversion tracking
+  - Add statistical analysis
+  - Create percentage-based rollouts
+  - _Requirements: 87_
+
+- [ ] 68. Build ML model management
+  - Implement model versioning
+  - Create blue-green model deployment
+  - Build performance tracking
+  - Add model drift detection
+  - Implement A/B testing for models
+  - _Requirements: 88_
+
+- [ ] 69. Implement data pipeline
+  - Create ETL pipeline system
+  - Build data quality validation
+  - Implement batch processing
+  - Add failed job handling
+  - Create pipeline scheduling
+  - _Requirements: 89_
+
+- [ ] 70. Build cost management
+  - Implement cost tracking by service
+  - Create cost allocation reports
+  - Build cost forecasting
+  - Add budget alerts
+  - Generate optimization recommendations
+  - _Requirements: 99_
+
+- [ ] 71. Implement legal and compliance
+  - Create terms of service acceptance tracking
+  - Build consent management
+  - Implement DMCA request handling
+  - Add license validation
+  - Create export control enforcement
+  - _Requirements: 95_
+
+- [ ] 72. Build customer success tools
+  - Implement onboarding tracking
+  - Create engagement metrics
+  - Build churn risk identification
+  - Add retention campaign triggers
+  - Implement NPS collection
+  - Create milestone celebrations
+  - _Requirements: 96_
+
+- [ ] 73. Implement content moderation
+  - Create content scanning system
+  - Build flagging and review workflow
+  - Implement policy enforcement
+  - Add appeal handling
+  - Create coordinated abuse detection
+  - _Requirements: 97_
+
+- [ ] 74. Build partner integration framework
+  - Implement OAuth 2.0 for partners
+  - Create webhook system for partners
+  - Build GraphQL API
+  - Add API key management
+  - Create partner certification program
+  - Implement marketplace
+  - _Requirements: 98_
+
+- [ ] 75. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Phase 15: Polish & Optimization
+
+- [ ] 76. Implement accessibility features
+  - Add screen reader support with ARIA labels
+  - Create high contrast mode
+  - Implement font size adjustment
+  - Add color blindness modes
+  - Ensure keyboard-only navigation
+  - _Requirements: 65, 112_
+
+- [ ] 77. Build onboarding and tutorials
+  - Create contextual tooltips
+  - Build interactive tutorials
+  - Implement struggle detection
+  - Add video walkthroughs
+  - Create progress tracking
+  - _Requirements: 59_
+
+- [ ] 78. Implement white-label capabilities
+  - Create branding customization
+  - Build custom domain support
+  - Implement branded reports
+  - Add logo and color customization
+  - Remove default branding
+  - _Requirements: 60_
+
+- [ ] 79. Build performance optimization
+  - Implement query optimization
+  - Add connection pooling
+  - Create materialized views
+  - Build model quantization
+  - Implement request batching
+  - _Requirements: 70_
+
+- [ ] 80. Create comprehensive documentation
+  - Write API documentation with examples
+  - Create user guides
+  - Build developer documentation
+  - Add troubleshooting guides
+  - Create video tutorials
+  - _Requirements: 23, 59_
+
+- [ ] 81. Final integration testing and bug fixes
+  - Run end-to-end test suite
+  - Perform load testing with 10,000 concurrent users
+  - Execute security penetration testing
+  - Verify GDPR, HIPAA, SOC 2 compliance
+  - Fix all critical and high-priority bugs
+  - _Requirements: All_
+
+- [ ] 82. Final Checkpoint - Production readiness verification
+  - Ensure all tests pass, ask the user if questions arise.

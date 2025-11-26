@@ -1,0 +1,98 @@
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ai_humanizer
+      - MONGODB_URI=mongodb://mongodb:27017/ai_humanizer
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-development-secret-change-in-production}
+      - CORS_ORIGINS=http://localhost:3000
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+    volumes:
+      - ./packages/backend/src:/app/src
+      - /app/node_modules
+    networks:
+      - ai-humanizer-network
+
+  # Frontend Web Application
+  frontend:
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+    volumes:
+      - ./packages/frontend/src:/app/src
+      - /app/node_modules
+    networks:
+      - ai-humanizer-network
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=ai_humanizer
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ai-humanizer-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB Database
+  mongodb:
+    image: mongo:7-jammy
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ai-humanizer-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-humanizer-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  redis_data:
+
+networks:
+  ai-humanizer-network:
+    driver: bridge

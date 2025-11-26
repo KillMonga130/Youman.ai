@@ -1,0 +1,85 @@
+import dotenv from 'dotenv';
+import { z } from 'zod';
+
+dotenv.config();
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  PORT: z.string().transform(Number).default('3001'),
+
+  // Database
+  DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/ai_humanizer'),
+  MONGODB_URI: z.string().default('mongodb://localhost:27017/ai_humanizer'),
+  REDIS_URL: z.string().default('redis://localhost:6379'),
+
+  // JWT
+  JWT_SECRET: z.string().default('development-secret-change-in-production'),
+  JWT_EXPIRES_IN: z.string().default('7d'),
+
+  // CORS
+  CORS_ORIGINS: z.string().default('http://localhost:3000'),
+
+  // API Keys (optional in development)
+  GPTZERO_API_KEY: z.string().optional(),
+  ORIGINALITY_API_KEY: z.string().optional(),
+  TURNITIN_API_KEY: z.string().optional(),
+
+  // Storage
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+
+  // Stripe
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  // eslint-disable-next-line no-console
+  console.error('❌ Invalid environment variables:', parsed.error.flatten().fieldErrors);
+  throw new Error('Invalid environment variables');
+}
+
+const env = parsed.data;
+
+export const config = {
+  nodeEnv: env.NODE_ENV,
+  port: env.PORT,
+  isProduction: env.NODE_ENV === 'production',
+  isDevelopment: env.NODE_ENV === 'development',
+  isTest: env.NODE_ENV === 'test',
+
+  database: {
+    url: env.DATABASE_URL,
+    mongoUri: env.MONGODB_URI,
+    redisUrl: env.REDIS_URL,
+  },
+
+  jwt: {
+    secret: env.JWT_SECRET,
+    expiresIn: env.JWT_EXPIRES_IN,
+  },
+
+  corsOrigins: env.CORS_ORIGINS.split(','),
+
+  externalApis: {
+    gptZero: env.GPTZERO_API_KEY,
+    originality: env.ORIGINALITY_API_KEY,
+    turnitin: env.TURNITIN_API_KEY,
+  },
+
+  storage: {
+    bucket: env.S3_BUCKET,
+    region: env.S3_REGION,
+    accessKey: env.S3_ACCESS_KEY,
+    secretKey: env.S3_SECRET_KEY,
+  },
+
+  stripe: {
+    secretKey: env.STRIPE_SECRET_KEY,
+    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+  },
+};
