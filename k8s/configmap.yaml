@@ -1,0 +1,88 @@
+# ConfigMaps for AI Humanizer
+# Requirements: 81 - System architecture
+# Requirements: 91 - Auto-scaling and resource management
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  CORS_ORIGINS: "https://ai-humanizer.example.com"
+  LOG_LEVEL: "info"
+  API_VERSION: "v1"
+  # Database connection strings (non-sensitive parts)
+  POSTGRES_HOST: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "ai_humanizer"
+  MONGODB_HOST: "mongodb-service"
+  MONGODB_PORT: "27017"
+  MONGODB_DB: "ai_humanizer"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: web
+data:
+  VITE_API_URL: "https://api.ai-humanizer.example.com"
+  VITE_WS_URL: "wss://api.ai-humanizer.example.com/ws"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: web
+data:
+  default.conf: |
+    server {
+        listen 80;
+        server_name localhost;
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+
+        # Readiness probe endpoint
+        location /ready {
+            access_log off;
+            return 200 "ready\n";
+            add_header Content-Type text/plain;
+        }
+
+        # SPA routing - serve index.html for all routes
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Cache static assets
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Gzip compression
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+        gzip_min_length 1000;
+    }

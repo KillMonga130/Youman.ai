@@ -1,0 +1,99 @@
+# Production Environment Overlay
+# Requirements: 81 - System architecture
+# Requirements: 91 - Auto-scaling and resource management
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ai-humanizer-prod
+
+namePrefix: prod-
+
+resources:
+  - ../../
+
+# Production-specific patches
+patches:
+  # Increase replicas for production
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 5
+    target:
+      kind: Deployment
+      name: backend
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+    target:
+      kind: Deployment
+      name: frontend
+  # Increase HPA limits for production
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 5
+      - op: replace
+        path: /spec/maxReplicas
+        value: 50
+    target:
+      kind: HorizontalPodAutoscaler
+      name: backend-hpa
+  - patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+    target:
+      kind: HorizontalPodAutoscaler
+      name: frontend-hpa
+  # Increase resource limits for production
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "500m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "2000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "2Gi"
+    target:
+      kind: Deployment
+      name: backend
+  # Increase PDB minAvailable for production
+  - patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 3
+    target:
+      kind: PodDisruptionBudget
+      name: backend-pdb
+  - patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+    target:
+      kind: PodDisruptionBudget
+      name: frontend-pdb
+
+images:
+  - name: ai-humanizer/backend
+    newTag: v1.0.0
+  - name: ai-humanizer/frontend
+    newTag: v1.0.0
+
+# Production ConfigMap overrides
+configMapGenerator:
+  - name: backend-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production
+      - LOG_LEVEL=warn
+      - CORS_ORIGINS=https://ai-humanizer.com

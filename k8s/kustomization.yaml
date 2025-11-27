@@ -1,0 +1,46 @@
+# Kustomization file for AI Humanizer Kubernetes deployment
+# Requirements: 81 - System architecture
+# Requirements: 91 - Auto-scaling and resource management
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: ai-humanizer
+
+namespace: ai-humanizer
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/part-of: ai-humanizer-platform
+  app.kubernetes.io/managed-by: kustomize
+
+# Resources to include
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - rbac.yaml
+  - services.yaml
+  - postgres-statefulset.yaml
+  - mongodb-statefulset.yaml
+  - redis-statefulset.yaml
+  - backend-deployment.yaml
+  - frontend-deployment.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - resource-quotas.yaml
+  - ingress.yaml
+
+# Image customization (override in overlays)
+images:
+  - name: ai-humanizer/backend
+    newTag: latest
+  - name: ai-humanizer/frontend
+    newTag: latest
+
+# ConfigMap generator (for environment-specific configs)
+configMapGenerator: []
+
+# Secret generator (for environment-specific secrets)
+secretGenerator: []

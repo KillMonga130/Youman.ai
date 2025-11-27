@@ -1,0 +1,173 @@
+# Kubernetes Services for AI Humanizer
+# Requirements: 81 - System architecture (service discovery)
+# Requirements: 91 - Auto-scaling and resource management
+
+# Backend API Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 3001
+      targetPort: http
+      protocol: TCP
+
+---
+# Frontend Web Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+
+---
+# PostgreSQL Headless Service (for StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb
+      protocol: TCP
+
+---
+# MongoDB Headless Service (for StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: mongodb
+    app.kubernetes.io/component: database
+  ports:
+    - name: mongodb
+      port: 27017
+      targetPort: mongodb
+      protocol: TCP
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+
+---
+# Redis Headless Service (for StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: ai-humanizer
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP

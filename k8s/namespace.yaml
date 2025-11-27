@@ -1,0 +1,12 @@
+# Kubernetes Namespace for AI Humanizer
+# Requirements: 81 - System architecture
+# Requirements: 91 - Auto-scaling and resource management
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ai-humanizer
+  labels:
+    app.kubernetes.io/name: ai-humanizer
+    app.kubernetes.io/part-of: ai-humanizer-platform
+    environment: production
