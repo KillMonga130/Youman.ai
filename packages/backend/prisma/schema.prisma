@@ -681,3 +681,145 @@ model SavedSearch {
   @@index([lastUsedAt])
   @@map("saved_searches")
 }
+
+// ============================================
+// Legal and Compliance
+// Requirements: 95 - Legal compliance, terms of service, consent, DMCA, licensing
+// ============================================
+
+model LegalDocument {
+  id            String    @id @default(uuid())
+  type          String    // TERMS_OF_SERVICE, PRIVACY_POLICY, etc.
+  version       String
+  title         String
+  content       String    @db.Text
+  effectiveDate DateTime  @map("effective_date")
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@unique([type, version])
+  @@index([type])
+  @@index([isActive])
+  @@map("legal_documents")
+}
+
+model TermsAcceptance {
+  id              String    @id @default(uuid())
+  userId          String    @map("user_id")
+  documentType    String    @map("document_type")
+  documentVersion String    @map("document_version")
+  acceptedAt      DateTime  @default(now()) @map("accepted_at")
+  ipAddress       String?   @map("ip_address")
+  userAgent       String?   @map("user_agent")
+
+  @@unique([userId, documentType, documentVersion])
+  @@index([userId])
+  @@index([documentType])
+  @@map("terms_acceptances")
+}
+
+model UserConsent {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  consentType String    @map("consent_type")
+  granted     Boolean   @default(false)
+  grantedAt   DateTime? @map("granted_at")
+  revokedAt   DateTime? @map("revoked_at")
+  expiresAt   DateTime? @map("expires_at")
+  ipAddress   String?   @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, consentType])
+  @@index([userId])
+  @@index([consentType])
+  @@map("user_consents")
+}
+
+model DMCARequest {
+  id                      String    @id @default(uuid())
+  requesterId             String?   @map("requester_id")
+  contentUrl              String    @map("content_url")
+  contentDescription      String    @map("content_description") @db.Text
+  copyrightOwner          String    @map("copyright_owner")
+  copyrightWorkDescription String   @map("copyright_work_description") @db.Text
+  contactEmail            String    @map("contact_email")
+  contactPhone            String?   @map("contact_phone")
+  contactAddress          String    @map("contact_address") @db.Text
+  status                  String    @default("PENDING")
+  signature               String
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @updatedAt @map("updated_at")
+  resolvedAt              DateTime? @map("resolved_at")
+  resolutionNotes         String?   @map("resolution_notes") @db.Text
+  affectedUserId          String?   @map("affected_user_id")
+  affectedProjectId       String?   @map("affected_project_id")
+
+  counterNotices DMCACounterNotice[]
+
+  @@index([requesterId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("dmca_requests")
+}
+
+model DMCACounterNotice {
+  id              String    @id @default(uuid())
+  dmcaRequestId   String    @map("dmca_request_id")
+  responderId     String    @map("responder_id")
+  counterStatement String   @map("counter_statement") @db.Text
+  contactEmail    String    @map("contact_email")
+  contactAddress  String    @map("contact_address") @db.Text
+  signature       String
+  status          String    @default("PENDING")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  dmcaRequest DMCARequest @relation(fields: [dmcaRequestId], references: [id], onDelete: Cascade)
+
+  @@index([dmcaRequestId])
+  @@index([responderId])
+  @@map("dmca_counter_notices")
+}
+
+model License {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  licenseKey          String    @unique @map("license_key")
+  licenseType         String    @map("license_type")
+  productId           String?   @map("product_id")
+  machineId           String?   @map("machine_id")
+  issuedAt            DateTime  @default(now()) @map("issued_at")
+  expiresAt           DateTime? @map("expires_at")
+  isActive            Boolean   @default(true) @map("is_active")
+  maxActivations      Int       @default(1) @map("max_activations")
+  currentActivations  Int       @default(0) @map("current_activations")
+  features            Json      @default("[]")
+  metadata            Json      @default("{}")
+
+  @@index([userId])
+  @@index([licenseKey])
+  @@index([licenseType])
+  @@map("licenses")
+}
+
+model LegalAuditLog {
+  id            String    @id @default(uuid())
+  userId        String?   @map("user_id")
+  action        String
+  documentType  String?   @map("document_type")
+  consentType   String?   @map("consent_type")
+  dmcaRequestId String?   @map("dmca_request_id")
+  licenseId     String?   @map("license_id")
+  details       Json?
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("legal_audit_logs")
+}
