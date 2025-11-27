@@ -26,6 +26,7 @@ import { schedulingRoutes } from '../scheduling';
 import { cloudStorageRouter } from '../cloud-storage';
 import { webhookRoutes } from '../webhook';
 import { mfaRoutes } from '../mfa';
+import { repurposingRoutes } from '../repurposing';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -192,6 +193,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 51 - Webhook system with HMAC verification
   apiRouter.use('/webhooks', standardRateLimiter, webhookRoutes);
   
+  // Repurposing routes (standard rate limiting)
+  // Requirements: 109 - Content repurposing for social platforms
+  apiRouter.use('/repurposing', standardRateLimiter, repurposingRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -275,6 +280,7 @@ function createVersionHandler(): express.RequestHandler {
         scheduling: `${API_PREFIX}/scheduling`,
         cloudStorage: `${API_PREFIX}/cloud-storage`,
         webhooks: `${API_PREFIX}/webhooks`,
+        repurposing: `${API_PREFIX}/repurposing`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
