@@ -22,6 +22,7 @@ import { seoRoutes } from '../seo';
 import { plagiarismRoutes } from '../plagiarism';
 import { citationRoutes } from '../citation';
 import { abTestingRoutes } from '../ab-testing';
+import { schedulingRoutes } from '../scheduling';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -172,6 +173,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 121 - Performance tracking and winner selection
   apiRouter.use('/ab-testing', standardRateLimiter, abTestingRoutes);
   
+  // Scheduling routes (standard rate limiting)
+  // Requirements: 35 - Scheduling and automation with cron jobs
+  apiRouter.use('/scheduling', standardRateLimiter, schedulingRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -251,6 +256,7 @@ function createVersionHandler(): express.RequestHandler {
         plagiarism: `${API_PREFIX}/plagiarism`,
         citation: `${API_PREFIX}/citation`,
         abTesting: `${API_PREFIX}/ab-testing`,
+        scheduling: `${API_PREFIX}/scheduling`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
