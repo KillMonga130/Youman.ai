@@ -582,7 +582,9 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(retention): implement content expiration with reminder notifications"`
   - _Requirements: 75_
 
-- [-] 39. Build watermarking system
+- [x] 39. Build watermarking system
+
+
 
 
 
@@ -594,7 +596,10 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(security): implement invisible watermarking system"`
   - _Requirements: 76_
 
-- [ ] 40. Implement data retention policies
+- [-] 40. Implement data retention policies
+
+
+
   - Create retention policy configuration
   - Build automatic deletion scheduler
   - Add archival system

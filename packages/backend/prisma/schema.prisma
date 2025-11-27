@@ -547,6 +547,75 @@ model AuditLog {
 }
 
 // ============================================
+// Data Retention Policies
+// Requirements: 63 - Data lifecycle and retention policies
+// ============================================
+
+model RetentionPolicy {
+  id                    String    @id @default(uuid())
+  userId                String    @unique @map("user_id")
+  defaultRetentionDays  Int       @default(365) @map("default_retention_days")
+  archiveBeforeDelete   Boolean   @default(true) @map("archive_before_delete")
+  notificationDays      Int[]     @default([30, 7, 1]) @map("notification_days")
+  autoDeleteEnabled     Boolean   @default(false) @map("auto_delete_enabled")
+  exemptProjectIds      String[]  @default([]) @map("exempt_project_ids")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("retention_policies")
+}
+
+model ArchivedProject {
+  id              String    @id @default(uuid())
+  originalId      String    @map("original_id")
+  userId          String    @map("user_id")
+  name            String
+  description     String?
+  wordCount       Int       @map("word_count")
+  documentData    Json?     @map("document_data")
+  metadata        Json?
+  archivedAt      DateTime  @default(now()) @map("archived_at")
+  retentionDays   Int       @map("retention_days")
+  scheduledDeleteAt DateTime @map("scheduled_delete_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([userId])
+  @@index([originalId])
+  @@index([scheduledDeleteAt])
+  @@map("archived_projects")
+}
+
+model RetentionAuditLog {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  action        RetentionAction
+  projectId     String?   @map("project_id")
+  projectName   String?   @map("project_name")
+  archiveId     String?   @map("archive_id")
+  details       Json?
+  ipAddress     String?   @map("ip_address")
+  userAgent     String?   @map("user_agent")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([action])
+  @@index([projectId])
+  @@index([createdAt])
+  @@map("retention_audit_logs")
+}
+
+enum RetentionAction {
+  POLICY_CREATED
+  POLICY_UPDATED
+  PROJECT_ARCHIVED
+  PROJECT_DELETED
+  ARCHIVE_DELETED
+  NOTIFICATION_SENT
+  AUTO_DELETE_TRIGGERED
+}
+
+// ============================================
 // Cloud Storage Integration
 // Requirements: 22 - Integrate with cloud storage services
 // ============================================
