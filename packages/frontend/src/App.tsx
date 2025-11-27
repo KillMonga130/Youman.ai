@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard, Editor, Comparison, Settings, History, Analytics } from './pages';
+import { ThemeProvider } from './components/ui';
 import { useAppStore } from './store';
 
 const queryClient = new QueryClient({
@@ -17,7 +18,7 @@ const queryClient = new QueryClient({
 function AppContent(): JSX.Element {
   const { settings } = useAppStore();
 
-  // Apply dark mode on mount
+  // Apply dark mode on mount and sync with store
   useEffect(() => {
     document.documentElement.classList.toggle('dark', settings.darkMode);
   }, [settings.darkMode]);
@@ -25,6 +26,10 @@ function AppContent(): JSX.Element {
   return (
     <BrowserRouter>
       <Layout>
+        {/* Skip link for keyboard navigation - WCAG AAA */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/editor" element={<Editor />} />
@@ -42,7 +47,9 @@ function AppContent(): JSX.Element {
 function App(): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
-      <AppContent />
+      <ThemeProvider defaultTheme="system">
+        <AppContent />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

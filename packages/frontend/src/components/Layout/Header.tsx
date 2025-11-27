@@ -1,5 +1,6 @@
 import { Sun, Moon, Bell } from 'lucide-react';
 import { useAppStore } from '../../store';
+import { Tooltip } from '../ui';
 
 export function Header(): JSX.Element {
   const { settings, updateSettings } = useAppStore();
@@ -18,21 +19,33 @@ export function Header(): JSX.Element {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            title={settings.darkMode ? 'Light mode' : 'Dark mode'}
-          >
-            {settings.darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+          <Tooltip content={settings.darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
+            <button
+              onClick={toggleDarkMode}
+              className="btn-icon-sm btn-ghost"
+              aria-label={settings.darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-pressed={settings.darkMode}
+            >
+              {settings.darkMode ? (
+                <Sun className="w-5 h-5" aria-hidden="true" />
+              ) : (
+                <Moon className="w-5 h-5" aria-hidden="true" />
+              )}
+            </button>
+          </Tooltip>
           
-          <button
-            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors relative"
-            title="Notifications"
-          >
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-          </button>
+          <Tooltip content="Notifications">
+            <button
+              className="btn-icon-sm btn-ghost relative"
+              aria-label="Notifications (1 unread)"
+            >
+              <Bell className="w-5 h-5" aria-hidden="true" />
+              <span 
+                className="absolute top-1 right-1 w-2 h-2 bg-error-500 rounded-full"
+                aria-hidden="true"
+              />
+            </button>
+          </Tooltip>
         </div>
       </div>
     </header>

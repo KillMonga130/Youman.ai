@@ -12,7 +12,14 @@ export function Layout({ children }: LayoutProps): JSX.Element {
       <Sidebar />
       <div className="lg:pl-64">
         <Header />
-        <main className="p-4 lg:p-6">{children}</main>
+        <main 
+          id="main-content" 
+          className="p-4 lg:p-6"
+          role="main"
+          tabIndex={-1}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );
