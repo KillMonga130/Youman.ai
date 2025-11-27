@@ -62,6 +62,7 @@ import {
 import { supportRoutes } from '../support';
 import { autoScalingRoutes } from '../auto-scaling';
 import { disasterRecoveryRoutes } from '../disaster-recovery';
+import { cdnRoutes } from '../cdn';
 
 /**
  * API version prefix
@@ -244,6 +245,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 92 - Disaster recovery and business continuity
   apiRouter.use('/disaster-recovery', strictRateLimiter, disasterRecoveryRoutes);
   
+  // CDN and caching routes (strict rate limiting - admin only)
+  // Requirements: 90 - CDN and global content delivery
+  apiRouter.use('/cdn', strictRateLimiter, cdnRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -333,6 +338,8 @@ function createVersionHandler(): express.RequestHandler {
         admin: `${API_PREFIX}/admin`,
         support: `${API_PREFIX}/support`,
         autoScaling: `${API_PREFIX}/auto-scaling`,
+        disasterRecovery: `${API_PREFIX}/disaster-recovery`,
+        cdn: `${API_PREFIX}/cdn`,
         monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
