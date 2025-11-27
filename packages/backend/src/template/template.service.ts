@@ -298,10 +298,11 @@ export class TemplateService {
 
       // Filter by user ID
       if (options.userId) {
+        const userId = options.userId;
         templates = templates.filter(t => 
-          t.userId === options.userId || 
+          t.userId === userId || 
           t.visibility === 'public' ||
-          this.hasSharedAccess(t.id, options.userId)
+          this.hasSharedAccess(t.id, userId)
         );
       }
 

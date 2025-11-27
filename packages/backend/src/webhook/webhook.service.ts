@@ -97,7 +97,7 @@ export class WebhookService {
       events: options.events,
       status: 'active',
       enabled: true,
-      headers: options.headers,
+      headers: options.headers || {},
       createdAt: now,
       updatedAt: now,
       deliveryCount: 0,
@@ -502,8 +502,12 @@ export class WebhookService {
 
       delivery.status = response.ok ? 'success' : 'failed';
       delivery.statusCode = response.status;
-      delivery.responseBody = response.body?.substring(0, 1000); // Truncate response
-      delivery.responseHeaders = response.headers;
+      if (response.body) {
+        delivery.responseBody = response.body.substring(0, 1000); // Truncate response
+      }
+      if (response.headers) {
+        delivery.responseHeaders = response.headers;
+      }
       delivery.durationMs = durationMs;
 
       if (response.ok) {
@@ -578,15 +582,20 @@ export class WebhookService {
 
       logger.info(`Scheduled retry for delivery ${delivery.id} in ${delay}ms (attempt ${delivery.attemptNumber + 1})`);
 
-      return {
+      const retryResult: DeliveryResult = {
         deliveryId: delivery.id,
         success: false,
-        statusCode: delivery.statusCode,
-        error: delivery.error,
         durationMs,
         willRetry: true,
         nextRetryAt: delivery.nextRetryAt,
       };
+      if (delivery.statusCode !== undefined) {
+        retryResult.statusCode = delivery.statusCode;
+      }
+      if (delivery.error !== undefined) {
+        retryResult.error = delivery.error;
+      }
+      return retryResult;
     } else {
       // Max retries exceeded
       delivery.status = 'failed';
@@ -599,14 +608,19 @@ export class WebhookService {
 
       logger.error(`Delivery ${delivery.id} failed after ${maxRetries} attempts`);
 
-      return {
+      const failedResult: DeliveryResult = {
         deliveryId: delivery.id,
         success: false,
-        statusCode: delivery.statusCode,
-        error: delivery.error,
         durationMs,
         willRetry: false,
       };
+      if (delivery.statusCode !== undefined) {
+        failedResult.statusCode = delivery.statusCode;
+      }
+      if (delivery.error !== undefined) {
+        failedResult.error = delivery.error;
+      }
+      return failedResult;
     }
   }
 
@@ -630,14 +644,20 @@ export class WebhookService {
       webhookId,
       eventType: event.type,
       status: delivery.status,
-      statusCode: delivery.statusCode,
-      durationMs: delivery.durationMs,
-      error: delivery.error,
       attemptNumber: delivery.attemptNumber,
       timestamp: new Date(),
       url: webhook?.url || '',
       eventId: event.id,
     };
+    if (delivery.statusCode !== undefined) {
+      log.statusCode = delivery.statusCode;
+    }
+    if (delivery.durationMs !== undefined) {
+      log.durationMs = delivery.durationMs;
+    }
+    if (delivery.error !== undefined) {
+      log.error = delivery.error;
+    }
 
     logs.push(log);
 
