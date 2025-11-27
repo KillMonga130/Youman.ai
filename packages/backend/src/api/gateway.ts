@@ -15,6 +15,7 @@ import { projectRouter } from '../project';
 import { versionRouter, branchRouter } from '../version';
 import { storageRouter } from '../storage';
 import { collaborationRouter } from '../collaboration';
+import { subscriptionRoutes } from '../subscription';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -132,6 +133,11 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 21 - Collaborate with team members on projects
   apiRouter.use('/collaboration', standardRateLimiter, collaborationRouter);
   
+  // Subscription routes (standard rate limiting)
+  // Requirements: 20 - Subscription tiers with different capabilities
+  // Requirements: 86 - Billing and invoice management
+  apiRouter.use('/subscription', standardRateLimiter, subscriptionRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -204,6 +210,7 @@ function createVersionHandler(): express.RequestHandler {
         branches: `${API_PREFIX}/branches`,
         storage: `${API_PREFIX}/storage`,
         collaboration: `${API_PREFIX}/collaboration`,
+        subscription: `${API_PREFIX}/subscription`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
