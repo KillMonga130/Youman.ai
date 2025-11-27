@@ -569,7 +569,9 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(security): implement multi-factor authentication with TOTP"`
   - _Requirements: 74_
 
-- [-] 38. Implement content expiration
+- [x] 38. Implement content expiration
+
+
 
 
 
@@ -580,7 +582,10 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(retention): implement content expiration with reminder notifications"`
   - _Requirements: 75_
 
-- [ ] 39. Build watermarking system
+- [-] 39. Build watermarking system
+
+
+
   - Implement invisible watermark embedding
   - Create watermark detection tool
   - Add watermark configuration
