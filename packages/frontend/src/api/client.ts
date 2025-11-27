@@ -113,6 +113,114 @@ class ApiClient {
   async getUsage(): Promise<{ usage: { wordsProcessed: number; limit: number; resetDate: string } }> {
     return this.request('/usage');
   }
+
+  // Search
+  async searchProjects(params: {
+    query: string;
+    filters?: Record<string, unknown>;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: string;
+  }): Promise<{
+    results: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      status: string;
+      wordCount: number;
+      createdAt: string;
+      updatedAt: string;
+      highlights: Array<{ field: string; snippet: string; matchedTerms: string[] }>;
+      score: number;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean };
+    query: string;
+    filters: Record<string, unknown>;
+    executionTimeMs: number;
+  }> {
+    return this.request('/search', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getSavedSearches(): Promise<{
+    savedSearches: Array<{
+      id: string;
+      name: string;
+      query: string | null;
+      filters: Record<string, unknown>;
+      useCount: number;
+      lastUsedAt: string | null;
+      createdAt: string;
+    }>;
+    total: number;
+  }> {
+    return this.request('/search/saved');
+  }
+
+  async saveSearch(params: {
+    name: string;
+    query?: string;
+    filters: Record<string, unknown>;
+  }): Promise<{
+    savedSearch: {
+      id: string;
+      name: string;
+      query: string | null;
+      filters: Record<string, unknown>;
+      useCount: number;
+      lastUsedAt: string | null;
+      createdAt: string;
+    };
+  }> {
+    return this.request('/search/saved', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async deleteSavedSearch(id: string): Promise<{ message: string }> {
+    return this.request(`/search/saved/${id}`, { method: 'DELETE' });
+  }
+
+  async updateSavedSearch(id: string, params: { name?: string }): Promise<{
+    savedSearch: {
+      id: string;
+      name: string;
+      query: string | null;
+      filters: Record<string, unknown>;
+    };
+  }> {
+    return this.request(`/search/saved/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async executeSavedSearch(id: string, params?: { page?: number; limit?: number }): Promise<{
+    results: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      status: string;
+      wordCount: number;
+      createdAt: string;
+      updatedAt: string;
+      highlights: Array<{ field: string; snippet: string; matchedTerms: string[] }>;
+      score: number;
+    }>;
+    pagination: { page: number; limit: number; total: number; totalPages: number; hasMore: boolean };
+    query: string;
+    filters: Record<string, unknown>;
+    executionTimeMs: number;
+  }> {
+    return this.request(`/search/saved/${id}/execute`, {
+      method: 'POST',
+      body: JSON.stringify(params || {}),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

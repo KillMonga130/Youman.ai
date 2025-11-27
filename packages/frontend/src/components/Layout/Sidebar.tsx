@@ -1,10 +1,11 @@
-import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock } from 'lucide-react';
+import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
   { path: '/editor', icon: FileText, label: 'Editor' },
+  { path: '/search', icon: Search, label: 'Search' },
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/analytics', icon: BarChart2, label: 'Analytics' },
   { path: '/settings', icon: Settings, label: 'Settings' },

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Layout } from './components/Layout';
-import { Dashboard, Editor, Comparison, Settings, History, Analytics } from './pages';
+import { Dashboard, Editor, Comparison, Settings, History, Analytics, Search } from './pages';
 import { ThemeProvider } from './components/ui';
 import { useAppStore } from './store';
 import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
@@ -40,6 +40,7 @@ function AppContent(): JSX.Element {
           <Route path="/comparison" element={<Comparison />} />
           <Route path="/history" element={<History />} />
           <Route path="/analytics" element={<Analytics />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
