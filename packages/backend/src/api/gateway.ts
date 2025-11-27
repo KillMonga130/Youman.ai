@@ -59,6 +59,7 @@ import {
   monitoringMiddleware,
   errorTrackingMiddleware,
 } from '../monitoring';
+import { supportRoutes } from '../support';
 
 /**
  * API version prefix
@@ -229,6 +230,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 19 - Monitor system performance and user activity
   apiRouter.use('/admin', standardRateLimiter, adminRoutes);
   
+  // Support and diagnostics routes (strict rate limiting - admin only)
+  // Requirements: 94 - Support and diagnostics tools
+  apiRouter.use('/support', strictRateLimiter, supportRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -316,6 +321,7 @@ function createVersionHandler(): express.RequestHandler {
         localization: `${API_PREFIX}/localization`,
         search: `${API_PREFIX}/search`,
         admin: `${API_PREFIX}/admin`,
+        support: `${API_PREFIX}/support`,
         monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
