@@ -743,7 +743,9 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(summarize): implement extractive and abstractive summarization"`
   - _Requirements: 78_
 
-- [-] 51. Implement content expansion
+- [x] 51. Implement content expansion
+
+
 
 
   - Create outline expansion system
@@ -753,7 +755,8 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(expand): implement content expansion with coherence maintenance"`
   - _Requirements: 79_
 
-- [ ] 52. Checkpoint - Phase 10 complete
+- [-] 52. Checkpoint - Phase 10 complete
+
 
   - Run: `npm run test --workspace=@ai-humanizer/backend -- --run --reporter=dot`
   - Ensure all tests pass, ask the user if questions arise.
