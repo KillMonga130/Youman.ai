@@ -499,7 +499,9 @@ npx vitest run --reporter=verbose
 
 ## Phase 6: Subscription & Billing
 
-- [-] 21. Implement subscription management
+- [x] 21. Implement subscription management
+
+
 
 
 
@@ -514,7 +516,10 @@ npx vitest run --reporter=verbose
   - **Git Commit:** `git add .; git commit -m "feat(billing): implement Stripe subscription management with tier enforcement"`
   - _Requirements: 20, 86_
 
-- [ ] 22. Build usage metering
+- [-] 22. Build usage metering
+
+
+
   - Track words processed per user
   - Monitor API call counts
   - Measure storage usage
