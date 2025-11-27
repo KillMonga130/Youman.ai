@@ -1,13 +1,24 @@
-﻿/**
+/**
  * Auto-Scaling Service
+ * Implements CPU/memory-based scaling, queue depth monitoring, predictive scaling,
+ * cost optimization, and scaling policy configuration
  * Requirements: 91 - Auto-scaling and resource optimization
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import {
-  ScalingPolicy, ResourceMetrics, ScalingEvent, LoadPrediction, CostOptimization,
-  CostRecommendation, ScalingAlert, ServiceConfig, HistoricalMetrics, QueueMetrics,
-  ScalingDecision, AutoScalingStatus,
+  ScalingPolicy,
+  ResourceMetrics,
+  ScalingEvent,
+  LoadPrediction,
+  CostOptimization,
+  CostRecommendation,
+  ScalingAlert,
+  ServiceConfig,
+  HistoricalMetrics,
+  QueueMetrics,
+  ScalingDecision,
+  AutoScalingStatus,
 } from './types';
 
 export class AutoScalingService {
@@ -23,10 +34,10 @@ export class AutoScalingService {
   async scaleUp(serviceId: string, reason: string): Promise<ScalingEvent> {
     const policy = this.policies.get(serviceId);
     const currentCount = this.currentInstances.get(serviceId) || 1;
-    if (!policy) throw new Error('No scaling policy found for service: ' + serviceId);
-    if (currentCount >= policy.maxInstances) throw new Error('Service ' + serviceId + ' already at maximum instances (' + policy.maxInstances + ')');
+    if (!policy) throw new Error(`No scaling policy found for service: ${serviceId}`);
+    if (currentCount >= policy.maxInstances) throw new Error(`Service ${serviceId} already at maximum instances (${policy.maxInstances})`);
     const cooldownEnd = this.cooldowns.get(serviceId);
-    if (cooldownEnd && cooldownEnd > new Date()) throw new Error('Service ' + serviceId + ' is in cooldown period until ' + cooldownEnd.toISOString());
+    if (cooldownEnd && cooldownEnd > new Date()) throw new Error(`Service ${serviceId} is in cooldown period until ${cooldownEnd.toISOString()}`);
     const targetInstances = Math.min(currentCount + 1, policy.maxInstances);
     const metrics = await this.getMetrics(serviceId);
     const event: ScalingEvent = { id: uuidv4(), serviceId, type: 'scale_up', reason, fromInstances: currentCount, toInstances: targetInstances, metrics, timestamp: new Date(), status: 'completed' };
@@ -38,13 +49,14 @@ export class AutoScalingService {
     return event;
   }
 
+
   async scaleDown(serviceId: string): Promise<ScalingEvent> {
     const policy = this.policies.get(serviceId);
     const currentCount = this.currentInstances.get(serviceId) || 1;
-    if (!policy) throw new Error('No scaling policy found for service: ' + serviceId);
-    if (currentCount <= policy.minInstances) throw new Error('Service ' + serviceId + ' already at minimum instances (' + policy.minInstances + ')');
+    if (!policy) throw new Error(`No scaling policy found for service: ${serviceId}`);
+    if (currentCount <= policy.minInstances) throw new Error(`Service ${serviceId} already at minimum instances (${policy.minInstances})`);
     const cooldownEnd = this.cooldowns.get(serviceId);
-    if (cooldownEnd && cooldownEnd > new Date()) throw new Error('Service ' + serviceId + ' is in cooldown period until ' + cooldownEnd.toISOString());
+    if (cooldownEnd && cooldownEnd > new Date()) throw new Error(`Service ${serviceId} is in cooldown period until ${cooldownEnd.toISOString()}`);
     const targetInstances = Math.max(currentCount - 1, policy.minInstances);
     const metrics = await this.getMetrics(serviceId);
     const event: ScalingEvent = { id: uuidv4(), serviceId, type: 'scale_down', reason: 'Resource utilization below threshold', fromInstances: currentCount, toInstances: targetInstances, metrics, timestamp: new Date(), status: 'completed' };
@@ -86,6 +98,7 @@ export class AutoScalingService {
     return { serviceId, timestamp: now, predictions, confidence: predictions.reduce((sum, p) => sum + p.confidence, 0) / predictions.length, model: 'time-series-historical', basedOnHistoricalDays: 30 };
   }
 
+
   async optimizeCosts(serviceId: string): Promise<CostOptimization> {
     const metrics = this.metricsHistory.get(serviceId) || [];
     const policy = this.policies.get(serviceId);
@@ -101,14 +114,43 @@ export class AutoScalingService {
       recommendations.push({ id: uuidv4(), type: 'spot_instances', title: 'Enable Spot Instances', description: 'Use spot instances for non-critical workloads to reduce costs by up to 60%', estimatedSavings: spotSavings, impact: 'medium', risk: 'medium', implementation: 'Enable spot instance support in service configuration' });
       optimizedMonthlyCost -= spotSavings * 0.5;
     }
+    if (metrics.length > 0) {
+      const avgCPU = metrics.reduce((sum, m) => sum + m.cpu.average, 0) / metrics.length;
+      const avgMemory = metrics.reduce((sum, m) => sum + m.memory.average, 0) / metrics.length;
+      if (avgCPU < 30 && avgMemory < 30) {
+        const rightSizingSavings = currentMonthlyCost * 0.3;
+        recommendations.push({ id: uuidv4(), type: 'right_sizing', title: 'Right-size Instances', description: `Average CPU (${avgCPU.toFixed(1)}%) and memory (${avgMemory.toFixed(1)}%) utilization is low. Consider smaller instance types.`, estimatedSavings: rightSizingSavings, impact: 'low', risk: 'low', implementation: 'Reduce resource requests and limits in deployment configuration' });
+        optimizedMonthlyCost -= rightSizingSavings;
+      }
+    }
+    const historical = this.historicalMetrics.get(serviceId) || [];
+    const nightHours = historical.filter(h => h.hourOfDay >= 22 || h.hourOfDay <= 6);
+    if (nightHours.length > 0) {
+      const avgNightLoad = nightHours.reduce((sum, h) => sum + h.averageCPU, 0) / nightHours.length;
+      if (avgNightLoad < 20) {
+        const scheduleSavings = currentMonthlyCost * 0.15;
+        recommendations.push({ id: uuidv4(), type: 'schedule_scaling', title: 'Implement Scheduled Scaling', description: 'Low utilization detected during night hours. Scale down during off-peak times.', estimatedSavings: scheduleSavings, impact: 'low', risk: 'low', implementation: 'Configure scheduled scaling policies for off-peak hours (10 PM - 6 AM)' });
+        optimizedMonthlyCost -= scheduleSavings;
+      }
+    }
+    if (policy && currentInstances > policy.minInstances) {
+      const recentMetrics = metrics.slice(-10);
+      const allLowUsage = recentMetrics.every(m => m.cpu.current < 10 && m.memory.current < 10);
+      if (allLowUsage) {
+        const idleSavings = (currentInstances - policy.minInstances) * hoursPerMonth * costPerInstanceHour;
+        recommendations.push({ id: uuidv4(), type: 'idle_resources', title: 'Remove Idle Resources', description: 'Detected idle instances with consistently low utilization', estimatedSavings: idleSavings, impact: 'high', risk: 'low', implementation: 'Scale down to minimum instances immediately' });
+        optimizedMonthlyCost -= idleSavings;
+      }
+    }
     if (policy && policy.minInstances >= 2) {
       const reservedSavings = policy.minInstances * hoursPerMonth * costPerInstanceHour * 0.4;
-      recommendations.push({ id: uuidv4(), type: 'reserved_capacity', title: 'Purchase Reserved Capacity', description: 'Reserve ' + policy.minInstances + ' instances for 1-year commitment to save up to 40%', estimatedSavings: reservedSavings, impact: 'high', risk: 'low', implementation: 'Purchase reserved instances through cloud provider console' });
+      recommendations.push({ id: uuidv4(), type: 'reserved_capacity', title: 'Purchase Reserved Capacity', description: `Reserve ${policy.minInstances} instances for 1-year commitment to save up to 40%`, estimatedSavings: reservedSavings, impact: 'high', risk: 'low', implementation: 'Purchase reserved instances through cloud provider console' });
     }
     const potentialSavings = currentMonthlyCost - optimizedMonthlyCost;
     const savingsPercentage = (potentialSavings / currentMonthlyCost) * 100;
     return { serviceId, timestamp: new Date(), currentMonthlyCost, optimizedMonthlyCost: Math.max(0, optimizedMonthlyCost), potentialSavings: Math.max(0, potentialSavings), savingsPercentage: Math.max(0, Math.min(100, savingsPercentage)), recommendations };
   }
+
 
   async configureScalingPolicy(serviceId: string, policy: Omit<ScalingPolicy, 'id' | 'serviceId' | 'createdAt' | 'updatedAt'>): Promise<ScalingPolicy> {
     if (policy.minInstances < 0) throw new Error('minInstances must be non-negative');
@@ -146,6 +188,7 @@ export class AutoScalingService {
     return metrics;
   }
 
+
   async makeScalingDecision(serviceId: string): Promise<ScalingDecision> {
     const policy = this.policies.get(serviceId);
     const metrics = await this.getMetrics(serviceId);
@@ -154,7 +197,7 @@ export class AutoScalingService {
     const cooldownEnd = this.cooldowns.get(serviceId);
     if (cooldownEnd && cooldownEnd > new Date()) {
       const cooldownRemaining = Math.ceil((cooldownEnd.getTime() - Date.now()) / 1000);
-      return { serviceId, shouldScale: false, direction: 'none', targetInstances: currentCount, currentInstances: currentCount, reason: 'In cooldown period (' + cooldownRemaining + 's remaining)', metrics, cooldownRemaining };
+      return { serviceId, shouldScale: false, direction: 'none', targetInstances: currentCount, currentInstances: currentCount, reason: `In cooldown period (${cooldownRemaining}s remaining)`, metrics, cooldownRemaining };
     }
     const cpuUtilization = metrics.cpu.average;
     const memoryUtilization = metrics.memory.average;
@@ -165,10 +208,10 @@ export class AutoScalingService {
     let reason = 'Resource utilization within acceptable range';
     if (maxUtilization > policy.scaleUpThreshold && currentCount < policy.maxInstances) {
       shouldScale = true; direction = 'up'; targetInstances = Math.min(currentCount + 1, policy.maxInstances);
-      reason = 'High utilization detected (CPU: ' + cpuUtilization.toFixed(1) + '%, Memory: ' + memoryUtilization.toFixed(1) + '%)';
+      reason = `High utilization detected (CPU: ${cpuUtilization.toFixed(1)}%, Memory: ${memoryUtilization.toFixed(1)}%)`;
     } else if (maxUtilization < policy.scaleDownThreshold && currentCount > policy.minInstances) {
       shouldScale = true; direction = 'down'; targetInstances = Math.max(currentCount - 1, policy.minInstances);
-      reason = 'Low utilization detected (CPU: ' + cpuUtilization.toFixed(1) + '%, Memory: ' + memoryUtilization.toFixed(1) + '%)';
+      reason = `Low utilization detected (CPU: ${cpuUtilization.toFixed(1)}%, Memory: ${memoryUtilization.toFixed(1)}%)`;
     }
     return { serviceId, shouldScale, direction, targetInstances, currentInstances: currentCount, reason, metrics, cooldownRemaining: 0 };
   }
@@ -191,6 +234,7 @@ export class AutoScalingService {
     if (cooldownActive && cooldownEnd) status.cooldownEndsAt = cooldownEnd;
     return status;
   }
+
 
   async createAlert(serviceId: string, type: ScalingAlert['type'], severity: ScalingAlert['severity'], message: string, currentValue: number, threshold: number): Promise<ScalingAlert> {
     const alert: ScalingAlert = { id: uuidv4(), serviceId, type, severity, message, currentValue, threshold, timestamp: new Date(), acknowledged: false };
@@ -250,9 +294,9 @@ export class AutoScalingService {
     const metrics = await this.getMetrics(serviceId);
     const queueUtilization = (queueMetrics.depth / queueMetrics.maxCapacity) * 100;
     if (queueUtilization > 80 && currentCount < policy.maxInstances) {
-      return { serviceId, shouldScale: true, direction: 'up', targetInstances: Math.min(currentCount + 1, policy.maxInstances), currentInstances: currentCount, reason: 'High queue depth: ' + queueMetrics.depth + ' messages (' + queueUtilization.toFixed(1) + '% capacity)', metrics, cooldownRemaining: 0 };
+      return { serviceId, shouldScale: true, direction: 'up', targetInstances: Math.min(currentCount + 1, policy.maxInstances), currentInstances: currentCount, reason: `High queue depth: ${queueMetrics.depth} messages (${queueUtilization.toFixed(1)}% capacity)`, metrics, cooldownRemaining: 0 };
     } else if (queueUtilization < 20 && currentCount > policy.minInstances) {
-      return { serviceId, shouldScale: true, direction: 'down', targetInstances: Math.max(currentCount - 1, policy.minInstances), currentInstances: currentCount, reason: 'Low queue depth: ' + queueMetrics.depth + ' messages (' + queueUtilization.toFixed(1) + '% capacity)', metrics, cooldownRemaining: 0 };
+      return { serviceId, shouldScale: true, direction: 'down', targetInstances: Math.max(currentCount - 1, policy.minInstances), currentInstances: currentCount, reason: `Low queue depth: ${queueMetrics.depth} messages (${queueUtilization.toFixed(1)}% capacity)`, metrics, cooldownRemaining: 0 };
     }
     return null;
   }
@@ -261,7 +305,7 @@ export class AutoScalingService {
 
   async setInstanceCount(serviceId: string, count: number): Promise<void> {
     const policy = this.policies.get(serviceId);
-    if (policy && (count < policy.minInstances || count > policy.maxInstances)) throw new Error('Instance count must be between ' + policy.minInstances + ' and ' + policy.maxInstances);
+    if (policy && (count < policy.minInstances || count > policy.maxInstances)) throw new Error(`Instance count must be between ${policy.minInstances} and ${policy.maxInstances}`);
     this.currentInstances.set(serviceId, count);
   }
 }
