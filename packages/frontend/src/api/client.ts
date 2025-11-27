@@ -221,6 +221,31 @@ class ApiClient {
       body: JSON.stringify(params || {}),
     });
   }
+
+  // Bulk Operations
+  async bulkDeleteProjects(ids: string[]): Promise<{ deleted: number; failed: string[] }> {
+    return this.request('/projects/bulk/delete', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  }
+
+  async bulkArchiveProjects(ids: string[]): Promise<{ archived: number; failed: string[] }> {
+    return this.request('/projects/bulk/archive', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    });
+  }
+
+  async bulkReprocessProjects(
+    ids: string[],
+    options?: { level?: number; strategy?: string }
+  ): Promise<{ processed: number; failed: string[] }> {
+    return this.request('/projects/bulk/reprocess', {
+      method: 'POST',
+      body: JSON.stringify({ ids, ...options }),
+    });
+  }
 }
 
 export const apiClient = new ApiClient(API_BASE_URL);

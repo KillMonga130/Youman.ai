@@ -92,3 +92,40 @@ export function useRegister() {
       apiClient.register(email, password, name),
   });
 }
+
+// Bulk Operations
+export function useBulkDeleteProjects() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => apiClient.bulkDeleteProjects(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
+export function useBulkArchiveProjects() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => apiClient.bulkArchiveProjects(ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
+export function useBulkReprocessProjects() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      ids,
+      options,
+    }: {
+      ids: string[];
+      options?: { level?: number; strategy?: string };
+    }) => apiClient.bulkReprocessProjects(ids, options),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
