@@ -218,7 +218,8 @@ describe('PlagiarismService', () => {
       expect(result).toBeDefined();
       expect(result.originalText).toBe(text);
       expect(result.rephrasedText).toBeDefined();
-      expect(result.processingTimeMs).toBeGreaterThan(0);
+      // Processing time may be 0ms for fast operations
+      expect(result.processingTimeMs).toBeGreaterThanOrEqual(0);
     });
 
     it('should apply synonym replacement at intensity 1', async () => {
