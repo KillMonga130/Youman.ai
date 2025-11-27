@@ -18,6 +18,7 @@ import { collaborationRouter } from '../collaboration';
 import { subscriptionRoutes } from '../subscription';
 import { usageRoutes } from '../usage';
 import { invoiceRoutes } from '../invoice';
+import { seoRoutes } from '../seo';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -150,6 +151,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 86 - Billing and invoice management
   apiRouter.use('/invoices', standardRateLimiter, invoiceRoutes);
   
+  // SEO routes (standard rate limiting)
+  // Requirements: 27 - SEO keyword preservation and metadata management
+  apiRouter.use('/seo', standardRateLimiter, seoRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -225,6 +230,7 @@ function createVersionHandler(): express.RequestHandler {
         subscription: `${API_PREFIX}/subscription`,
         usage: `${API_PREFIX}/usage`,
         invoices: `${API_PREFIX}/invoices`,
+        seo: `${API_PREFIX}/seo`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
