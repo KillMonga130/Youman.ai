@@ -67,21 +67,21 @@ export class DetectionService {
   private buildConfig(overrides?: Partial<DetectionServiceConfig>): DetectionServiceConfig {
     return {
       gptzero: {
-        apiKey: config.externalApis.gptZero,
+        apiKey: config.externalApis.gptZero ?? '',
         baseUrl: 'https://api.gptzero.me/v2',
         enabled: !!config.externalApis.gptZero,
         timeout: DEFAULT_TIMEOUT,
         ...overrides?.gptzero,
       },
       originality: {
-        apiKey: config.externalApis.originality,
+        apiKey: config.externalApis.originality ?? '',
         baseUrl: 'https://api.originality.ai/api/v1',
         enabled: !!config.externalApis.originality,
         timeout: DEFAULT_TIMEOUT,
         ...overrides?.originality,
       },
       turnitin: {
-        apiKey: config.externalApis.turnitin,
+        apiKey: config.externalApis.turnitin ?? '',
         baseUrl: 'https://api.turnitin.com/api/v1',
         enabled: !!config.externalApis.turnitin,
         timeout: DEFAULT_TIMEOUT,

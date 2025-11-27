@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@ai-humanizer/shared": "1.0.0",
+    "@aws-sdk/client-s3": "^3.940.0",
     "@prisma/client": "^6.19.0",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",

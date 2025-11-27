@@ -11,6 +11,9 @@ import { Router, Express, Request, Response } from 'express';
 import compression from 'compression';
 import express from 'express';
 import { authRouter } from '../auth';
+import { projectRouter } from '../project';
+import { versionRouter, branchRouter } from '../version';
+import { storageRouter } from '../storage';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -109,11 +112,23 @@ function mountApiRoutes(app: Express): void {
   // Health check for API
   apiRouter.get('/health', relaxedRateLimiter, createHealthCheckHandler());
 
+  // Projects routes (standard rate limiting)
+  apiRouter.use('/projects', standardRateLimiter, projectRouter);
+  
+  // Version control routes (standard rate limiting)
+  // Requirements: 16 - Save drafts and revisions with version history
+  apiRouter.use('/versions', standardRateLimiter, versionRouter);
+  
+  // Branch routes (standard rate limiting)
+  // Requirements: 56 - Branching system with merge conflict resolution
+  apiRouter.use('/branches', standardRateLimiter, branchRouter);
+  
+  // Storage routes (standard rate limiting)
+  // Requirements: 12, 15, 63 - Document storage with S3 and MongoDB
+  apiRouter.use('/storage', standardRateLimiter, storageRouter);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
-  
-  // Projects routes (standard rate limiting)
-  apiRouter.use('/projects', standardRateLimiter, createPlaceholderRouter('projects'));
   
   // Transformations routes (standard rate limiting)
   apiRouter.use('/transformations', standardRateLimiter, createPlaceholderRouter('transformations'));
@@ -180,6 +195,9 @@ function createVersionHandler(): express.RequestHandler {
       endpoints: {
         auth: `${API_PREFIX}/auth`,
         projects: `${API_PREFIX}/projects`,
+        versions: `${API_PREFIX}/versions`,
+        branches: `${API_PREFIX}/branches`,
+        storage: `${API_PREFIX}/storage`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
