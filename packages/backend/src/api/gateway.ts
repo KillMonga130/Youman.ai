@@ -27,6 +27,7 @@ import { cloudStorageRouter } from '../cloud-storage';
 import { webhookRoutes } from '../webhook';
 import { mfaRoutes } from '../mfa';
 import { repurposingRoutes } from '../repurposing';
+import { localizationRoutes } from '../localization';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -197,6 +198,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 109 - Content repurposing for social platforms
   apiRouter.use('/repurposing', standardRateLimiter, repurposingRoutes);
   
+  // Localization routes (standard rate limiting)
+  // Requirements: 111 - Content localization with cultural adaptation
+  apiRouter.use('/localization', standardRateLimiter, localizationRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -281,6 +286,7 @@ function createVersionHandler(): express.RequestHandler {
         cloudStorage: `${API_PREFIX}/cloud-storage`,
         webhooks: `${API_PREFIX}/webhooks`,
         repurposing: `${API_PREFIX}/repurposing`,
+        localization: `${API_PREFIX}/localization`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
