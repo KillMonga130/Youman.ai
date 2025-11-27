@@ -832,7 +832,7 @@ export class PlagiarismService {
 
     for (let i = 0; i < sentences.length; i++) {
       if (i > 0 && i % 3 === 0 && Math.random() > 0.5) {
-        const transition = transitions[Math.floor(Math.random() * transitions.length)];
+        const transition = transitions[Math.floor(Math.random() * transitions.length)] ?? 'Additionally, ';
         result.push(transition + sentences[i]?.toLowerCase());
       } else {
         result.push(sentences[i] ?? '');
