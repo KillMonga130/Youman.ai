@@ -42,6 +42,9 @@ model User {
   webhooks          Webhook[]
   preferences       UserPreference?
   sentInvitations   ProjectInvitation[]
+  mfaDevices        MfaDevice[]
+  mfaBackupCodes    MfaBackupCode[]
+  loginAttempts     LoginAttempt[]
 
   @@index([email])
   @@index([createdAt])
@@ -102,6 +105,75 @@ model ApiKey {
   @@index([keyHash])
   @@index([userId])
   @@map("api_keys")
+}
+
+// ============================================
+// Multi-Factor Authentication
+// Requirements: 74 - MFA with SMS, authenticator app, hardware keys
+// ============================================
+
+model MfaDevice {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  name          String
+  type          MfaMethod
+  secret        String?   // For TOTP authenticator apps
+  phoneNumber   String?   @map("phone_number") // For SMS
+  credentialId  String?   @map("credential_id") // For hardware keys (WebAuthn)
+  publicKey     String?   @map("public_key") // For hardware keys
+  counter       Int       @default(0) // For hardware keys
+  isVerified    Boolean   @default(false) @map("is_verified")
+  isPrimary     Boolean   @default(false) @map("is_primary")
+  lastUsedAt    DateTime? @map("last_used_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@map("mfa_devices")
+}
+
+enum MfaMethod {
+  SMS
+  AUTHENTICATOR
+  HARDWARE_KEY
+}
+
+model MfaBackupCode {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([codeHash])
+  @@map("mfa_backup_codes")
+}
+
+model LoginAttempt {
+  id          String    @id @default(uuid())
+  userId      String?   @map("user_id")
+  email       String
+  ipAddress   String    @map("ip_address")
+  userAgent   String?   @map("user_agent")
+  success     Boolean
+  failureReason String? @map("failure_reason")
+  isSuspicious Boolean  @default(false) @map("is_suspicious")
+  location    String?   // Geo-location from IP
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([email])
+  @@index([ipAddress])
+  @@index([createdAt])
+  @@map("login_attempts")
 }
 
 // ============================================

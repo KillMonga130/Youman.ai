@@ -25,6 +25,7 @@ import { abTestingRoutes } from '../ab-testing';
 import { schedulingRoutes } from '../scheduling';
 import { cloudStorageRouter } from '../cloud-storage';
 import { webhookRoutes } from '../webhook';
+import { mfaRoutes } from '../mfa';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -119,6 +120,10 @@ function mountApiRoutes(app: Express): void {
 
   // Authentication routes (strict rate limiting)
   apiRouter.use('/auth', strictRateLimiter, authRouter);
+  
+  // MFA routes (strict rate limiting)
+  // Requirements: 74 - Multi-factor authentication with SMS, authenticator app, hardware keys
+  apiRouter.use('/mfa', strictRateLimiter, mfaRoutes);
 
   // Health check for API
   apiRouter.get('/health', relaxedRateLimiter, createHealthCheckHandler());
@@ -254,6 +259,7 @@ function createVersionHandler(): express.RequestHandler {
       documentation: '/api/v1/docs',
       endpoints: {
         auth: `${API_PREFIX}/auth`,
+        mfa: `${API_PREFIX}/mfa`,
         projects: `${API_PREFIX}/projects`,
         versions: `${API_PREFIX}/versions`,
         branches: `${API_PREFIX}/branches`,
