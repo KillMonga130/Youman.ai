@@ -823,3 +823,107 @@ model LegalAuditLog {
   @@index([createdAt])
   @@map("legal_audit_logs")
 }
+
+
+// ============================================
+// Customer Success
+// Requirements: 96 - Customer success tools
+// ============================================
+
+model OnboardingStep {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  stepType    String    @map("step_type")
+  status      String    @default("NOT_STARTED")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  skippedAt   DateTime? @map("skipped_at")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([userId, stepType], name: "userId_stepType")
+  @@index([userId])
+  @@index([status])
+  @@map("onboarding_steps")
+}
+
+model UserActivity {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  activityType  String    @map("activity_type")
+  featureName   String?   @map("feature_name")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("user_activities")
+}
+
+model ChurnRiskAssessment {
+  id                  String    @id @default(uuid())
+  userId              String    @unique @map("user_id")
+  riskLevel           String    @map("risk_level")
+  riskScore           Int       @map("risk_score")
+  factors             Json      @default("[]")
+  predictedChurnDate  DateTime? @map("predicted_churn_date")
+  recommendedActions  String[]  @default([]) @map("recommended_actions")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([riskLevel])
+  @@index([riskScore])
+  @@map("churn_risk_assessments")
+}
+
+model RetentionCampaign {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  campaignType  String    @map("campaign_type")
+  status        String    @default("PENDING")
+  customMessage String?   @map("custom_message")
+  scheduledAt   DateTime? @map("scheduled_at")
+  sentAt        DateTime? @map("sent_at")
+  openedAt      DateTime? @map("opened_at")
+  clickedAt     DateTime? @map("clicked_at")
+  convertedAt   DateTime? @map("converted_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([campaignType])
+  @@index([status])
+  @@index([scheduledAt])
+  @@map("retention_campaigns")
+}
+
+model NPSResponse {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  score     Int
+  category  String
+  feedback  String?   @db.Text
+  context   String?
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("nps_responses")
+}
+
+model Milestone {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  milestoneType String    @map("milestone_type")
+  achievedAt    DateTime  @default(now()) @map("achieved_at")
+  celebratedAt  DateTime? @map("celebrated_at")
+  metadata      Json      @default("{}")
+
+  @@unique([userId, milestoneType])
+  @@index([userId])
+  @@index([milestoneType])
+  @@map("milestones")
+}
