@@ -60,6 +60,7 @@ import {
   errorTrackingMiddleware,
 } from '../monitoring';
 import { supportRoutes } from '../support';
+import { autoScalingRoutes } from '../auto-scaling';
 
 /**
  * API version prefix
@@ -234,6 +235,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 94 - Support and diagnostics tools
   apiRouter.use('/support', strictRateLimiter, supportRoutes);
   
+  // Auto-scaling routes (strict rate limiting - admin only)
+  // Requirements: 91 - Auto-scaling and resource optimization
+  apiRouter.use('/auto-scaling', strictRateLimiter, autoScalingRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -322,6 +327,7 @@ function createVersionHandler(): express.RequestHandler {
         search: `${API_PREFIX}/search`,
         admin: `${API_PREFIX}/admin`,
         support: `${API_PREFIX}/support`,
+        autoScaling: `${API_PREFIX}/auto-scaling`,
         monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
