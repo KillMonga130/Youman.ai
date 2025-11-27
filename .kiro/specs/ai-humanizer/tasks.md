@@ -596,7 +596,9 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(security): implement invisible watermarking system"`
   - _Requirements: 76_
 
-- [-] 40. Implement data retention policies
+- [x] 40. Implement data retention policies
+
+
 
 
 
@@ -610,7 +612,10 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
 
 ## Phase 10: Additional Transformation Features
 
-- [ ] 41. Implement grammar style preferences
+- [-] 41. Implement grammar style preferences
+
+
+
   - Create Oxford comma preference handling
   - Build quote style configuration (single/double)
   - Add date and number format preferences
