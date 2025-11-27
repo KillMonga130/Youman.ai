@@ -61,6 +61,7 @@ import {
 } from '../monitoring';
 import { supportRoutes } from '../support';
 import { autoScalingRoutes } from '../auto-scaling';
+import { disasterRecoveryRoutes } from '../disaster-recovery';
 
 /**
  * API version prefix
@@ -238,6 +239,10 @@ function mountApiRoutes(app: Express): void {
   // Auto-scaling routes (strict rate limiting - admin only)
   // Requirements: 91 - Auto-scaling and resource optimization
   apiRouter.use('/auto-scaling', strictRateLimiter, autoScalingRoutes);
+  
+  // Disaster recovery routes (strict rate limiting - admin only)
+  // Requirements: 92 - Disaster recovery and business continuity
+  apiRouter.use('/disaster-recovery', strictRateLimiter, disasterRecoveryRoutes);
   
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
