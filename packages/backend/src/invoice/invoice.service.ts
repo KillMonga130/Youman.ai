@@ -113,9 +113,7 @@ function transformStripeInvoice(
     id: line.id,
     description: line.description || 'Subscription',
     quantity: line.quantity || 1,
-    unitAmount: line.unit_amount_excluding_tax
-      ? Number(line.unit_amount_excluding_tax)
-      : (line.amount || 0) / (line.quantity || 1),
+    unitAmount: (line.amount || 0) / (line.quantity || 1),
     amount: line.amount || 0,
     currency: line.currency,
   }));
@@ -128,7 +126,7 @@ function transformStripeInvoice(
     status: mapStripeStatus(stripeInvoice.status),
     currency: stripeInvoice.currency,
     subtotal: stripeInvoice.subtotal || 0,
-    tax: stripeInvoice.tax || 0,
+    tax: (stripeInvoice.total - stripeInvoice.subtotal) || 0,
     total: stripeInvoice.total || 0,
     amountPaid: stripeInvoice.amount_paid || 0,
     amountDue: stripeInvoice.amount_due || 0,
@@ -260,7 +258,7 @@ export async function generateInvoice(input: CreateInvoiceInput): Promise<Invoic
  * Get invoices for a user or all users
  */
 export async function getInvoices(input: GetInvoicesInput): Promise<Invoice[]> {
-  const { userId, status, startDate, endDate, limit, offset } = input;
+  const { userId, status, startDate, endDate, limit, offset: _offset } = input;
 
   if (!stripe) {
     logger.warn('Stripe not configured, returning empty invoice list');
@@ -278,18 +276,24 @@ export async function getInvoices(input: GetInvoicesInput): Promise<Invoice[]> {
       return [];
     }
 
-    const stripeInvoices = await stripe.invoices.list({
+    const listParams: Stripe.InvoiceListParams = {
       customer: subscription.stripeCustomerId,
       limit: limit || 20,
-      starting_after: offset ? undefined : undefined,
-      status: status as Stripe.InvoiceListParams.Status | undefined,
-      created: startDate || endDate
-        ? {
-            gte: startDate ? Math.floor(startDate.getTime() / 1000) : undefined,
-            lte: endDate ? Math.floor(endDate.getTime() / 1000) : undefined,
-          }
-        : undefined,
-    });
+    };
+    if (status) {
+      listParams.status = status as Stripe.InvoiceListParams.Status;
+    }
+    if (startDate && endDate) {
+      listParams.created = {
+        gte: Math.floor(startDate.getTime() / 1000),
+        lte: Math.floor(endDate.getTime() / 1000),
+      };
+    } else if (startDate) {
+      listParams.created = { gte: Math.floor(startDate.getTime() / 1000) };
+    } else if (endDate) {
+      listParams.created = { lte: Math.floor(endDate.getTime() / 1000) };
+    }
+    const stripeInvoices = await stripe.invoices.list(listParams);
 
     return stripeInvoices.data.map((inv) =>
       transformStripeInvoice(inv, userId, subscription.user.email)
@@ -297,16 +301,23 @@ export async function getInvoices(input: GetInvoicesInput): Promise<Invoice[]> {
   }
 
   // Get all invoices (admin use case)
-  const stripeInvoices = await stripe.invoices.list({
+  const adminListParams: Stripe.InvoiceListParams = {
     limit: limit || 20,
-    status: status as Stripe.InvoiceListParams.Status | undefined,
-    created: startDate || endDate
-      ? {
-          gte: startDate ? Math.floor(startDate.getTime() / 1000) : undefined,
-          lte: endDate ? Math.floor(endDate.getTime() / 1000) : undefined,
-        }
-      : undefined,
-  });
+  };
+  if (status) {
+    adminListParams.status = status as Stripe.InvoiceListParams.Status;
+  }
+  if (startDate && endDate) {
+    adminListParams.created = {
+      gte: Math.floor(startDate.getTime() / 1000),
+      lte: Math.floor(endDate.getTime() / 1000),
+    };
+  } else if (startDate) {
+    adminListParams.created = { gte: Math.floor(startDate.getTime() / 1000) };
+  } else if (endDate) {
+    adminListParams.created = { lte: Math.floor(endDate.getTime() / 1000) };
+  }
+  const stripeInvoices = await stripe.invoices.list(adminListParams);
 
   // Map invoices to users
   const invoices: Invoice[] = [];
@@ -733,7 +744,7 @@ async function getPaymentAttemptCount(invoiceId: string): Promise<number> {
  * Calculate the next retry date based on attempt count
  */
 function calculateNextRetryDate(attemptCount: number): Date {
-  const daysToWait = RETRY_DELAY_DAYS[attemptCount] || RETRY_DELAY_DAYS[RETRY_DELAY_DAYS.length - 1];
+  const daysToWait = RETRY_DELAY_DAYS[attemptCount] ?? RETRY_DELAY_DAYS[RETRY_DELAY_DAYS.length - 1] ?? 7;
   const nextDate = new Date();
   nextDate.setDate(nextDate.getDate() + daysToWait);
   return nextDate;
@@ -820,11 +831,12 @@ export async function processRefund(input: ProcessRefundInput): Promise<RefundRe
   if (stripe && invoice.stripeInvoiceId) {
     try {
       // Get the payment intent from the invoice
-      const stripeInvoice = await stripe.invoices.retrieve(invoice.stripeInvoiceId);
-      const paymentIntentId =
-        typeof stripeInvoice.payment_intent === 'string'
-          ? stripeInvoice.payment_intent
-          : stripeInvoice.payment_intent?.id;
+      const stripeInvoiceResponse = await stripe.invoices.retrieve(invoice.stripeInvoiceId);
+      // Access payment_intent from the response
+      const paymentIntentRaw = (stripeInvoiceResponse as { payment_intent?: string | { id: string } | null }).payment_intent;
+      const paymentIntentId = typeof paymentIntentRaw === 'string' 
+        ? paymentIntentRaw 
+        : paymentIntentRaw?.id ?? null;
 
       if (!paymentIntentId) {
         throw new InvoiceError('No payment intent found for invoice', 'NO_PAYMENT_INTENT');
@@ -1106,21 +1118,23 @@ export async function getRevenueHistory(days: number = 30): Promise<RevenueHisto
 
   // Initialize all dates in range
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    const dateKey = d.toISOString().split('T')[0];
-    entriesByDate.set(dateKey, {
-      date: new Date(dateKey),
-      revenue: 0,
-      newSubscriptions: 0,
-      canceledSubscriptions: 0,
-      upgrades: 0,
-      downgrades: 0,
-    });
+    const dateKey = d.toISOString().split('T')[0] || '';
+    if (dateKey) {
+      entriesByDate.set(dateKey, {
+        date: new Date(dateKey),
+        revenue: 0,
+        newSubscriptions: 0,
+        canceledSubscriptions: 0,
+        upgrades: 0,
+        downgrades: 0,
+      });
+    }
   }
 
   // Process subscriptions
   for (const sub of subscriptions) {
-    const createdDateKey = sub.createdAt.toISOString().split('T')[0];
-    const updatedDateKey = sub.updatedAt.toISOString().split('T')[0];
+    const createdDateKey = sub.createdAt.toISOString().split('T')[0] || '';
+    const updatedDateKey = sub.updatedAt.toISOString().split('T')[0] || '';
 
     // New subscription
     if (sub.createdAt >= startDate && sub.createdAt <= endDate) {
