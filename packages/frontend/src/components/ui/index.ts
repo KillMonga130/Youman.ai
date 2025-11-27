@@ -25,6 +25,15 @@ export { Modal, type ModalProps } from './Modal';
 export { Tooltip, type TooltipProps } from './Tooltip';
 export { Tabs, TabList, Tab, TabPanel, type TabsProps, type TabProps } from './Tabs';
 
+// File Upload
+export {
+  FileUpload,
+  type FileUploadProps,
+  type UploadedFile,
+  type SupportedFormat,
+  type UploadStatus,
+} from './FileUpload';
+
 // Theme
 export { ThemeProvider, useTheme } from './ThemeProvider';
 export * from './theme';

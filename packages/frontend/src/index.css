@@ -694,3 +694,63 @@
     @apply shadow-none border;
   }
 }
+
+/* ============================================
+   Keyboard Shortcuts Styles
+   Requirement 64: Full keyboard accessibility
+   ============================================ */
+
+/* Keyboard shortcut key badge */
+.shortcut-key {
+  @apply inline-flex items-center justify-center;
+  @apply px-2 py-1 min-w-[2rem];
+  @apply text-xs font-mono font-medium;
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply text-gray-700 dark:text-gray-300;
+  @apply border border-gray-300 dark:border-gray-600;
+  @apply rounded shadow-sm;
+}
+
+.shortcut-key-sm {
+  @apply inline-flex items-center justify-center;
+  @apply px-1.5 py-0.5;
+  @apply text-[10px] font-mono font-medium;
+  @apply bg-gray-100 dark:bg-gray-700;
+  @apply text-gray-600 dark:text-gray-400;
+  @apply border border-gray-300 dark:border-gray-600;
+  @apply rounded;
+}
+
+/* Shortcut feedback animation */
+@keyframes shortcut-feedback {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+.animate-shortcut-feedback {
+  animation: shortcut-feedback 1.5s ease-in-out forwards;
+}
+
+/* Focus visible enhancement for keyboard navigation */
+.keyboard-focus:focus-visible {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+}
+
+/* Keyboard shortcut recording input */
+.shortcut-recording {
+  @apply animate-pulse border-primary-500;
+}

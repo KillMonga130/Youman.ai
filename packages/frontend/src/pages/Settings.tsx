@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { useAppStore, UserSettings } from '../store';
+import { KeyboardShortcutsSettings } from '../components/KeyboardShortcutsSettings';
 
 const defaultSettings: UserSettings = {
   defaultLevel: 3,
@@ -202,6 +203,9 @@ export function Settings(): JSX.Element {
           </label>
         </div>
       </div>
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcutsSettings />
 
       {/* Actions */}
       <div className="flex items-center justify-between">

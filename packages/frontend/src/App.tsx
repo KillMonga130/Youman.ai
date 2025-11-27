@@ -5,6 +5,9 @@ import { Layout } from './components/Layout';
 import { Dashboard, Editor, Comparison, Settings, History, Analytics } from './pages';
 import { ThemeProvider } from './components/ui';
 import { useAppStore } from './store';
+import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
+import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
+import { ShortcutFeedback } from './components/ShortcutFeedback';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,7 +27,7 @@ function AppContent(): JSX.Element {
   }, [settings.darkMode]);
 
   return (
-    <BrowserRouter>
+    <KeyboardShortcutsProvider>
       <Layout>
         {/* Skip link for keyboard navigation - WCAG AAA */}
         <a href="#main-content" className="skip-link">
@@ -40,6 +43,17 @@ function AppContent(): JSX.Element {
           <Route path="/settings" element={<Settings />} />
         </Routes>
       </Layout>
+      {/* Keyboard shortcuts modal and feedback */}
+      <KeyboardShortcutsModal />
+      <ShortcutFeedback />
+    </KeyboardShortcutsProvider>
+  );
+}
+
+function AppRouter(): JSX.Element {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }
@@ -48,7 +62,7 @@ function App(): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
-        <AppContent />
+        <AppRouter />
       </ThemeProvider>
     </QueryClientProvider>
   );

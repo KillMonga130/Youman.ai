@@ -1,6 +1,10 @@
 import { useState, useCallback } from 'react';
-import { Wand2, Copy, Download, RotateCcw, ChevronDown, Shield } from 'lucide-react';
+import { Wand2, Copy, Download, RotateCcw, ChevronDown, Shield, Upload } from 'lucide-react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useAppStore } from '../store';
+import { FileUpload, type UploadedFile } from '../components/ui';
+import { useKeyboardShortcuts } from '../context/KeyboardShortcutsContext';
+import { ShortcutHint } from '../components/KeyboardShortcutsModal';
 
 type Strategy = 'auto' | 'casual' | 'professional' | 'academic';
 
@@ -12,8 +16,10 @@ interface TransformOptions {
 
 export function Editor(): JSX.Element {
   const { originalText, setOriginalText, humanizedText, setHumanizedText, settings } = useAppStore();
+  const { getShortcutKey, shortcutsEnabled } = useKeyboardShortcuts();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showFileUpload, setShowFileUpload] = useState(false);
   const [options, setOptions] = useState<TransformOptions>({
     level: settings.defaultLevel,
     strategy: settings.defaultStrategy,
@@ -25,6 +31,12 @@ export function Editor(): JSX.Element {
     burstiness: number;
     modificationPercentage: number;
   } | null>(null);
+
+  // Handle file content extraction from upload
+  const handleContentExtracted = useCallback((content: string, _file: UploadedFile) => {
+    setOriginalText(content);
+    setShowFileUpload(false);
+  }, [setOriginalText]);
 
   const handleHumanize = useCallback(async () => {
     if (!originalText.trim()) return;
@@ -75,6 +87,64 @@ export function Editor(): JSX.Element {
 
   const wordCount = originalText.trim() ? originalText.trim().split(/\s+/).length : 0;
 
+  // Register editor-specific keyboard shortcuts
+  useHotkeys(
+    getShortcutKey('humanize'),
+    (e) => {
+      e.preventDefault();
+      if (originalText.trim() && !isProcessing) {
+        handleHumanize();
+      }
+    },
+    { enabled: shortcutsEnabled, enableOnFormTags: true },
+    [originalText, isProcessing, handleHumanize]
+  );
+
+  useHotkeys(
+    getShortcutKey('copy-output'),
+    (e) => {
+      e.preventDefault();
+      if (humanizedText) {
+        handleCopy();
+      }
+    },
+    { enabled: shortcutsEnabled },
+    [humanizedText, handleCopy]
+  );
+
+  useHotkeys(
+    getShortcutKey('download'),
+    (e) => {
+      e.preventDefault();
+      if (humanizedText) {
+        handleDownload();
+      }
+    },
+    { enabled: shortcutsEnabled },
+    [humanizedText, handleDownload]
+  );
+
+  useHotkeys(
+    getShortcutKey('reset'),
+    (e) => {
+      e.preventDefault();
+      if (originalText || humanizedText) {
+        handleReset();
+      }
+    },
+    { enabled: shortcutsEnabled },
+    [originalText, humanizedText, handleReset]
+  );
+
+  useHotkeys(
+    getShortcutKey('upload'),
+    (e) => {
+      e.preventDefault();
+      setShowFileUpload(true);
+    },
+    { enabled: shortcutsEnabled }
+  );
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col">
       {/* Toolbar */}
@@ -117,23 +187,65 @@ export function Editor(): JSX.Element {
 
         {/* Action buttons */}
         <button
+          onClick={() => setShowFileUpload(true)}
+          className="btn btn-outline flex items-center gap-2"
+          title="Upload File"
+        >
+          <Upload className="w-4 h-4" />
+          <span className="hidden sm:inline">Upload</span>
+          <ShortcutHint shortcutId="upload" />
+        </button>
+
+        <button
           onClick={handleReset}
           className="btn btn-outline flex items-center gap-2"
           disabled={!originalText && !humanizedText}
+          title="Reset Editor"
         >
           <RotateCcw className="w-4 h-4" />
           <span className="hidden sm:inline">Reset</span>
+          <ShortcutHint shortcutId="reset" />
         </button>
         
         <button
           onClick={handleHumanize}
           disabled={!originalText.trim() || isProcessing}
           className="btn btn-primary flex items-center gap-2"
+          title="Humanize Text"
         >
           <Wand2 className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} />
           {isProcessing ? 'Processing...' : 'Humanize'}
+          <ShortcutHint shortcutId="humanize" />
         </button>
       </div>
+
+      {/* File Upload Modal */}
+      {showFileUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Upload Document
+              </h2>
+              <button
+                onClick={() => setShowFileUpload(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                aria-label="Close"
+              >
+                <span className="text-2xl leading-none">&times;</span>
+              </button>
+            </div>
+            <div className="p-6">
+              <FileUpload
+                onContentExtracted={handleContentExtracted}
+                acceptedFormats={['docx', 'pdf', 'txt', 'epub']}
+                maxSize={50 * 1024 * 1024}
+                maxFiles={1}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Split pane editor */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 min-h-0">
@@ -160,17 +272,19 @@ export function Editor(): JSX.Element {
                 <>
                   <button
                     onClick={handleCopy}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-1"
                     title="Copy to clipboard"
                   >
                     <Copy className="w-4 h-4" />
+                    <span className="sr-only">Copy</span>
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-1"
                     title="Download"
                   >
                     <Download className="w-4 h-4" />
+                    <span className="sr-only">Download</span>
                   </button>
                 </>
               )}
