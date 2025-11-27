@@ -9,9 +9,6 @@ import crypto from 'crypto';
 import {
   TargetRegion,
   SensitivityLevel,
-  UnitSystem,
-  DateFormatStyle,
-  CurrencyInfo,
   RegionConfig,
   IdiomAdaptation,
   MetaphorAdaptation,
@@ -523,7 +520,7 @@ export class LocalizationService {
     const regionResults: Partial<Record<TargetRegion, LocalizationResult>> = {};
 
     for (const targetRegion of request.targetRegions) {
-      const result = await this.localize({
+      const localizationRequest: LocalizationRequest = {
         content: request.content,
         sourceRegion,
         targetRegion,
@@ -534,8 +531,11 @@ export class LocalizationService {
         convertCurrency: request.convertCurrency,
         convertDateFormats: request.convertDateFormats,
         checkSensitivity: request.checkSensitivity,
-        preserveTerms: request.preserveTerms,
-      });
+      };
+      if (request.preserveTerms) {
+        localizationRequest.preserveTerms = request.preserveTerms;
+      }
+      const result = await this.localize(localizationRequest);
       regionResults[targetRegion] = result;
     }
 
@@ -922,15 +922,18 @@ export class LocalizationService {
       let match;
 
       while ((match = pattern.exec(lowerContent)) !== null) {
-        flags.push({
+        const flag: CulturalSensitivityFlag = {
           text: match[0],
           startPosition: match.index,
           endPosition: match.index + match[0].length,
           level: data.level,
           reason: data.reason,
           affectedRegions,
-          suggestion: data.suggestion,
-        });
+        };
+        if (data.suggestion) {
+          flag.suggestion = data.suggestion;
+        }
+        flags.push(flag);
       }
     }
 
