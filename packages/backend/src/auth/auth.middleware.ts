@@ -138,6 +138,36 @@ export function optionalAuth(req: Request, _res: Response, next: NextFunction): 
 }
 
 /**
+ * Admin role middleware - requires user to be an admin
+ * Admin users are configured via ADMIN_EMAILS environment variable
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (!req.user) {
+    res.status(401).json({
+      error: 'Authentication required',
+      code: 'NO_AUTH',
+    });
+    return;
+  }
+
+  // Get admin emails from environment variable (comma-separated)
+  const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
+  
+  // Check if user's email is in the admin list
+  const isAdmin = adminEmails.includes(req.user.email.toLowerCase());
+
+  if (!isAdmin) {
+    res.status(403).json({
+      error: 'Admin access required',
+      code: 'FORBIDDEN',
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
  * Error handler for auth errors
  */
 export function handleAuthError(

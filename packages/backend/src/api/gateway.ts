@@ -29,6 +29,7 @@ import { mfaRoutes } from '../mfa';
 import { repurposingRoutes } from '../repurposing';
 import { localizationRoutes } from '../localization';
 import { searchRouter } from '../search';
+import { adminRoutes } from '../admin';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -207,6 +208,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 61 - Advanced search and filtering
   apiRouter.use('/search', standardRateLimiter, searchRouter);
   
+  // Admin routes (standard rate limiting)
+  // Requirements: 19 - Monitor system performance and user activity
+  apiRouter.use('/admin', standardRateLimiter, adminRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -293,6 +298,7 @@ function createVersionHandler(): express.RequestHandler {
         repurposing: `${API_PREFIX}/repurposing`,
         localization: `${API_PREFIX}/localization`,
         search: `${API_PREFIX}/search`,
+        admin: `${API_PREFIX}/admin`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
