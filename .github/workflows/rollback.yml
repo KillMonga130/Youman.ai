@@ -1,0 +1,226 @@
+# Manual Rollback Pipeline
+# Requirements: 93 - CI/CD pipeline
+# Requirements: 100 - Development environment setup
+
+name: Manual Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      rollback-type:
+        description: 'Rollback type'
+        required: true
+        type: choice
+        options:
+          - previous-version
+          - specific-version
+      version:
+        description: 'Specific version to rollback to (only for specific-version type)'
+        required: false
+        type: string
+      confirm:
+        description: 'Type "ROLLBACK" to confirm'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  KUBE_NAMESPACE: ai-humanizer
+
+jobs:
+  # Validate rollback request
+  validate:
+    name: Validate Rollback Request
+    runs-on: ubuntu-latest
+    outputs:
+      proceed: ${{ steps.validate.outputs.proceed }}
+    steps:
+      - name: Validate confirmation
+        id: validate
+        run: |
+          if [[ "${{ inputs.confirm }}" != "ROLLBACK" ]]; then
+            echo "::error::Rollback not confirmed. Please type 'ROLLBACK' to confirm."
+            echo "proceed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          if [[ "${{ inputs.rollback-type }}" == "specific-version" && -z "${{ inputs.version }}" ]]; then
+            echo "::error::Version is required for specific-version rollback type."
+            echo "proceed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "proceed=true" >> $GITHUB_OUTPUT
+          echo "Rollback validated for ${{ inputs.environment }} environment"
+
+  # Execute rollback
+  rollback:
+    name: Execute Rollback
+    runs-on: ubuntu-latest
+    needs: validate
+    if: needs.validate.outputs.proceed == 'true'
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          if [[ "${{ inputs.environment }}" == "production" ]]; then
+            echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          else
+            echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          fi
+          chmod 600 $HOME/.kube/config
+
+      - name: Get current deployment info
+        id: current
+        run: |
+          NAMESPACE="${{ env.KUBE_NAMESPACE }}"
+          if [[ "${{ inputs.environment }}" == "staging" ]]; then
+            NAMESPACE="${{ env.KUBE_NAMESPACE }}-staging"
+          fi
+          
+          echo "Getting current deployment info..."
+          
+          BACKEND_IMAGE=$(kubectl get deployment backend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "unknown")
+          FRONTEND_IMAGE=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo "unknown")
+          
+          echo "Current backend image: $BACKEND_IMAGE"
+          echo "Current frontend image: $FRONTEND_IMAGE"
+          
+          echo "backend-image=$BACKEND_IMAGE" >> $GITHUB_OUTPUT
+          echo "frontend-image=$FRONTEND_IMAGE" >> $GITHUB_OUTPUT
+          echo "namespace=$NAMESPACE" >> $GITHUB_OUTPUT
+
+      - name: Rollback to previous version
+        if: inputs.rollback-type == 'previous-version'
+        run: |
+          NAMESPACE="${{ steps.current.outputs.namespace }}"
+          
+          echo "Rolling back to previous version in $NAMESPACE..."
+          
+          # Rollback deployments
+          kubectl rollout undo deployment/backend -n $NAMESPACE
+          kubectl rollout undo deployment/frontend -n $NAMESPACE
+          
+          # Wait for rollback to complete
+          kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+          
+          echo "Rollback to previous version completed"
+
+      - name: Rollback to specific version
+        if: inputs.rollback-type == 'specific-version'
+        run: |
+          NAMESPACE="${{ steps.current.outputs.namespace }}"
+          VERSION="${{ inputs.version }}"
+          
+          echo "Rolling back to version $VERSION in $NAMESPACE..."
+          
+          # Update deployments to specific version
+          kubectl set image deployment/backend backend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:$VERSION -n $NAMESPACE
+          kubectl set image deployment/frontend frontend=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:$VERSION -n $NAMESPACE
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/backend -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/frontend -n $NAMESPACE --timeout=300s
+          
+          echo "Rollback to version $VERSION completed"
+
+      - name: Verify rollback
+        run: |
+          NAMESPACE="${{ steps.current.outputs.namespace }}"
+          
+          echo "Verifying rollback..."
+          
+          # Wait for services to stabilize
+          sleep 30
+          
+          # Check pod status
+          kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=backend
+          kubectl get pods -n $NAMESPACE -l app.kubernetes.io/name=frontend
+          
+          # Get new deployment info
+          NEW_BACKEND_IMAGE=$(kubectl get deployment backend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}')
+          NEW_FRONTEND_IMAGE=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.spec.template.spec.containers[0].image}')
+          
+          echo "New backend image: $NEW_BACKEND_IMAGE"
+          echo "New frontend image: $NEW_FRONTEND_IMAGE"
+          
+          # Verify pods are running
+          BACKEND_READY=$(kubectl get deployment backend -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
+          FRONTEND_READY=$(kubectl get deployment frontend -n $NAMESPACE -o jsonpath='{.status.readyReplicas}')
+          
+          if [[ "$BACKEND_READY" -lt 1 ]] || [[ "$FRONTEND_READY" -lt 1 ]]; then
+            echo "::error::Rollback verification failed - pods not ready"
+            exit 1
+          fi
+          
+          echo "Rollback verified successfully!"
+
+      - name: Create rollback record
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const environment = '${{ inputs.environment }}';
+            const rollbackType = '${{ inputs.rollback-type }}';
+            const version = '${{ inputs.version }}' || 'previous';
+            const actor = '${{ github.actor }}';
+            
+            // Create an issue to track the rollback
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Rollback ${status}: ${environment} to ${version}`,
+              body: `## Rollback Record
+              
+              - **Environment:** ${environment}
+              - **Rollback Type:** ${rollbackType}
+              - **Target Version:** ${version}
+              - **Initiated By:** @${actor}
+              - **Status:** ${status}
+              - **Timestamp:** ${new Date().toISOString()}
+              - **Workflow Run:** [Link](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+              
+              ### Previous Images
+              - Backend: ${{ steps.current.outputs.backend-image }}
+              - Frontend: ${{ steps.current.outputs.frontend-image }}
+              `,
+              labels: ['rollback', environment, status === 'success' ? 'resolved' : 'needs-attention']
+            });
+
+      - name: Notify rollback status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const environment = '${{ inputs.environment }}';
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: status === 'success' ? 'success' : 'failure',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: `Rollback ${status} for ${environment}`,
+              context: `rollback/${environment}`
+            });

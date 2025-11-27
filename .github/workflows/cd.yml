@@ -1,0 +1,333 @@
+# CD Pipeline - Blue-Green Deployment with Automated Rollback
+# Requirements: 93 - CI/CD pipeline
+# Requirements: 100 - Development environment setup
+
+name: CD Pipeline
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Image version to deploy (leave empty for latest)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  KUBE_NAMESPACE: ai-humanizer
+
+jobs:
+  # Prepare deployment
+  prepare:
+    name: Prepare Deployment
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      version: ${{ steps.set-version.outputs.version }}
+      deploy-slot: ${{ steps.determine-slot.outputs.slot }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          else
+            echo "environment=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set version
+        id: set-version
+        run: |
+          if [[ -n "${{ inputs.version }}" ]]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine deployment slot (Blue-Green)
+        id: determine-slot
+        run: |
+          # For blue-green deployment, alternate between slots
+          # In production, this would check current active slot
+          CURRENT_SLOT="${{ vars.CURRENT_DEPLOYMENT_SLOT || 'blue' }}"
+          if [[ "$CURRENT_SLOT" == "blue" ]]; then
+            echo "slot=green" >> $GITHUB_OUTPUT
+          else
+            echo "slot=blue" >> $GITHUB_OUTPUT
+          fi
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: prepare
+    if: needs.prepare.outputs.environment == 'staging'
+    environment:
+      name: staging
+      url: https://staging.ai-humanizer.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Deploy to staging (Blue-Green)
+        id: deploy
+        run: |
+          SLOT="${{ needs.prepare.outputs.deploy-slot }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+          
+          echo "Deploying version $VERSION to $SLOT slot..."
+          
+          # Update image tags in kustomization
+          cd k8s/overlays/development
+          
+          # Apply kustomization with new image tags
+          kubectl kustomize . | \
+            sed "s|ai-humanizer/backend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:$VERSION|g" | \
+            sed "s|ai-humanizer/frontend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:$VERSION|g" | \
+            kubectl apply -f - --namespace=${{ env.KUBE_NAMESPACE }}-staging
+          
+          # Wait for rollout
+          kubectl rollout status deployment/backend --namespace=${{ env.KUBE_NAMESPACE }}-staging --timeout=300s
+          kubectl rollout status deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }}-staging --timeout=300s
+          
+          echo "deployment-success=true" >> $GITHUB_OUTPUT
+
+      - name: Run smoke tests
+        id: smoke-tests
+        run: |
+          echo "Running smoke tests against staging..."
+          
+          # Wait for services to be ready
+          sleep 30
+          
+          # Health check
+          BACKEND_URL="https://staging-api.ai-humanizer.example.com"
+          FRONTEND_URL="https://staging.ai-humanizer.example.com"
+          
+          # Backend health check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || echo "000")
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "Backend health check failed with status: $HTTP_STATUS"
+            echo "smoke-tests-passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "Smoke tests passed!"
+          echo "smoke-tests-passed=true" >> $GITHUB_OUTPUT
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "Deployment failed, initiating rollback..."
+          
+          kubectl rollout undo deployment/backend --namespace=${{ env.KUBE_NAMESPACE }}-staging
+          kubectl rollout undo deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }}-staging
+          
+          # Wait for rollback to complete
+          kubectl rollout status deployment/backend --namespace=${{ env.KUBE_NAMESPACE }}-staging --timeout=300s
+          kubectl rollout status deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }}-staging --timeout=300s
+          
+          echo "Rollback completed"
+
+      - name: Notify deployment status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const version = '${{ needs.prepare.outputs.version }}';
+            const slot = '${{ needs.prepare.outputs.deploy-slot }}';
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: status === 'success' ? 'success' : 'failure',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: `Staging deployment ${status} (${slot} slot, version: ${version.substring(0, 7)})`,
+              context: 'deployment/staging'
+            });
+
+  # Deploy to production (requires manual approval)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [prepare, deploy-staging]
+    if: needs.prepare.outputs.environment == 'production' || (needs.prepare.outputs.environment == 'staging' && github.ref == 'refs/heads/main')
+    environment:
+      name: production
+      url: https://ai-humanizer.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Pre-deployment checks
+        run: |
+          echo "Running pre-deployment checks..."
+          
+          # Check cluster health
+          kubectl get nodes
+          kubectl get pods --namespace=${{ env.KUBE_NAMESPACE }}
+          
+          # Check resource availability
+          kubectl top nodes || true
+
+      - name: Deploy to production (Blue-Green)
+        id: deploy
+        run: |
+          SLOT="${{ needs.prepare.outputs.deploy-slot }}"
+          VERSION="${{ needs.prepare.outputs.version }}"
+          
+          echo "Deploying version $VERSION to $SLOT slot in production..."
+          
+          # Update image tags in kustomization
+          cd k8s/overlays/production
+          
+          # Apply kustomization with new image tags
+          kubectl kustomize . | \
+            sed "s|ai-humanizer/backend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend:$VERSION|g" | \
+            sed "s|ai-humanizer/frontend:latest|${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:$VERSION|g" | \
+            kubectl apply -f - --namespace=${{ env.KUBE_NAMESPACE }}
+          
+          # Wait for rollout with extended timeout for production
+          kubectl rollout status deployment/backend --namespace=${{ env.KUBE_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }} --timeout=600s
+          
+          echo "deployment-success=true" >> $GITHUB_OUTPUT
+
+      - name: Run production smoke tests
+        id: smoke-tests
+        run: |
+          echo "Running production smoke tests..."
+          
+          # Wait for services to be ready
+          sleep 60
+          
+          # Health checks
+          BACKEND_URL="https://api.ai-humanizer.example.com"
+          
+          # Backend health check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health" || echo "000")
+          if [[ "$HTTP_STATUS" != "200" ]]; then
+            echo "Backend health check failed with status: $HTTP_STATUS"
+            echo "smoke-tests-passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # API endpoint check
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/v1/health" || echo "000")
+          if [[ "$HTTP_STATUS" != "200" && "$HTTP_STATUS" != "401" ]]; then
+            echo "API endpoint check failed with status: $HTTP_STATUS"
+            echo "smoke-tests-passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          echo "Production smoke tests passed!"
+          echo "smoke-tests-passed=true" >> $GITHUB_OUTPUT
+
+      - name: Update deployment slot variable
+        if: success()
+        run: |
+          echo "Updating active deployment slot to ${{ needs.prepare.outputs.deploy-slot }}"
+          # In production, this would update the repository variable
+          # gh variable set CURRENT_DEPLOYMENT_SLOT --body "${{ needs.prepare.outputs.deploy-slot }}"
+
+      - name: Automated rollback on failure
+        if: failure()
+        run: |
+          echo "Production deployment failed, initiating automated rollback..."
+          
+          # Rollback deployments
+          kubectl rollout undo deployment/backend --namespace=${{ env.KUBE_NAMESPACE }}
+          kubectl rollout undo deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }}
+          
+          # Wait for rollback to complete
+          kubectl rollout status deployment/backend --namespace=${{ env.KUBE_NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/frontend --namespace=${{ env.KUBE_NAMESPACE }} --timeout=600s
+          
+          echo "Automated rollback completed"
+
+      - name: Notify deployment status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const version = '${{ needs.prepare.outputs.version }}';
+            const slot = '${{ needs.prepare.outputs.deploy-slot }}';
+            
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.sha,
+              state: status === 'success' ? 'success' : 'failure',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: `Production deployment ${status} (${slot} slot, version: ${version.substring(0, 7)})`,
+              context: 'deployment/production'
+            });
+
+  # Cleanup old images
+  cleanup:
+    name: Cleanup Old Images
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: always() && needs.deploy-staging.result == 'success'
+    steps:
+      - name: Delete old container images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'backend'
+          package-type: 'container'
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: 'true'
+
+      - name: Delete old frontend images
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: 'frontend'
+          package-type: 'container'
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: 'true'

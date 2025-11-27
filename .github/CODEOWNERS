@@ -1,0 +1,31 @@
+# CODEOWNERS file for AI Humanizer
+# Requirements: 93 - CI/CD pipeline
+
+# Default owners for everything in the repo
+* @ai-humanizer/core-team
+
+# Backend code owners
+/packages/backend/ @ai-humanizer/backend-team
+
+# Frontend code owners
+/packages/frontend/ @ai-humanizer/frontend-team
+
+# Shared code owners
+/packages/shared/ @ai-humanizer/core-team
+
+# Infrastructure and DevOps
+/k8s/ @ai-humanizer/devops-team
+/.github/ @ai-humanizer/devops-team
+/docker-compose.yml @ai-humanizer/devops-team
+/**/Dockerfile @ai-humanizer/devops-team
+
+# Database schemas
+/packages/backend/prisma/ @ai-humanizer/backend-team @ai-humanizer/dba-team
+
+# Security-sensitive files
+/packages/backend/src/auth/ @ai-humanizer/security-team
+/packages/backend/src/mfa/ @ai-humanizer/security-team
+/k8s/secrets.yaml @ai-humanizer/security-team @ai-humanizer/devops-team
+
+# Documentation
+*.md @ai-humanizer/docs-team

@@ -1,0 +1,145 @@
+# PR Validation Pipeline
+# Requirements: 93 - CI/CD pipeline
+# Requirements: 100 - Development environment setup
+
+name: PR Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # Check PR title follows conventional commits
+  validate-pr:
+    name: Validate PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            chore
+            ci
+            build
+            revert
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}"
+            should start with a lowercase letter.
+
+  # Check for breaking changes
+  breaking-changes:
+    name: Check Breaking Changes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for breaking changes in PR
+        run: |
+          # Check if PR title or body contains BREAKING CHANGE
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          
+          if [[ "$PR_TITLE" == *"BREAKING CHANGE"* ]] || [[ "$PR_BODY" == *"BREAKING CHANGE"* ]]; then
+            echo "::warning::This PR contains breaking changes. Please ensure proper documentation and migration guides are provided."
+          fi
+
+  # Code quality checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for console.log statements
+        run: |
+          # Check for console.log in source files (excluding tests)
+          if grep -r "console\.log" --include="*.ts" --include="*.tsx" packages/*/src/ --exclude="*.test.*" --exclude="*test-setup*" | grep -v "// eslint-disable"; then
+            echo "::warning::Found console.log statements in source code. Consider removing them before merging."
+          fi
+
+      - name: Check for TODO comments
+        run: |
+          # Count TODO comments
+          TODO_COUNT=$(grep -r "TODO" --include="*.ts" --include="*.tsx" packages/ | wc -l || echo "0")
+          if [[ "$TODO_COUNT" -gt 0 ]]; then
+            echo "::notice::Found $TODO_COUNT TODO comments in the codebase."
+          fi
+
+  # Size check
+  size-check:
+    name: Bundle Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build --workspace=@ai-humanizer/frontend
+
+      - name: Check bundle size
+        run: |
+          # Get the size of the dist folder
+          DIST_SIZE=$(du -sh packages/frontend/dist | cut -f1)
+          echo "Frontend bundle size: $DIST_SIZE"
+          
+          # Check if size exceeds threshold (10MB)
+          DIST_SIZE_KB=$(du -sk packages/frontend/dist | cut -f1)
+          if [[ "$DIST_SIZE_KB" -gt 10240 ]]; then
+            echo "::warning::Frontend bundle size ($DIST_SIZE) exceeds 10MB threshold."
+          fi
+
+  # Dependency audit
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high || true
+
+      - name: Check for outdated dependencies
+        run: npm outdated || true
