@@ -677,7 +677,9 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - **Git Commit:** `git add .; git commit -m "feat(formal): implement content formalization with hedging language"`
   - _Requirements: 107_
 
-- [-] 46. Build content repurposing
+- [x] 46. Build content repurposing
+
+
 
 
 
@@ -687,8 +689,10 @@ const absolutePath = path.resolve(__dirname, '..', 'config');
   - Add hashtag and formatting rule enforcement
   - **Git Commit:** `git add .; git commit -m "feat(repurpose): implement content repurposing for social platforms"`
   - _Requirements: 109_
+-
 
-- [ ] 47. Implement fact-checking
+- [-] 47. Implement fact-checking
+
 
   - Create factual claim verification against sources
   - Build inaccuracy flagging
