@@ -154,6 +154,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-west-2', 'eu-west-1'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       });
 
@@ -168,6 +169,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: [],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       })).rejects.toThrow('At least one target region is required');
     });
@@ -177,6 +179,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-east-1', 'us-west-2'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       })).rejects.toThrow('Target regions cannot include source region');
     });
@@ -186,6 +189,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-west-2'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       });
 
@@ -202,6 +206,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-west-2'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       });
 
@@ -216,6 +221,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-west-2'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       });
 
@@ -453,6 +459,7 @@ describe('DisasterRecoveryService', () => {
         sourceRegion: 'us-east-1',
         targetRegions: ['us-west-2'],
         mode: 'async',
+        lagThresholdMs: 5000,
         enabled: true,
       });
 

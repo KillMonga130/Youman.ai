@@ -7,7 +7,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import {
   CDNDistribution,
-  CDNOrigin,
   CacheBehavior,
   CacheEntry,
   CacheStats,
@@ -16,7 +15,6 @@ import {
   GeoEndpoint,
   GeoRoutingConfig,
   GeoRoutingDecision,
-  CacheLevel,
   CachingStrategy,
   LatencyMetrics,
 } from './types';
@@ -238,7 +236,7 @@ export class CDNService {
       throw new Error('No geo-routing configurations available');
     }
 
-    const config = configs[0];
+    const config = configs[0]!;
     const healthyEndpoints = config.endpoints.filter(e => e.healthy);
 
     if (healthyEndpoints.length === 0) {
@@ -250,7 +248,7 @@ export class CDNService {
 
     switch (config.routingPolicy) {
       case 'latency':
-        selectedEndpoint = healthyEndpoints.reduce((min, e) => e.latency < min.latency ? e : min);
+        selectedEndpoint = healthyEndpoints.reduce((min, e) => e.latency < min.latency ? e : min, healthyEndpoints[0]!);
         reason = `Lowest latency endpoint (${selectedEndpoint.latency}ms)`;
         break;
       case 'geoproximity':
@@ -262,11 +260,11 @@ export class CDNService {
         reason = `Weighted selection (weight: ${selectedEndpoint.weight})`;
         break;
       case 'failover':
-        selectedEndpoint = healthyEndpoints.sort((a, b) => b.weight - a.weight)[0];
+        selectedEndpoint = healthyEndpoints.sort((a, b) => b.weight - a.weight)[0]!;
         reason = 'Primary endpoint (failover policy)';
         break;
       default:
-        selectedEndpoint = healthyEndpoints[0];
+        selectedEndpoint = healthyEndpoints[0]!;
         reason = 'Default selection';
     }
 
@@ -286,7 +284,7 @@ export class CDNService {
     if (regionMatch) return regionMatch;
 
     // Fall back to lowest latency
-    return endpoints.reduce((min, e) => e.latency < min.latency ? e : min);
+    return endpoints.reduce((min, e) => e.latency < min.latency ? e : min, endpoints[0]!);
   }
 
   private selectWeightedEndpoint(endpoints: GeoEndpoint[]): GeoEndpoint {
@@ -298,7 +296,7 @@ export class CDNService {
       if (random <= 0) return endpoint;
     }
 
-    return endpoints[0];
+    return endpoints[0]!;
   }
 
   async updateEndpointHealth(configId: string, region: string, healthy: boolean): Promise<void> {
@@ -320,12 +318,12 @@ export class CDNService {
 
     const metrics: LatencyMetrics = {
       region,
-      p50: samples[49],
-      p90: samples[89],
-      p99: samples[98],
+      p50: samples[49] ?? 0,
+      p90: samples[89] ?? 0,
+      p99: samples[98] ?? 0,
       avg: samples.reduce((sum, s) => sum + s, 0) / samples.length,
-      min: samples[0],
-      max: samples[99],
+      min: samples[0] ?? 0,
+      max: samples[99] ?? 0,
       sampleCount: samples.length,
       timestamp: new Date(),
     };
