@@ -21,6 +21,7 @@ import { invoiceRoutes } from '../invoice';
 import { seoRoutes } from '../seo';
 import { plagiarismRoutes } from '../plagiarism';
 import { citationRoutes } from '../citation';
+import { abTestingRoutes } from '../ab-testing';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -166,6 +167,11 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 33 - Citation and reference management
   apiRouter.use('/citation', standardRateLimiter, citationRoutes);
   
+  // A/B Testing routes (standard rate limiting)
+  // Requirements: 34 - A/B testing for content variations
+  // Requirements: 121 - Performance tracking and winner selection
+  apiRouter.use('/ab-testing', standardRateLimiter, abTestingRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -244,6 +250,7 @@ function createVersionHandler(): express.RequestHandler {
         seo: `${API_PREFIX}/seo`,
         plagiarism: `${API_PREFIX}/plagiarism`,
         citation: `${API_PREFIX}/citation`,
+        abTesting: `${API_PREFIX}/ab-testing`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
