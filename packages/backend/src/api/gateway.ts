@@ -19,6 +19,7 @@ import { subscriptionRoutes } from '../subscription';
 import { usageRoutes } from '../usage';
 import { invoiceRoutes } from '../invoice';
 import { seoRoutes } from '../seo';
+import { plagiarismRoutes } from '../plagiarism';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -155,6 +156,11 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 27 - SEO keyword preservation and metadata management
   apiRouter.use('/seo', standardRateLimiter, seoRoutes);
   
+  // Plagiarism detection routes (standard rate limiting)
+  // Requirements: 31 - Plagiarism checking integrated with humanization
+  // Requirements: 118 - Plagiarism-free certificates for premium users
+  apiRouter.use('/plagiarism', standardRateLimiter, plagiarismRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -231,6 +237,7 @@ function createVersionHandler(): express.RequestHandler {
         usage: `${API_PREFIX}/usage`,
         invoices: `${API_PREFIX}/invoices`,
         seo: `${API_PREFIX}/seo`,
+        plagiarism: `${API_PREFIX}/plagiarism`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,

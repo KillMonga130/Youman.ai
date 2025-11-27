@@ -23,6 +23,8 @@ const envSchema = z.object({
   GPTZERO_API_KEY: z.string().optional(),
   ORIGINALITY_API_KEY: z.string().optional(),
   TURNITIN_API_KEY: z.string().optional(),
+  COPYSCAPE_API_KEY: z.string().optional(),
+  GRAMMARLY_API_KEY: z.string().optional(),
 
   // Storage
   S3_BUCKET: z.string().optional(),
@@ -69,7 +71,11 @@ export const config = {
     gptZero: env.GPTZERO_API_KEY,
     originality: env.ORIGINALITY_API_KEY,
     turnitin: env.TURNITIN_API_KEY,
+    copyscape: env.COPYSCAPE_API_KEY,
+    grammarly: env.GRAMMARLY_API_KEY,
   },
+
+  jwtSecret: env.JWT_SECRET,
 
   storage: {
     bucket: env.S3_BUCKET,
