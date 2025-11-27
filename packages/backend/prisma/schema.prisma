@@ -473,3 +473,48 @@ model AuditLog {
   @@index([createdAt])
   @@map("audit_logs")
 }
+
+// ============================================
+// Cloud Storage Integration
+// Requirements: 22 - Integrate with cloud storage services
+// ============================================
+
+model CloudConnection {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  provider      String    // GOOGLE_DRIVE, DROPBOX, ONEDRIVE
+  email         String
+  displayName   String?   @map("display_name")
+  accessToken   String    @map("access_token")
+  refreshToken  String?   @map("refresh_token")
+  expiresAt     DateTime? @map("expires_at")
+  isActive      Boolean   @default(true) @map("is_active")
+  connectedAt   DateTime  @default(now()) @map("connected_at")
+  lastUsedAt    DateTime? @map("last_used_at")
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider])
+  @@map("cloud_connections")
+}
+
+model ProjectSyncConfig {
+  id              String    @id @default(uuid())
+  projectId       String    @map("project_id")
+  userId          String    @map("user_id")
+  provider        String    // GOOGLE_DRIVE, DROPBOX, ONEDRIVE
+  cloudFolderId   String    @map("cloud_folder_id")
+  cloudFolderPath String    @map("cloud_folder_path")
+  autoSync        Boolean   @default(true) @map("auto_sync")
+  syncInterval    Int?      @map("sync_interval") // in minutes
+  lastSyncAt      DateTime? @map("last_sync_at")
+  lastSyncStatus  String    @default("IDLE") @map("last_sync_status") // IDLE, SYNCING, SUCCESS, FAILED
+  lastSyncError   String?   @map("last_sync_error")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([projectId, provider])
+  @@index([userId])
+  @@index([projectId])
+  @@map("project_sync_configs")
+}

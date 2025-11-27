@@ -35,6 +35,14 @@ const envSchema = z.object({
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+
+  // Cloud Storage (Google Drive, Dropbox, OneDrive)
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  DROPBOX_CLIENT_ID: z.string().optional(),
+  DROPBOX_CLIENT_SECRET: z.string().optional(),
+  ONEDRIVE_CLIENT_ID: z.string().optional(),
+  ONEDRIVE_CLIENT_SECRET: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -87,5 +95,20 @@ export const config = {
   stripe: {
     secretKey: env.STRIPE_SECRET_KEY,
     webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+  },
+
+  cloudStorage: {
+    google: {
+      clientId: env.GOOGLE_CLIENT_ID,
+      clientSecret: env.GOOGLE_CLIENT_SECRET,
+    },
+    dropbox: {
+      clientId: env.DROPBOX_CLIENT_ID,
+      clientSecret: env.DROPBOX_CLIENT_SECRET,
+    },
+    onedrive: {
+      clientId: env.ONEDRIVE_CLIENT_ID,
+      clientSecret: env.ONEDRIVE_CLIENT_SECRET,
+    },
   },
 };

@@ -23,6 +23,8 @@ import { plagiarismRoutes } from '../plagiarism';
 import { citationRoutes } from '../citation';
 import { abTestingRoutes } from '../ab-testing';
 import { schedulingRoutes } from '../scheduling';
+import { cloudStorageRouter } from '../cloud-storage';
+import { webhookRoutes } from '../webhook';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -177,6 +179,14 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 35 - Scheduling and automation with cron jobs
   apiRouter.use('/scheduling', standardRateLimiter, schedulingRoutes);
   
+  // Cloud Storage routes (standard rate limiting)
+  // Requirements: 22 - Integrate with cloud storage services (Google Drive, Dropbox, OneDrive)
+  apiRouter.use('/cloud-storage', standardRateLimiter, cloudStorageRouter);
+  
+  // Webhook routes (standard rate limiting)
+  // Requirements: 51 - Webhook system with HMAC verification
+  apiRouter.use('/webhooks', standardRateLimiter, webhookRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -257,6 +267,8 @@ function createVersionHandler(): express.RequestHandler {
         citation: `${API_PREFIX}/citation`,
         abTesting: `${API_PREFIX}/ab-testing`,
         scheduling: `${API_PREFIX}/scheduling`,
+        cloudStorage: `${API_PREFIX}/cloud-storage`,
+        webhooks: `${API_PREFIX}/webhooks`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
