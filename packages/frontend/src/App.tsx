@@ -1,32 +1,49 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { Layout } from './components/Layout';
+import { Dashboard, Editor, Comparison, Settings, History, Analytics } from './pages';
+import { useAppStore } from './store';
 
-function HomePage(): JSX.Element {
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+    },
+  },
+});
+
+function AppContent(): JSX.Element {
+  const { settings } = useAppStore();
+
+  // Apply dark mode on mount
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', settings.darkMode);
+  }, [settings.darkMode]);
+
   return (
-    <div className="container">
-      <header className="header">
-        <h1>AI Humanizer</h1>
-        <p>Transform AI-generated text into natural, human-like content</p>
-      </header>
-      <main className="main">
-        <section className="hero">
-          <h2>Welcome to AI Humanizer</h2>
-          <p>
-            Our advanced platform helps you transform AI-generated content into authentic,
-            human-sounding text that maintains your original meaning while evading AI detection.
-          </p>
-        </section>
-      </main>
-    </div>
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/editor" element={<Editor />} />
+          <Route path="/editor/:id" element={<Editor />} />
+          <Route path="/comparison" element={<Comparison />} />
+          <Route path="/history" element={<History />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/settings" element={<Settings />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
   );
 }
 
 function App(): JSX.Element {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-      </Routes>
-    </BrowserRouter>
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }
 

@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   --color-primary: #2563eb;
   --color-primary-dark: #1d4ed8;
@@ -9,73 +13,43 @@
   --color-surface: #ffffff;
   --color-text: #1e293b;
   --color-text-secondary: #64748b;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+.dark {
+  --color-background: #0f172a;
+  --color-surface: #1e293b;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
 }
 
-body {
-  font-family: var(--font-family);
-  background-color: var(--color-background);
-  color: var(--color-text);
-  line-height: 1.6;
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100;
+  }
 }
 
-.container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1rem;
-}
-
-.header {
-  text-align: center;
-  padding: 2rem 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.header h1 {
-  font-size: 2.5rem;
-  color: var(--color-primary);
-  margin-bottom: 0.5rem;
-}
-
-.header p {
-  color: var(--color-text-secondary);
-  font-size: 1.125rem;
-}
-
-.main {
-  padding: 2rem 0;
-}
-
-.hero {
-  text-align: center;
-  padding: 3rem 1rem;
-  background: var(--color-surface);
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.hero h2 {
-  font-size: 1.875rem;
-  margin-bottom: 1rem;
-}
-
-.hero p {
-  color: var(--color-text-secondary);
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #0f172a;
-    --color-surface: #1e293b;
-    --color-text: #f1f5f9;
-    --color-text-secondary: #94a3b8;
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
+  }
+  
+  .btn-outline {
+    @apply border border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800;
+  }
+  
+  .card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700;
+  }
+  
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white;
   }
 }
