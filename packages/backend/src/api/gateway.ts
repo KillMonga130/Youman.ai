@@ -14,6 +14,7 @@ import { authRouter } from '../auth';
 import { projectRouter } from '../project';
 import { versionRouter, branchRouter } from '../version';
 import { storageRouter } from '../storage';
+import { collaborationRouter } from '../collaboration';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -127,6 +128,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 12, 15, 63 - Document storage with S3 and MongoDB
   apiRouter.use('/storage', standardRateLimiter, storageRouter);
   
+  // Collaboration routes (standard rate limiting)
+  // Requirements: 21 - Collaborate with team members on projects
+  apiRouter.use('/collaboration', standardRateLimiter, collaborationRouter);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -198,6 +203,7 @@ function createVersionHandler(): express.RequestHandler {
         versions: `${API_PREFIX}/versions`,
         branches: `${API_PREFIX}/branches`,
         storage: `${API_PREFIX}/storage`,
+        collaboration: `${API_PREFIX}/collaboration`,
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,

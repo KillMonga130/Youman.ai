@@ -41,6 +41,7 @@ model User {
   usageRecords      UsageRecord[]
   webhooks          Webhook[]
   preferences       UserPreference?
+  sentInvitations   ProjectInvitation[]
 
   @@index([email])
   @@index([createdAt])
@@ -179,6 +180,7 @@ model Project {
   // Relations
   owner           User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   collaborators   ProjectCollaborator[]
+  invitations     ProjectInvitation[]
   versions        Version[]
   transformations Transformation[]
   branches        Branch[]
@@ -217,6 +219,41 @@ enum CollaboratorRole {
   VIEWER
   EDITOR
   ADMIN
+}
+
+// ============================================
+// Project Invitations
+// ============================================
+
+model ProjectInvitation {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  email       String
+  role        CollaboratorRole @default(VIEWER)
+  token       String    @unique
+  message     String?
+  status      InvitationStatus @default(PENDING)
+  invitedBy   String    @map("invited_by")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  inviter     User      @relation(fields: [invitedBy], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([email])
+  @@index([token])
+  @@index([status])
+  @@map("project_invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  REVOKED
 }
 
 // ============================================
