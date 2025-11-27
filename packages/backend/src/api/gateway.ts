@@ -54,6 +54,11 @@ import {
 import { checkDatabaseHealth } from '../database';
 import { logger } from '../utils/logger';
 import { config } from '../config/env';
+import { 
+  monitoringRoutes,
+  monitoringMiddleware,
+  errorTrackingMiddleware,
+} from '../monitoring';
 
 /**
  * API version prefix
@@ -91,9 +96,17 @@ export function createApiGateway(app: Express): void {
   
   // 8. API key validation (optional)
   app.use(validateApiKey);
+  
+  // 9. Monitoring middleware (request tracking, tracing, metrics)
+  // Requirements: 82 - Logging and monitoring with ELK and Prometheus
+  app.use(monitoringMiddleware());
 
   // Health check endpoint (no rate limiting)
   app.get('/health', createHealthCheckHandler());
+  
+  // Monitoring endpoints (metrics, diagnostics, alerts)
+  // Requirements: 82 - Prometheus metrics and diagnostic reports
+  app.use('/monitoring', monitoringRoutes);
   
   // API version info endpoint
   app.get(API_PREFIX, relaxedRateLimiter, createVersionHandler());
@@ -103,6 +116,10 @@ export function createApiGateway(app: Express): void {
 
   // Error logging middleware
   app.use(errorLogger);
+  
+  // Error tracking for diagnostics
+  // Requirements: 82 - Error tracking and diagnostic reports
+  app.use(errorTrackingMiddleware);
   
   // 404 handler
   app.use(notFoundHandler);
@@ -299,6 +316,7 @@ function createVersionHandler(): express.RequestHandler {
         localization: `${API_PREFIX}/localization`,
         search: `${API_PREFIX}/search`,
         admin: `${API_PREFIX}/admin`,
+        monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
         detection: `${API_PREFIX}/detection`,
