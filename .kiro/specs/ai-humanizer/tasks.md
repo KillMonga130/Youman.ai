@@ -516,7 +516,9 @@ npx vitest run --reporter=verbose
   - **Git Commit:** `git add .; git commit -m "feat(billing): implement Stripe subscription management with tier enforcement"`
   - _Requirements: 20, 86_
 
-- [-] 22. Build usage metering
+- [x] 22. Build usage metering
+
+
 
 
 
@@ -528,7 +530,10 @@ npx vitest run --reporter=verbose
   - **Git Commit:** `git add .; git commit -m "feat(billing): implement usage metering with quota tracking"`
   - _Requirements: 20, 66, 80_
 
-- [ ] 23. Implement invoice generation
+- [-] 23. Implement invoice generation
+
+
+
   - Create automated invoice generation
   - Build invoice email delivery
   - Add payment retry logic
