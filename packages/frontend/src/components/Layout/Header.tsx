@@ -1,8 +1,12 @@
-import { Sun, Moon, Bell } from 'lucide-react';
+import { Sun, Moon, Bell, HelpCircle } from 'lucide-react';
 import { useAppStore } from '../../store';
 import { Tooltip } from '../ui';
 
-export function Header(): JSX.Element {
+interface HeaderProps {
+  onOpenTutorials?: () => void;
+}
+
+export function Header({ onOpenTutorials }: HeaderProps): JSX.Element {
   const { settings, updateSettings } = useAppStore();
 
   const toggleDarkMode = (): void => {
@@ -19,6 +23,20 @@ export function Header(): JSX.Element {
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
+          {/* Help/Tutorials button */}
+          {onOpenTutorials && (
+            <Tooltip content="Help & Tutorials">
+              <button
+                onClick={onOpenTutorials}
+                className="btn-icon-sm btn-ghost"
+                aria-label="Open help and tutorials"
+                data-tour="help-button"
+              >
+                <HelpCircle className="w-5 h-5" aria-hidden="true" />
+              </button>
+            </Tooltip>
+          )}
+
           <Tooltip content={settings.darkMode ? 'Switch to light mode' : 'Switch to dark mode'}>
             <button
               onClick={toggleDarkMode}

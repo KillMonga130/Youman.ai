@@ -1,6 +1,7 @@
-import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search } from 'lucide-react';
+import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search, BookOpen, HelpCircle } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store';
+import { OnboardingProgressIndicator } from '../TutorialCenter';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
@@ -11,7 +12,11 @@ const navItems = [
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
-export function Sidebar(): JSX.Element {
+interface SidebarProps {
+  onOpenTutorials?: () => void;
+}
+
+export function Sidebar({ onOpenTutorials }: SidebarProps): JSX.Element {
   const location = useLocation();
   const { sidebarOpen, setSidebarOpen, user, setUser } = useAppStore();
 
@@ -71,7 +76,28 @@ export function Sidebar(): JSX.Element {
                 </Link>
               );
             })}
+
+            {/* Tutorials button */}
+            {onOpenTutorials && (
+              <button
+                onClick={onOpenTutorials}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 w-full"
+                data-tour="tutorials"
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>Tutorials</span>
+              </button>
+            )}
           </nav>
+
+          {/* Onboarding progress */}
+          <div className="px-4 py-2 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-2">
+              <HelpCircle className="w-3 h-3" />
+              <span>Learning Progress</span>
+            </div>
+            <OnboardingProgressIndicator />
+          </div>
 
           {/* User section */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700">
