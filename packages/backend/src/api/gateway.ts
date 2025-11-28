@@ -63,6 +63,8 @@ import { supportRoutes } from '../support';
 import { autoScalingRoutes } from '../auto-scaling';
 import { disasterRecoveryRoutes } from '../disaster-recovery';
 import { cdnRoutes } from '../cdn';
+import { performanceRoutes } from '../performance';
+import { setupSwagger } from '../docs';
 
 /**
  * API version prefix
@@ -107,6 +109,10 @@ export function createApiGateway(app: Express): void {
 
   // Health check endpoint (no rate limiting)
   app.get('/health', createHealthCheckHandler());
+  
+  // Setup Swagger API documentation
+  // Requirements: 23 - Comprehensive API documentation
+  setupSwagger(app);
   
   // Monitoring endpoints (metrics, diagnostics, alerts)
   // Requirements: 82 - Prometheus metrics and diagnostic reports
@@ -249,6 +255,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 90 - CDN and global content delivery
   apiRouter.use('/cdn', strictRateLimiter, cdnRoutes);
   
+  // Performance optimization routes (strict rate limiting - admin only)
+  // Requirements: 70 - Performance optimization
+  apiRouter.use('/performance', strictRateLimiter, performanceRoutes);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
   
@@ -340,6 +350,7 @@ function createVersionHandler(): express.RequestHandler {
         autoScaling: `${API_PREFIX}/auto-scaling`,
         disasterRecovery: `${API_PREFIX}/disaster-recovery`,
         cdn: `${API_PREFIX}/cdn`,
+        performance: `${API_PREFIX}/performance`,
         monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,
