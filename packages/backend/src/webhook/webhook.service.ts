@@ -401,10 +401,15 @@ export class WebhookService {
     }
 
     const expectedSignature = this.computeSignature(payload, secret, timestamp);
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature)
-    );
+    const signatureBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+    
+    // Signatures must be same length for timing-safe comparison
+    if (signatureBuffer.length !== expectedBuffer.length) {
+      return false;
+    }
+    
+    return crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
   }
 
   /**
