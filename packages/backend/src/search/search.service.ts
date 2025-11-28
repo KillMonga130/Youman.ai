@@ -299,7 +299,7 @@ export async function saveSearch(
     data: {
       name: input.name,
       query: input.query || null,
-      filters: input.filters as Record<string, unknown>,
+      filters: input.filters ? JSON.parse(JSON.stringify(input.filters)) : {},
       userId,
       useCount: 0,
     },

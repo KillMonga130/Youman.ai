@@ -69,6 +69,14 @@ vi.mock('../storage/storage.service', () => ({
   }),
 }));
 
+vi.mock('../database/schemas/document.schema', () => ({
+  DocumentModel: {
+    find: vi.fn().mockResolvedValue([]),
+    findById: vi.fn().mockResolvedValue(null),
+    create: vi.fn().mockResolvedValue({}),
+  },
+}));
+
 describe('Cloud Storage Service', () => {
   beforeEach(() => {
     vi.clearAllMocks();

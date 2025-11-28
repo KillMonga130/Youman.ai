@@ -86,11 +86,10 @@ StorageQuotaSchema.index({ totalBytesUsed: -1 });
 StorageQuotaSchema.index({ lastCalculatedAt: 1 });
 
 // Limit usage history to last 1000 entries to prevent unbounded growth
-StorageQuotaSchema.pre('save', function(next) {
+StorageQuotaSchema.pre('save', function() {
   if (this.usageHistory && this.usageHistory.length > 1000) {
     this.usageHistory = this.usageHistory.slice(-1000);
   }
-  next();
 });
 
 export const StorageQuotaModel = mongoose.model<IStorageQuota>('StorageQuota', StorageQuotaSchema);

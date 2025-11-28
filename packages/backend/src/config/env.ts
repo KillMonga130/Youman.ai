@@ -81,6 +81,7 @@ export const config = {
     turnitin: env.TURNITIN_API_KEY,
     copyscape: env.COPYSCAPE_API_KEY,
     grammarly: env.GRAMMARLY_API_KEY,
+    googleFactCheck: process.env.GOOGLE_FACT_CHECK_API_KEY,
   },
 
   jwtSecret: env.JWT_SECRET,

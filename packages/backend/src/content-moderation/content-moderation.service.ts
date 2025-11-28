@@ -1162,12 +1162,19 @@ export class ContentModerationService {
    * Get user moderation history
    */
   async getUserModerationHistory(userId: string): Promise<UserModerationHistory> {
+    // Get content IDs for this user's scan results
+    const userScanResults = await prisma.contentScanResult.findMany({
+      where: { userId },
+      select: { contentId: true },
+    });
+    const userContentIds = userScanResults.map(r => r.contentId);
+
     const [flags, appeals, warnings, user] = await Promise.all([
       prisma.contentFlag.findMany({
         where: {
           OR: [
             { reportedBy: userId },
-            { contentScanResult: { userId } },
+            { contentId: { in: userContentIds } },
           ],
         },
         orderBy: { createdAt: 'desc' },
@@ -1371,7 +1378,7 @@ export class ContentModerationService {
       name: policy.name,
       type: policy.type as PolicyType,
       description: policy.description,
-      rules: (policy.rules as PolicyRule[]) ?? [],
+      rules: (Array.isArray(policy.rules) ? policy.rules : []) as unknown as PolicyRule[],
       isActive: policy.isActive,
       createdAt: policy.createdAt,
       updatedAt: policy.updatedAt,

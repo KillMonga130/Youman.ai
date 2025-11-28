@@ -6,7 +6,6 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { whiteLabelService } from './white-label.service';
-import { logger } from '../utils/logger';
 import type {
   CreateBrandingOptions,
   UpdateBrandingOptions,
@@ -22,7 +21,7 @@ const router = Router();
  * POST /white-label/branding
  * Create a new branding configuration
  */
-router.post('/branding', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/branding', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const options: CreateBrandingOptions = {
       userId: req.body.userId,
@@ -53,15 +52,17 @@ router.post('/branding', async (req: Request, res: Response, next: NextFunction)
  * GET /white-label/branding/:brandingId
  * Get branding configuration by ID
  */
-router.get('/branding/:brandingId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/branding/:brandingId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const branding = await whiteLabelService.getBranding(req.params.brandingId);
+    const brandingId = req.params.brandingId as string;
+    const branding = await whiteLabelService.getBranding(brandingId);
 
     if (!branding) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Branding configuration not found',
       });
+      return;
     }
 
     res.json({
@@ -73,19 +74,22 @@ router.get('/branding/:brandingId', async (req: Request, res: Response, next: Ne
   }
 });
 
+
 /**
  * GET /white-label/branding/user/:userId
  * Get branding configuration by user ID
  */
-router.get('/branding/user/:userId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/branding/user/:userId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const branding = await whiteLabelService.getBrandingByUser(req.params.userId);
+    const userId = req.params.userId as string;
+    const branding = await whiteLabelService.getBrandingByUser(userId);
 
     if (!branding) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'No branding configuration found for user',
       });
+      return;
     }
 
     res.json({
@@ -101,8 +105,9 @@ router.get('/branding/user/:userId', async (req: Request, res: Response, next: N
  * PATCH /white-label/branding/:brandingId
  * Update branding configuration
  */
-router.patch('/branding/:brandingId', async (req: Request, res: Response, next: NextFunction) => {
+router.patch('/branding/:brandingId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const brandingId = req.params.brandingId as string;
     const options: UpdateBrandingOptions = {
       companyName: req.body.companyName,
       logoUrl: req.body.logoUrl,
@@ -124,7 +129,7 @@ router.patch('/branding/:brandingId', async (req: Request, res: Response, next: 
       removeDefaultBranding: req.body.removeDefaultBranding,
     };
 
-    const branding = await whiteLabelService.updateBranding(req.params.brandingId, options);
+    const branding = await whiteLabelService.updateBranding(brandingId, options);
 
     res.json({
       success: true,
@@ -141,9 +146,10 @@ router.patch('/branding/:brandingId', async (req: Request, res: Response, next: 
  */
 router.post(
   '/branding/:brandingId/activate',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branding = await whiteLabelService.activateBranding(req.params.brandingId);
+      const brandingId = req.params.brandingId as string;
+      const branding = await whiteLabelService.activateBranding(brandingId);
 
       res.json({
         success: true,
@@ -161,9 +167,10 @@ router.post(
  */
 router.post(
   '/branding/:brandingId/deactivate',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const branding = await whiteLabelService.deactivateBranding(req.params.brandingId);
+      const brandingId = req.params.brandingId as string;
+      const branding = await whiteLabelService.deactivateBranding(brandingId);
 
       res.json({
         success: true,
@@ -181,9 +188,10 @@ router.post(
  */
 router.delete(
   '/branding/:brandingId',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await whiteLabelService.deleteBranding(req.params.brandingId);
+      const brandingId = req.params.brandingId as string;
+      await whiteLabelService.deleteBranding(brandingId);
 
       res.json({
         success: true,
@@ -201,9 +209,10 @@ router.delete(
  */
 router.get(
   '/branding/:userId/assets',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const assets = await whiteLabelService.applyBranding(req.params.userId);
+      const userId = req.params.userId as string;
+      const assets = await whiteLabelService.applyBranding(userId);
 
       res.json({
         success: true,
@@ -215,13 +224,14 @@ router.get(
   }
 );
 
+
 // ============ Custom Domains ============
 
 /**
  * POST /white-label/domains
  * Set up a custom domain
  */
-router.post('/domains', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/domains', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const options: SetupDomainOptions = {
       userId: req.body.userId,
@@ -261,15 +271,17 @@ router.post('/domains', async (req: Request, res: Response, next: NextFunction) 
  * GET /white-label/domains/:domainId
  * Get custom domain by ID
  */
-router.get('/domains/:domainId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/domains/:domainId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const domain = await whiteLabelService.getDomain(req.params.domainId);
+    const domainId = req.params.domainId as string;
+    const domain = await whiteLabelService.getDomain(domainId);
 
     if (!domain) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Domain not found',
       });
+      return;
     }
 
     res.json({
@@ -285,9 +297,10 @@ router.get('/domains/:domainId', async (req: Request, res: Response, next: NextF
  * GET /white-label/domains/user/:userId
  * Get domains by user ID
  */
-router.get('/domains/user/:userId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/domains/user/:userId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const domains = whiteLabelService.getDomainsByUser(req.params.userId);
+    const userId = req.params.userId as string;
+    const domains = whiteLabelService.getDomainsByUser(userId);
 
     res.json({
       success: true,
@@ -304,9 +317,10 @@ router.get('/domains/user/:userId', async (req: Request, res: Response, next: Ne
  */
 router.post(
   '/domains/:domainId/verify',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await whiteLabelService.verifyDomain(req.params.domainId);
+      const domainId = req.params.domainId as string;
+      const result = await whiteLabelService.verifyDomain(domainId);
 
       res.json({
         success: true,
@@ -324,15 +338,17 @@ router.post(
  */
 router.get(
   '/domains/lookup/:hostname',
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const domain = await whiteLabelService.getDomainByHostname(req.params.hostname);
+      const hostname = req.params.hostname as string;
+      const domain = await whiteLabelService.getDomainByHostname(hostname);
 
       if (!domain) {
-        return res.status(404).json({
+        res.status(404).json({
           success: false,
           error: 'Domain not found or not verified',
         });
+        return;
       }
 
       res.json({
@@ -354,9 +370,10 @@ router.get(
  * DELETE /white-label/domains/:domainId
  * Delete a custom domain
  */
-router.delete('/domains/:domainId', async (req: Request, res: Response, next: NextFunction) => {
+router.delete('/domains/:domainId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    await whiteLabelService.deleteDomain(req.params.domainId);
+    const domainId = req.params.domainId as string;
+    await whiteLabelService.deleteDomain(domainId);
 
     res.json({
       success: true,
@@ -367,13 +384,14 @@ router.delete('/domains/:domainId', async (req: Request, res: Response, next: Ne
   }
 });
 
+
 // ============ Branded Reports ============
 
 /**
  * POST /white-label/reports
  * Generate a branded report
  */
-router.post('/reports', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/reports', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const options: GenerateReportOptions = {
       userId: req.body.userId,
@@ -399,15 +417,17 @@ router.post('/reports', async (req: Request, res: Response, next: NextFunction) 
  * GET /white-label/reports/:reportId
  * Get a branded report by ID
  */
-router.get('/reports/:reportId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/reports/:reportId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const report = await whiteLabelService.getReport(req.params.reportId);
+    const reportId = req.params.reportId as string;
+    const report = await whiteLabelService.getReport(reportId);
 
     if (!report) {
-      return res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Report not found',
       });
+      return;
     }
 
     res.json({
@@ -423,9 +443,10 @@ router.get('/reports/:reportId', async (req: Request, res: Response, next: NextF
  * GET /white-label/reports/user/:userId
  * Get reports by user ID
  */
-router.get('/reports/user/:userId', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/reports/user/:userId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const reports = whiteLabelService.getReportsByUser(req.params.userId);
+    const userId = req.params.userId as string;
+    const reports = whiteLabelService.getReportsByUser(userId);
 
     res.json({
       success: true,

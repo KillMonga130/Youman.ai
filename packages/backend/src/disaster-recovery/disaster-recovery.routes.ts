@@ -129,7 +129,11 @@ router.post('/replication', async (req: Request, res: Response): Promise<void> =
       res.status(400).json({ error: 'sourceRegion, targetRegions, and mode are required' });
       return;
     }
-    const result = await disasterRecoveryService.configureReplication(config);
+    const result = await disasterRecoveryService.configureReplication({
+      ...config,
+      enabled: config.enabled ?? true,
+      lagThresholdMs: config.lagThresholdMs ?? 5000,
+    });
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ error: (error as Error).message });

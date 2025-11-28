@@ -14,6 +14,9 @@ import {
   reviewAppealSchema,
   createPolicySchema,
   reportAbuseSchema,
+  ModerationStatus,
+  FlagSeverity,
+  ModerationAuditAction,
 } from './types';
 
 const router = Router();
@@ -106,8 +109,8 @@ router.get('/queue', async (req: Request, res: Response, _next: NextFunction) =>
   try {
     const { status, severity, assignedTo, limit, offset } = req.query;
     const queue = await contentModerationService.getModerationQueue({
-      status: status as string | undefined,
-      severity: severity as string | undefined,
+      status: status as ModerationStatus | undefined,
+      severity: severity as FlagSeverity | undefined,
       assignedTo: assignedTo as string | undefined,
       limit: limit ? parseInt(limit as string, 10) : undefined,
       offset: offset ? parseInt(offset as string, 10) : undefined,
@@ -304,7 +307,7 @@ router.get('/audit', async (req: Request, res: Response, _next: NextFunction) =>
   try {
     const { action, actorId, targetUserId, startDate, endDate, limit } = req.query;
     const logs = await contentModerationService.getAuditLogs({
-      action: action as string | undefined,
+      action: action as ModerationAuditAction | undefined,
       actorId: actorId as string | undefined,
       targetUserId: targetUserId as string | undefined,
       startDate: startDate ? new Date(startDate as string) : undefined,

@@ -37,6 +37,8 @@ export interface JWTPayload {
   email: string;
   sessionId: string;
   type: 'access' | 'refresh';
+  firstName?: string | null;
+  lastName?: string | null;
   iat?: number;
   exp?: number;
 }

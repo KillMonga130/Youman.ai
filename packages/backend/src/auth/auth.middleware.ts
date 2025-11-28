@@ -168,6 +168,20 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
+ * Authenticated request type for routes that require authentication
+ */
+export interface AuthenticatedRequest extends Request {
+  user: AuthUser;
+  sessionId: string;
+  token: JWTPayload;
+}
+
+/**
+ * Auth middleware alias for backward compatibility
+ */
+export const authMiddleware = authenticate;
+
+/**
  * Error handler for auth errors
  */
 export function handleAuthError(

@@ -36,6 +36,7 @@ import type {
   StorageLocation,
   StorageProvider,
 } from './types';
+import { prisma } from '../database/prisma';
 
 // ============================================
 // Error Classes
@@ -184,11 +185,9 @@ export async function retrieveDocument(documentId: string): Promise<IDocument | 
     
     try {
       const result = await downloadFromS3(key);
-      // Return document with content from S3
-      return {
-        ...document.toObject(),
-        content: result.content,
-      } as IDocument;
+      // Update document content in memory and return
+      document.content = result.content;
+      return document;
     } catch (error) {
       logger.error('Failed to retrieve document from S3', { documentId, key, error });
       throw new StorageError('Failed to retrieve document content', 'S3_RETRIEVAL_FAILED');
@@ -375,10 +374,9 @@ export async function retrieveChunks(options: ChunkRetrievalOptions): Promise<IC
         const key = generateChunkKey(chunk.documentId, chunk.index);
         try {
           const result = await downloadFromS3(key);
-          return {
-            ...chunk.toObject(),
-            content: result.content,
-          } as IChunk;
+          // Update chunk content in memory and return
+          chunk.content = result.content;
+          return chunk;
         } catch (error) {
           logger.warn('Failed to retrieve chunk from S3', { 
             chunkId: chunk._id, 
@@ -580,8 +578,6 @@ export async function checkStorageQuota(
  */
 export async function recalculateStorageQuota(userId: string): Promise<StorageQuotaStatus> {
   // Get all documents for user's projects
-  const { prisma } = await import('../database/prisma');
-  
   const projects = await prisma.project.findMany({
     where: { ownerId: userId },
     select: { id: true },

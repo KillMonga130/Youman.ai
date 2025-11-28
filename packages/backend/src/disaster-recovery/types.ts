@@ -197,4 +197,5 @@ export interface ConfigureReplicationRequest {
   targetRegions: string[];
   mode: 'sync' | 'async';
   lagThresholdMs?: number;
+  enabled?: boolean;
 }

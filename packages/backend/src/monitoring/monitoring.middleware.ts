@@ -11,13 +11,12 @@ import { diagnosticsService } from './diagnostics.service';
 import { ContextualLogger } from './structured-logger';
 
 // Extend Express Request to include monitoring context
+// Note: requestId and startTime are already declared in request-logger.ts
 declare global {
   namespace Express {
     interface Request {
-      requestId: string;
-      startTime: number;
       span?: TracingSpan;
-      logger: ContextualLogger;
+      logger?: ContextualLogger;
     }
   }
 }
@@ -70,13 +69,15 @@ export function tracingMiddleware(
   span.setTag('http.method', req.method);
   span.setTag('http.url', req.originalUrl);
   span.setTag('http.host', req.hostname);
-  span.setTag('request.id', req.requestId);
+  if (req.requestId) {
+    span.setTag('request.id', req.requestId);
+  }
 
   // Store span in request for use in handlers
   req.span = span;
 
   // Update logger with trace context
-  req.logger.setTraceContext(span.getContext());
+  req.logger?.setTraceContext(span.getContext());
 
   // Finish span when response is sent
   res.on('finish', () => {
@@ -108,7 +109,7 @@ export function metricsMiddleware(
 
   // Record metrics when response is finished
   res.on('finish', () => {
-    const duration = (Date.now() - req.startTime) / 1000; // Convert to seconds
+    const duration = (Date.now() - (req.startTime || Date.now())) / 1000; // Convert to seconds
     const path = normalizePath(req.route?.path || req.path);
 
     // Record HTTP metrics
@@ -134,7 +135,7 @@ export function requestLoggingMiddleware(
   next: NextFunction
 ): void {
   // Log incoming request
-  req.logger.debug('Incoming request', {
+  req.logger?.debug('Incoming request', {
     method: req.method,
     path: req.path,
     query: req.query,
@@ -144,9 +145,9 @@ export function requestLoggingMiddleware(
 
   // Log response when finished
   res.on('finish', () => {
-    const duration = Date.now() - req.startTime;
+    const duration = Date.now() - (req.startTime || Date.now());
     
-    req.logger.httpRequest(
+    req.logger?.httpRequest(
       req.method,
       req.path,
       res.statusCode,
@@ -174,7 +175,7 @@ export function errorTrackingMiddleware(
   diagnosticsService.trackError(err);
 
   // Log error with context
-  req.logger.error('Request error', err, {
+  req.logger?.error('Request error', err, {
     method: req.method,
     path: req.path,
     statusCode: res.statusCode,

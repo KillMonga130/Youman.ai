@@ -710,14 +710,15 @@ export async function addToBatch<T>(request: BatchRequest<T>): Promise<BatchResu
   
   // Process immediately if batch is full
   if (batch.length >= batchingConfig.maxBatchSize) {
-    return processBatchByKey(batchKey).then(results => 
-      results.find(r => r.requestId === request.id) || {
+    return processBatchByKey(batchKey).then(results => {
+      const found = results.find(r => r.requestId === request.id);
+      return (found || {
         requestId: request.id,
         success: false,
         error: 'Request not found in batch results',
         processingTime: 0,
-      }
-    );
+      }) as BatchResult<T>;
+    });
   }
   
   // Return a promise that resolves when the batch is processed

@@ -21,6 +21,8 @@ import {
   JobNotificationOptions,
   DayOfWeek,
   JobHistoryEntry,
+  ContentSource,
+  TransformSettings,
 } from './types';
 
 /** Default configuration */

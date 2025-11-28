@@ -15,23 +15,29 @@ const elkFormat = winston.format.printf((info) => {
     message: String(info.message),
     service: 'ai-humanizer-backend',
     environment: config.nodeEnv,
-    ...(info.traceId && { traceId: info.traceId as string }),
-    ...(info.spanId && { spanId: info.spanId as string }),
-    ...(info.userId && { userId: info.userId as string }),
-    ...(info.requestId && { requestId: info.requestId as string }),
-    ...(info.duration && { duration: info.duration as number }),
-    ...(info.statusCode && { statusCode: info.statusCode as number }),
-    ...(info.method && { method: info.method as string }),
-    ...(info.path && { path: info.path as string }),
-    ...(info.error && {
-      error: {
-        name: (info.error as Error).name,
-        message: (info.error as Error).message,
-        stack: (info.error as Error).stack,
-        ...(info.errorCode && { code: info.errorCode as string }),
-      },
-    }),
   };
+
+  // Add optional fields if present
+  if (typeof info.traceId === 'string') entry.traceId = info.traceId;
+  if (typeof info.spanId === 'string') entry.spanId = info.spanId;
+  if (typeof info.userId === 'string') entry.userId = info.userId;
+  if (typeof info.requestId === 'string') entry.requestId = info.requestId;
+  if (typeof info.duration === 'number') entry.duration = info.duration;
+  if (typeof info.statusCode === 'number') entry.statusCode = info.statusCode;
+  if (typeof info.method === 'string') entry.method = info.method;
+  if (typeof info.path === 'string') entry.path = info.path;
+  
+  if (info.error && typeof info.error === 'object') {
+    const err = info.error as Error;
+    entry.error = {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    };
+    if (typeof info.errorCode === 'string') {
+      entry.error.code = info.errorCode;
+    }
+  }
 
   // Add any additional metadata
   const excludeKeys = [

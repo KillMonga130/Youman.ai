@@ -10,7 +10,8 @@ import { Dropbox } from 'dropbox';
 import { v4 as uuidv4 } from 'uuid';
 import { prisma } from '../database/prisma';
 import { logger } from '../utils/logger';
-import { storeDocument } from '../storage/storage.service';
+import { storeDocument, retrieveDocument } from '../storage/storage.service';
+import { DocumentModel } from '../database/schemas/document.schema';
 import {
   CloudProvider,
   CloudFileType,
@@ -56,6 +57,43 @@ export class CloudStorageError extends Error {
     this.name = 'CloudStorageError';
     this.code = code;
   }
+}
+
+// ============================================
+// OAuth Response Types
+// ============================================
+
+interface OAuthTokenData {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  token_type?: string;
+}
+
+interface OneDriveUserInfo {
+  mail?: string;
+  userPrincipalName?: string;
+  displayName?: string;
+}
+
+interface OneDriveFileListResponse {
+  value?: OneDriveFileItem[];
+  '@odata.nextLink'?: string;
+}
+
+interface OneDriveFileItem {
+  id: string;
+  name: string;
+  size?: number;
+  folder?: { childCount: number };
+  file?: { mimeType: string };
+  webUrl?: string;
+  lastModifiedDateTime?: string;
+  createdDateTime?: string;
+  parentReference?: { path?: string; id?: string };
+  '@microsoft.graph.downloadUrl'?: string;
+  thumbnails?: Array<{ medium?: { url?: string } }>;
+  shared?: boolean;
 }
 
 // ============================================
@@ -155,7 +193,7 @@ async function exchangeCodeForTokens(
         throw new CloudStorageError('Failed to exchange Dropbox code', 'TOKEN_EXCHANGE_FAILED');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OAuthTokenData;
       return {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
@@ -184,7 +222,7 @@ async function exchangeCodeForTokens(
         throw new CloudStorageError('Failed to exchange OneDrive code', 'TOKEN_EXCHANGE_FAILED');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OAuthTokenData;
       return {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
@@ -236,7 +274,7 @@ async function refreshAccessToken(
         throw new CloudStorageError('Failed to refresh Dropbox token', 'TOKEN_REFRESH_FAILED');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OAuthTokenData;
       return {
         accessToken: data.access_token,
         refreshToken: refreshToken,
@@ -264,7 +302,7 @@ async function refreshAccessToken(
         throw new CloudStorageError('Failed to refresh OneDrive token', 'TOKEN_REFRESH_FAILED');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OAuthTokenData;
       return {
         accessToken: data.access_token,
         refreshToken: data.refresh_token || refreshToken,
@@ -317,7 +355,7 @@ async function getUserInfo(
         throw new CloudStorageError('Failed to get OneDrive user info', 'USER_INFO_FAILED');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OneDriveUserInfo;
       return {
         email: data.mail || data.userPrincipalName || '',
         displayName: data.displayName,
@@ -670,9 +708,9 @@ async function listOneDriveFiles(
     throw new CloudStorageError('Failed to list OneDrive files', 'LIST_FILES_FAILED');
   }
 
-  const data = await response.json();
+  const data = await response.json() as OneDriveFileListResponse;
 
-  const files: CloudFile[] = (data.value || []).map((item: any) => ({
+  const files: CloudFile[] = (data.value || []).map((item: OneDriveFileItem) => ({
     id: item.id,
     name: item.name,
     type: item.folder ? CloudFileType.FOLDER : CloudFileType.FILE,
@@ -729,7 +767,7 @@ export async function importFile(
         id: uuidv4(),
         name: filename.replace(/\.[^/.]+$/, ''), // Remove extension
         ownerId: userId,
-        status: 'DRAFT',
+        status: 'ACTIVE',
       },
     });
     targetProjectId = project.id;
@@ -890,7 +928,7 @@ async function downloadOneDriveFile(
     throw new CloudStorageError('Failed to get OneDrive file metadata', 'DOWNLOAD_FAILED');
   }
 
-  const metadata = await metadataResponse.json();
+  const metadata = await metadataResponse.json() as OneDriveFileItem;
   const filename = metadata.name;
   const mimeType = metadata.file?.mimeType || 'text/plain';
 
@@ -930,7 +968,6 @@ export async function exportFile(
   const accessToken = await getValidAccessToken(userId, provider);
 
   // Get document content
-  const { retrieveDocument } = await import('../storage/storage.service');
   const document = await retrieveDocument(documentId);
 
   if (!document) {
@@ -1118,13 +1155,13 @@ async function uploadToOneDrive(
     throw new CloudStorageError('Failed to upload to OneDrive', 'UPLOAD_FAILED');
   }
 
-  const data = await response.json();
+  const data = await response.json() as OneDriveFileItem;
 
   return {
     fileId: data.id,
     filename: data.name,
     path: data.parentReference?.path ? `${data.parentReference.path}/${data.name}` : `/${data.name}`,
-    size: data.size,
+    size: data.size || 0,
     exportedAt: new Date(),
     webViewLink: data.webUrl,
   };
@@ -1283,7 +1320,6 @@ export async function syncProject(
     }
 
     // Get documents for the project
-    const { DocumentModel } = await import('../database/schemas/document.schema');
     const documents = await DocumentModel.find({ projectId });
 
     // Upload each document
@@ -1448,7 +1484,7 @@ async function getFolderPath(
         throw new CloudStorageError('Failed to get folder info', 'FOLDER_NOT_FOUND');
       }
 
-      const data = await response.json();
+      const data = await response.json() as OneDriveFileItem;
       return data.parentReference?.path
         ? `${data.parentReference.path}/${data.name}`
         : `/${data.name}`;

@@ -1029,11 +1029,13 @@ export class DataPipelineService {
 
     return [...data].sort((a, b) => {
       for (const field of sortConfig.fields) {
-        const aVal = a.transformed[field.field];
-        const bVal = b.transformed[field.field];
+        const aVal = a.transformed[field.field] as string | number | boolean | null;
+        const bVal = b.transformed[field.field] as string | number | boolean | null;
         
         let comparison = 0;
-        if (aVal < bVal) comparison = -1;
+        if (aVal === null || aVal === undefined) comparison = -1;
+        else if (bVal === null || bVal === undefined) comparison = 1;
+        else if (aVal < bVal) comparison = -1;
         else if (aVal > bVal) comparison = 1;
         
         if (comparison !== 0) {

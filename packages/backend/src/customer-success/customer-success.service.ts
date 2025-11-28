@@ -222,7 +222,7 @@ export class CustomerSuccessService {
       prisma.userActivity.findMany({
         where: { userId, createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
       }),
-      prisma.project.count({ where: { userId } }),
+      prisma.project.count({ where: { ownerId: userId } }),
       prisma.userActivity.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' },
