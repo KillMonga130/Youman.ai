@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Sparkles, Play, BookOpen, ArrowRight, CheckCircle } from 'lucide-react';
 import { useOnboarding, TUTORIALS } from '../context/OnboardingContext';
 
@@ -8,7 +8,7 @@ interface WelcomeModalProps {
 }
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps): JSX.Element | null {
-  const { startTutorial, skipOnboarding, progress } = useOnboarding();
+  const { startTutorial, skipOnboarding } = useOnboarding();
   const [step, setStep] = useState(0);
 
   if (!isOpen) return null;
@@ -44,7 +44,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps): JSX.Elemen
     },
   ];
 
-  const currentStep = welcomeSteps[step];
+  const currentStep = welcomeSteps[step]!;
   const isLastStep = step === welcomeSteps.length - 1;
 
   const handleStartTour = () => {

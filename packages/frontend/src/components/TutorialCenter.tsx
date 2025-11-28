@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { 
   BookOpen, 
   Play, 
   CheckCircle, 
   Clock, 
-  ChevronRight, 
   RotateCcw,
   Video,
   GraduationCap,

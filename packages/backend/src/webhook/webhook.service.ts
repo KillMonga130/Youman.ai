@@ -12,14 +12,10 @@ import {
   WebhookDelivery,
   DeliveryResult,
   WebhookLog,
-  WebhookStatus,
-  DeliveryStatus,
-  WebhookEventType,
   RegisterWebhookOptions,
   UpdateWebhookOptions,
   WebhookServiceConfig,
   WebhookRetryConfig,
-  WebhookSignature,
   WebhookStats,
   WebhookLogFilter,
 } from './types';
@@ -145,7 +141,6 @@ export class WebhookService {
     }
 
     const deliveryId = this.generateId('del');
-    const startTime = Date.now();
 
     // Create delivery record
     const delivery: WebhookDelivery = {
@@ -242,7 +237,7 @@ export class WebhookService {
    * @returns Webhook or null
    */
   async getWebhook(webhookId: string): Promise<Webhook | null> {
-    return this.webhooks.get(webhookId) || null;
+    return Promise.resolve(this.webhooks.get(webhookId) || null);
   }
 
   /**
@@ -681,7 +676,7 @@ export class WebhookService {
   private async sendHttpRequest(
     url: string,
     event: WebhookEvent,
-    headers: Record<string, string>
+    _headers: Record<string, string>
   ): Promise<{ ok: boolean; status: number; statusText: string; body?: string; headers?: Record<string, string> }> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 50));

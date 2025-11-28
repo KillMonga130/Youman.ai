@@ -5,7 +5,7 @@
  */
 
 import { useState } from 'react';
-import { Filter, X, ChevronDown, ChevronUp, Calendar, Hash, Layers, Tag } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, Calendar, Hash, Layers, Tag } from 'lucide-react';
 import { useSearch, type SearchFilters as SearchFiltersType } from '../context/SearchContext';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -50,7 +50,12 @@ export function SearchFilters({ onApply, className = '' }: SearchFiltersProps): 
     const newStrategy = checked
       ? [...currentStrategy, strategy]
       : currentStrategy.filter(s => s !== strategy);
-    updateFilters({ strategy: newStrategy.length > 0 ? newStrategy : undefined });
+    if (newStrategy.length > 0) {
+      updateFilters({ strategy: newStrategy });
+    } else {
+      const { strategy: _, ...rest } = filters;
+      setFilters(rest);
+    }
   };
 
   const handleLevelChange = (level: number, checked: boolean) => {
@@ -58,7 +63,12 @@ export function SearchFilters({ onApply, className = '' }: SearchFiltersProps): 
     const newLevels = checked
       ? [...currentLevels, level]
       : currentLevels.filter(l => l !== level);
-    updateFilters({ humanizationLevel: newLevels.length > 0 ? newLevels : undefined });
+    if (newLevels.length > 0) {
+      updateFilters({ humanizationLevel: newLevels });
+    } else {
+      const { humanizationLevel: _, ...rest } = filters;
+      setFilters(rest);
+    }
   };
 
   const handleApply = () => {
@@ -133,23 +143,25 @@ export function SearchFilters({ onApply, className = '' }: SearchFiltersProps): 
               type="date"
               label="From"
               value={filters.dateRange?.from?.split('T')[0] || ''}
-              onChange={(e) => updateFilters({
-                dateRange: {
-                  ...filters.dateRange,
-                  from: e.target.value ? `${e.target.value}T00:00:00Z` : undefined,
-                },
-              })}
+              onChange={(e) => {
+                const newFrom = e.target.value ? `${e.target.value}T00:00:00Z` : undefined;
+                const existingTo = filters.dateRange?.to;
+                updateFilters({
+                  dateRange: newFrom || existingTo ? { from: newFrom, to: existingTo } : undefined,
+                });
+              }}
             />
             <Input
               type="date"
               label="To"
               value={filters.dateRange?.to?.split('T')[0] || ''}
-              onChange={(e) => updateFilters({
-                dateRange: {
-                  ...filters.dateRange,
-                  to: e.target.value ? `${e.target.value}T23:59:59Z` : undefined,
-                },
-              })}
+              onChange={(e) => {
+                const newTo = e.target.value ? `${e.target.value}T23:59:59Z` : undefined;
+                const existingFrom = filters.dateRange?.from;
+                updateFilters({
+                  dateRange: existingFrom || newTo ? { from: existingFrom, to: newTo } : undefined,
+                });
+              }}
             />
           </div>
         </FilterSection>
@@ -167,24 +179,30 @@ export function SearchFilters({ onApply, className = '' }: SearchFiltersProps): 
               label="Min"
               placeholder="0"
               value={filters.wordCountRange?.min ?? ''}
-              onChange={(e) => updateFilters({
-                wordCountRange: {
-                  ...filters.wordCountRange,
-                  min: e.target.value ? parseInt(e.target.value) : undefined,
-                },
-              })}
+              onChange={(e) => {
+                const newMin = e.target.value ? parseInt(e.target.value) : undefined;
+                const existingMax = filters.wordCountRange?.max;
+                updateFilters({
+                  wordCountRange: newMin !== undefined || existingMax !== undefined 
+                    ? { min: newMin, max: existingMax } 
+                    : undefined,
+                });
+              }}
             />
             <Input
               type="number"
               label="Max"
               placeholder="∞"
               value={filters.wordCountRange?.max ?? ''}
-              onChange={(e) => updateFilters({
-                wordCountRange: {
-                  ...filters.wordCountRange,
-                  max: e.target.value ? parseInt(e.target.value) : undefined,
-                },
-              })}
+              onChange={(e) => {
+                const newMax = e.target.value ? parseInt(e.target.value) : undefined;
+                const existingMin = filters.wordCountRange?.min;
+                updateFilters({
+                  wordCountRange: existingMin !== undefined || newMax !== undefined 
+                    ? { min: existingMin, max: newMax } 
+                    : undefined,
+                });
+              }}
             />
           </div>
         </FilterSection>

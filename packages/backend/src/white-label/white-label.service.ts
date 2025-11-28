@@ -11,16 +11,13 @@ import {
   CustomDomain,
   BrandedReport,
   BrandedAssets,
-  WhiteLabelStatus,
-  DomainStatus,
-  FontFamily,
-  ReportType,
   CreateBrandingOptions,
   UpdateBrandingOptions,
   SetupDomainOptions,
   DomainVerificationResult,
   GenerateReportOptions,
   WhiteLabelServiceConfig,
+  FontFamily,
 } from './types';
 
 /** Default service configuration */
@@ -101,7 +98,7 @@ export class WhiteLabelService {
    * Gets branding configuration by ID
    */
   async getBranding(brandingId: string): Promise<BrandingConfig | null> {
-    return this.brandingConfigs.get(brandingId) || null;
+    return Promise.resolve(this.brandingConfigs.get(brandingId) || null);
   }
 
   /**
@@ -109,8 +106,8 @@ export class WhiteLabelService {
    */
   async getBrandingByUser(userId: string): Promise<BrandingConfig | null> {
     const brandingId = this.userToBranding.get(userId);
-    if (!brandingId) return null;
-    return this.brandingConfigs.get(brandingId) || null;
+    if (!brandingId) return Promise.resolve(null);
+    return Promise.resolve(this.brandingConfigs.get(brandingId) || null);
   }
 
   /**
@@ -410,7 +407,7 @@ export class WhiteLabelService {
    * Gets custom domain by ID
    */
   async getDomain(domainId: string): Promise<CustomDomain | null> {
-    return this.customDomains.get(domainId) || null;
+    return Promise.resolve(this.customDomains.get(domainId) || null);
   }
 
   /**
@@ -426,10 +423,10 @@ export class WhiteLabelService {
   async getDomainByHostname(hostname: string): Promise<CustomDomain | null> {
     for (const domain of this.customDomains.values()) {
       if (domain.hostname === hostname && domain.status === 'verified') {
-        return domain;
+        return Promise.resolve(domain);
       }
     }
-    return null;
+    return Promise.resolve(null);
   }
 
   /**
@@ -494,7 +491,7 @@ export class WhiteLabelService {
    * Gets a branded report by ID
    */
   async getReport(reportId: string): Promise<BrandedReport | null> {
-    return this.brandedReports.get(reportId) || null;
+    return Promise.resolve(this.brandedReports.get(reportId) || null);
   }
 
   /**
@@ -614,7 +611,7 @@ export class WhiteLabelService {
   private async checkDnsRecords(domain: CustomDomain): Promise<boolean> {
     // Simulate DNS check - in production, use dns.resolveTxt()
     // For testing purposes, we'll verify based on a pattern
-    return domain.verificationToken.startsWith('aihumanizer-verify-');
+    return Promise.resolve(domain.verificationToken.startsWith('aihumanizer-verify-'));
   }
 
   /**

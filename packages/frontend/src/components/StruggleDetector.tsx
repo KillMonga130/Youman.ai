@@ -139,7 +139,7 @@ interface StruggleHelpModalProps {
   onStartTutorial: (tutorialId: string) => void;
 }
 
-function StruggleHelpModal({ featureId, helpContent, onClose, onStartTutorial }: StruggleHelpModalProps): JSX.Element {
+function StruggleHelpModal({ helpContent, onClose, onStartTutorial }: StruggleHelpModalProps): JSX.Element {
   const relatedTutorial = helpContent.relatedTutorial 
     ? TUTORIALS.find(t => t.id === helpContent.relatedTutorial)
     : null;

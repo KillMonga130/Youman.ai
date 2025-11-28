@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import Joyride, { CallBackProps, STATUS, Step, ACTIONS, EVENTS } from 'react-joyride';
 
 // Onboarding step definitions
@@ -299,16 +299,17 @@ export function OnboardingProvider({ children }: OnboardingProviderProps): JSX.E
       // Auto-start onboarding for new users after a short delay
       const timer = setTimeout(() => {
         setIsOnboardingActive(true);
-        setCurrentTutorial(TUTORIALS[0]);
+        setCurrentTutorial(TUTORIALS[0] ?? null);
         setRun(true);
       }, 1000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [progress.completedTutorials.length, progress.completedSteps.length, progress.dismissedTooltips]);
 
   const startOnboarding = useCallback(() => {
     setIsOnboardingActive(true);
-    setCurrentTutorial(TUTORIALS[0]);
+    setCurrentTutorial(TUTORIALS[0] ?? null);
     setStepIndex(0);
     setRun(true);
   }, []);

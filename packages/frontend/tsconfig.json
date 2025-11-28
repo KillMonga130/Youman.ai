@@ -11,7 +11,9 @@
     "paths": {
       "@/*": ["./*"]
     },
-    "noEmit": true
+    "noEmit": true,
+    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

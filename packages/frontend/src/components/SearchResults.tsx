@@ -6,7 +6,7 @@
 
 import { Link } from 'react-router-dom';
 import { FileText, Clock, Edit, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useSearch, type SearchResultItem, type SortBy, type SortOrder } from '../context/SearchContext';
+import { useSearch, type SearchResultItem, type SortBy } from '../context/SearchContext';
 import { Badge } from './ui/Badge';
 import { Select } from './ui/Select';
 import { Button } from './ui/Button';
