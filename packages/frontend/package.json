@@ -39,7 +39,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.22",
     "fast-check": "^4.3.0",
-    "jsdom": "^23.0.1",
+    "jsdom": "^27.2.0",
     "msw": "^2.12.3",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.18",
