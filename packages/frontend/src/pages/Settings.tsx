@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { useAppStore, UserSettings } from '../store';
 import { KeyboardShortcutsSettings } from '../components/KeyboardShortcutsSettings';
+import { AccessibilitySettings } from '../components/AccessibilitySettings';
 
 const defaultSettings: UserSettings = {
   defaultLevel: 3,
@@ -9,6 +10,13 @@ const defaultSettings: UserSettings = {
   defaultLanguage: 'en',
   darkMode: false,
   autoSave: true,
+  accessibility: {
+    highContrast: false,
+    fontSize: 100,
+    colorBlindnessMode: 'none',
+    reduceMotion: false,
+    screenReaderOptimized: false,
+  },
 };
 
 const languages = [
@@ -206,6 +214,9 @@ export function Settings(): JSX.Element {
 
       {/* Keyboard Shortcuts */}
       <KeyboardShortcutsSettings />
+
+      {/* Accessibility */}
+      <AccessibilitySettings />
 
       {/* Actions */}
       <div className="flex items-center justify-between">

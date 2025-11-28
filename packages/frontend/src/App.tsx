@@ -6,6 +6,7 @@ import { Dashboard, Editor, Comparison, Settings, History, Analytics, Search } f
 import { ThemeProvider } from './components/ui';
 import { useAppStore } from './store';
 import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
+import { AccessibilityProvider } from './context/AccessibilityContext';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { ShortcutFeedback } from './components/ShortcutFeedback';
 
@@ -63,7 +64,9 @@ function App(): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
-        <AppRouter />
+        <AccessibilityProvider>
+          <AppRouter />
+        </AccessibilityProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

@@ -11,12 +11,23 @@ export interface Project {
   detectionScore?: number;
 }
 
+export type ColorBlindnessMode = 'none' | 'deuteranopia' | 'protanopia' | 'tritanopia';
+
+export interface AccessibilitySettings {
+  highContrast: boolean;
+  fontSize: number; // 100 = default, up to 200
+  colorBlindnessMode: ColorBlindnessMode;
+  reduceMotion: boolean;
+  screenReaderOptimized: boolean;
+}
+
 export interface UserSettings {
   defaultLevel: number;
   defaultStrategy: 'casual' | 'professional' | 'academic' | 'auto';
   defaultLanguage: string;
   darkMode: boolean;
   autoSave: boolean;
+  accessibility: AccessibilitySettings;
 }
 
 interface AppState {
@@ -83,6 +94,13 @@ export const useAppStore = create<AppState>()(
         defaultLanguage: 'en',
         darkMode: false,
         autoSave: true,
+        accessibility: {
+          highContrast: false,
+          fontSize: 100,
+          colorBlindnessMode: 'none',
+          reduceMotion: false,
+          screenReaderOptimized: false,
+        },
       },
       updateSettings: (newSettings) =>
         set((state) => ({ settings: { ...state.settings, ...newSettings } })),
