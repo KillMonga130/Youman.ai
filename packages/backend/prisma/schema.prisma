@@ -26,6 +26,7 @@ model User {
   emailVerifiedAt   DateTime? @map("email_verified_at")
   mfaEnabled        Boolean   @default(false) @map("mfa_enabled")
   mfaSecret         String?   @map("mfa_secret")
+  status            String    @default("ACTIVE") // ACTIVE, SUSPENDED, BANNED
   lastLoginAt       DateTime? @map("last_login_at")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
@@ -926,4 +927,155 @@ model Milestone {
   @@index([userId])
   @@index([milestoneType])
   @@map("milestones")
+}
+
+
+// ============================================
+// Content Moderation
+// Requirements: 97 - Content moderation features
+// ============================================
+
+model ContentScanResult {
+  id              String    @id @default(uuid())
+  contentId       String    @map("content_id")
+  userId          String    @map("user_id")
+  status          String    @default("PENDING")
+  riskScore       Int       @default(0) @map("risk_score")
+  contentType     String    @default("TEXT") @map("content_type")
+  processingTimeMs Int?     @map("processing_time_ms")
+  violations      Json      @default("[]")
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([contentId])
+  @@index([userId])
+  @@index([status])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@map("content_scan_results")
+}
+
+model ContentFlag {
+  id            String    @id @default(uuid())
+  contentId     String    @map("content_id")
+  flagType      String    @map("flag_type")
+  severity      String    @default("MEDIUM")
+  reason        String    @db.Text
+  evidence      String?   @db.Text
+  reportedBy    String?   @map("reported_by")
+  status        String    @default("FLAGGED")
+  assignedTo    String?   @map("assigned_to")
+  reviewedBy    String?   @map("reviewed_by")
+  reviewedAt    DateTime? @map("reviewed_at")
+  reviewNotes   String?   @map("review_notes") @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([contentId])
+  @@index([flagType])
+  @@index([severity])
+  @@index([status])
+  @@index([reportedBy])
+  @@index([assignedTo])
+  @@index([createdAt])
+  @@map("content_flags")
+}
+
+model ModerationPolicy {
+  id          String    @id @default(uuid())
+  name        String
+  type        String
+  description String    @db.Text
+  rules       Json      @default("[]")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdBy   String    @map("created_by")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([isActive])
+  @@index([createdBy])
+  @@map("moderation_policies")
+}
+
+model Appeal {
+  id                  String    @id @default(uuid())
+  flagId              String    @map("flag_id")
+  userId              String    @map("user_id")
+  reason              String    @db.Text
+  additionalEvidence  String?   @map("additional_evidence") @db.Text
+  status              String    @default("PENDING")
+  reviewedBy          String?   @map("reviewed_by")
+  reviewedAt          DateTime? @map("reviewed_at")
+  reviewNotes         String?   @map("review_notes") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([flagId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("appeals")
+}
+
+model AbuseReport {
+  id              String    @id @default(uuid())
+  reporterId      String?   @map("reporter_id")
+  targetUserId    String    @map("target_user_id")
+  patternType     String    @map("pattern_type")
+  description     String    @db.Text
+  evidence        String[]  @default([])
+  status          String    @default("PENDING")
+  investigatedBy  String?   @map("investigated_by")
+  investigatedAt  DateTime? @map("investigated_at")
+  actionTaken     String?   @map("action_taken")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([reporterId])
+  @@index([targetUserId])
+  @@index([patternType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("abuse_reports")
+}
+
+model UserWarning {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  contentId   String?   @map("content_id")
+  issuedBy    String    @map("issued_by")
+  reason      String    @db.Text
+  acknowledged Boolean  @default(false)
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([contentId])
+  @@index([issuedBy])
+  @@index([createdAt])
+  @@map("user_warnings")
+}
+
+model ModerationAuditLog {
+  id            String    @id @default(uuid())
+  action        String
+  actorId       String?   @map("actor_id")
+  targetUserId  String?   @map("target_user_id")
+  contentId     String?   @map("content_id")
+  flagId        String?   @map("flag_id")
+  appealId      String?   @map("appeal_id")
+  policyId      String?   @map("policy_id")
+  details       Json      @default("{}")
+  ipAddress     String?   @map("ip_address")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([action])
+  @@index([actorId])
+  @@index([targetUserId])
+  @@index([contentId])
+  @@index([flagId])
+  @@index([createdAt])
+  @@map("moderation_audit_logs")
 }
