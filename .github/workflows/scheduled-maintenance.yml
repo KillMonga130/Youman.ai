@@ -111,7 +111,7 @@ jobs:
 
       - name: Create issue for outdated dependencies
         if: steps.outdated.outputs.has-outdated == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const fs = require('fs');
