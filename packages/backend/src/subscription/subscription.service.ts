@@ -26,6 +26,7 @@ import {
   type PaymentMethodSummary,
   type UpgradePreview,
   type TierLimits,
+  type SerializableTierLimits,
 } from './types';
 
 // ============================================
@@ -67,6 +68,13 @@ function getCurrentPeriod(): { start: Date; end: Date } {
 /**
  * Transform database subscription to response format
  */
+function toSerializableLimits(limits: TierLimits): SerializableTierLimits {
+  return {
+    ...limits,
+    storageLimit: Number(limits.storageLimit),
+  };
+}
+
 function toSubscriptionResponse(subscription: {
   id: string;
   userId: string;
@@ -82,8 +90,10 @@ function toSubscriptionResponse(subscription: {
   cancelAtPeriodEnd: boolean;
   createdAt: Date;
   updatedAt: Date;
-}): SubscriptionResponse {
+}): SubscriptionResponse & { monthlyWordLimit: number; monthlyApiCallLimit: number; storageLimit: number } {
   const tier = subscription.tier as SubscriptionTier;
+  const limits = TIER_LIMITS[tier];
+  
   return {
     id: subscription.id,
     userId: subscription.userId,
@@ -91,12 +101,16 @@ function toSubscriptionResponse(subscription: {
     status: subscription.status as SubscriptionStatus,
     stripeCustomerId: subscription.stripeCustomerId,
     stripeSubscriptionId: subscription.stripeSubscriptionId,
-    limits: TIER_LIMITS[tier],
+    limits: toSerializableLimits(limits),
     currentPeriodStart: subscription.currentPeriodStart,
     currentPeriodEnd: subscription.currentPeriodEnd,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     createdAt: subscription.createdAt,
     updatedAt: subscription.updatedAt,
+    // Include direct fields for frontend compatibility
+    monthlyWordLimit: subscription.monthlyWordLimit,
+    monthlyApiCallLimit: subscription.monthlyApiCallLimit,
+    storageLimit: Number(subscription.storageLimit), // Convert bigint to number
   };
 }
 
@@ -110,7 +124,7 @@ function toSubscriptionResponse(subscription: {
 export async function createSubscription(
   userId: string,
   input?: CreateSubscriptionInput
-): Promise<SubscriptionResponse> {
+): Promise<SubscriptionResponse & { monthlyWordLimit: number; monthlyApiCallLimit: number; storageLimit: number }> {
   const tier = input?.tier ?? SubscriptionTier.FREE;
   const limits = TIER_LIMITS[tier];
   const { start, end } = getCurrentPeriod();
@@ -187,14 +201,14 @@ export async function createSubscription(
 /**
  * Get subscription for a user
  */
-export async function getSubscription(userId: string): Promise<SubscriptionResponse> {
+export async function getSubscription(userId: string): Promise<SubscriptionResponse & { monthlyWordLimit: number; monthlyApiCallLimit: number; storageLimit: number }> {
   const subscription = await prisma.subscription.findUnique({
     where: { userId },
   });
 
   if (!subscription) {
     // Auto-create free subscription if none exists
-    return createSubscription(userId);
+    return createSubscription(userId) as Promise<SubscriptionResponse & { monthlyWordLimit: number; monthlyApiCallLimit: number; storageLimit: number }>;
   }
 
   return toSubscriptionResponse(subscription);
@@ -545,7 +559,10 @@ export async function getUpgradePreview(
     proratedAmount,
     newMonthlyAmount,
     effectiveDate: new Date(),
-    newLimits,
+    newLimits: {
+      ...newLimits,
+      storageLimit: Number(newLimits.storageLimit), // Convert BigInt to number for JSON serialization
+    },
   };
 }
 
@@ -749,9 +766,9 @@ export async function hasFeatureAccess(
 }
 
 /**
- * Get tier limits for a user
+ * Get tier limits for a user (returns serializable version)
  */
-export async function getTierLimits(userId: string): Promise<TierLimits> {
+export async function getTierLimits(userId: string): Promise<SerializableTierLimits> {
   const subscription = await getSubscription(userId);
   return subscription.limits;
 }

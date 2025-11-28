@@ -19,31 +19,37 @@ export interface RateLimitConfig {
 }
 
 /**
+ * Check if we're in development mode
+ */
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+/**
  * Default rate limit configurations
+ * Higher limits in development for easier testing
  */
 export const rateLimitConfigs = {
   // Standard API rate limit
   standard: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
+    max: isDevelopment ? 1000 : 100, // 1000 in dev, 100 in prod
     message: 'Too many requests, please try again later.',
   },
   // Strict rate limit for sensitive endpoints (auth)
   strict: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20,
+    max: isDevelopment ? 200 : 20, // 200 in dev, 20 in prod
     message: 'Too many authentication attempts, please try again later.',
   },
   // Relaxed rate limit for read-only endpoints
   relaxed: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500,
+    max: isDevelopment ? 5000 : 500, // 5000 in dev, 500 in prod
     message: 'Too many requests, please try again later.',
   },
   // Transformation endpoint rate limit
   transformation: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 50,
+    max: isDevelopment ? 500 : 50, // 500 in dev, 50 in prod
     message: 'Transformation rate limit exceeded, please try again later.',
   },
 } as const;

@@ -1,9 +1,12 @@
-const API_BASE_URL = '/api';
+// Use environment variable for API URL, fallback to relative path for production
+const API_BASE_URL = (import.meta.env?.VITE_API_URL as string | undefined) || '/api/v1';
 
 interface ApiError {
   message: string;
   code: string;
   status: number;
+  details?: Record<string, string[]>;
+  error?: string;
 }
 
 class ApiClient {
@@ -12,74 +15,437 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    // Load token from localStorage on initialization
+    const savedToken = localStorage.getItem('auth_token');
+    if (savedToken) {
+      this.token = savedToken;
+    }
   }
 
   setToken(token: string | null): void {
     this.token = token;
+    if (token) {
+      localStorage.setItem('auth_token', token);
+    } else {
+      localStorage.removeItem('auth_token');
+    }
+  }
+
+  getToken(): string | null {
+    if (!this.token) {
+      this.token = localStorage.getItem('auth_token');
+    }
+    return this.token;
+  }
+
+  private async decodeToken(token: string): Promise<{ exp?: number } | null> {
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return null;
+      return JSON.parse(atob(payload));
+    } catch {
+      return null;
+    }
+  }
+
+  private async shouldRefreshToken(token: string): Promise<boolean> {
+    const decoded = await this.decodeToken(token);
+    if (!decoded || !decoded.exp) return false;
+    
+    // Refresh if token expires in less than 5 minutes
+    const expiresIn = decoded.exp * 1000 - Date.now();
+    return expiresIn < 5 * 60 * 1000; // 5 minutes
+  }
+
+  private async attemptTokenRefresh(): Promise<boolean> {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) return false;
+
+    try {
+      const tokens = await this.refreshToken(refreshToken);
+      return !!tokens.accessToken;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      // Clear tokens on refresh failure
+      this.setToken(null);
+      localStorage.removeItem('refresh_token');
+      return false;
+    }
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryOn401 = true
   ): Promise<T> {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (this.token) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+    let token = this.getToken();
+    
+    // Auto-refresh token if it's about to expire
+    if (token) {
+      const needsRefresh = await this.shouldRefreshToken(token);
+      if (needsRefresh) {
+        const refreshed = await this.attemptTokenRefresh();
+        if (refreshed) {
+          token = this.getToken();
+        }
+      }
     }
 
+    if (token) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeoutId);
+
+    // Handle 401 - try to refresh token once
+    if (response.status === 401 && retryOn401 && token) {
+      const refreshed = await this.attemptTokenRefresh();
+      if (refreshed) {
+        // Retry the request with new token
+        const newToken = this.getToken();
+        if (newToken) {
+          (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
+          const retryController = new AbortController();
+          const retryTimeoutId = setTimeout(() => retryController.abort(), 30000);
+          
+          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+            ...options,
+            headers,
+            signal: retryController.signal,
+          });
+          
+          clearTimeout(retryTimeoutId);
+          
+          if (!retryResponse.ok) {
+            // If retry still fails, handle error normally
+            return this.handleErrorResponse<T>(retryResponse);
+          }
+          
+          return retryResponse.json();
+        }
+      }
+      
+      // Refresh failed or no token - logout user
+      this.setToken(null);
+      localStorage.removeItem('refresh_token');
+      window.location.href = '/login';
+      throw new Error(JSON.stringify({
+        message: 'Session expired. Please login again.',
+        code: 'SESSION_EXPIRED',
+        status: 401,
+      }));
+    }
 
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
-        message: 'An error occurred',
-        code: 'UNKNOWN_ERROR',
-        status: response.status,
-      }));
-      throw error;
+      return this.handleErrorResponse<T>(response);
     }
 
     return response.json();
   }
 
+  private async handleErrorResponse<T>(response: Response): Promise<T> {
+    const errorData: ApiError = await response.json().catch(() => ({
+      message: 'An error occurred',
+      code: 'UNKNOWN_ERROR',
+      status: response.status,
+    }));
+    
+    // Format validation errors with details
+    let errorMessage = errorData.error || errorData.message || 'An error occurred';
+    if (errorData.details) {
+      const details = Object.entries(errorData.details)
+        .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+        .join('; ');
+      errorMessage = details || errorMessage;
+    }
+    
+    const error: ApiError = {
+      ...errorData,
+      message: errorMessage,
+      status: response.status,
+    };
+    
+    throw new Error(JSON.stringify(error));
+  }
+
   // Auth
   async login(email: string, password: string): Promise<{ token: string; user: { id: string; email: string; name: string } }> {
-    return this.request('/auth/login', {
+    const response = await this.request<{ 
+      message: string;
+      user: { 
+        id: string; 
+        email: string; 
+        firstName: string | null;
+        lastName: string | null;
+      };
+      tokens: {
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+      };
+    }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
+    
+    // Store tokens
+    this.setToken(response.tokens.accessToken);
+    localStorage.setItem('refresh_token', response.tokens.refreshToken);
+    
+    // Transform response to match expected format
+    return {
+      token: response.tokens.accessToken,
+      user: {
+        id: response.user.id,
+        email: response.user.email,
+        name: [response.user.firstName, response.user.lastName].filter(Boolean).join(' ') || email,
+      },
+    };
   }
 
   async register(email: string, password: string, name: string): Promise<{ token: string; user: { id: string; email: string; name: string } }> {
-    return this.request('/auth/register', {
+    // Split name into firstName and lastName
+    const trimmedName = name.trim();
+    const nameParts = trimmedName.split(/\s+/).filter(part => part.length > 0);
+    const firstName = nameParts[0] || undefined;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : undefined;
+    
+    // Build payload - only include fields that have values
+    const payload: { email: string; password: string; firstName?: string; lastName?: string } = {
+      email,
+      password,
+    };
+    
+    if (firstName) {
+      payload.firstName = firstName;
+    }
+    
+    if (lastName) {
+      payload.lastName = lastName;
+    }
+    
+    const response = await this.request<{ 
+      message: string;
+      user: { 
+        id: string; 
+        email: string; 
+        firstName: string | null;
+        lastName: string | null;
+      };
+      tokens: {
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+      };
+    }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify(payload),
     });
+    
+    // Store tokens
+    this.setToken(response.tokens.accessToken);
+    localStorage.setItem('refresh_token', response.tokens.refreshToken);
+    
+    // Transform response to match expected format
+    return {
+      token: response.tokens.accessToken,
+      user: {
+        id: response.user.id,
+        email: response.user.email,
+        name: [response.user.firstName, response.user.lastName].filter(Boolean).join(' ') || email,
+      },
+    };
+  }
+
+  async logout(): Promise<void> {
+    this.setToken(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
+  }
+
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresIn: number }> {
+    // IMPORTANT: Use fetch directly to avoid infinite loop in request() method
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error('Token refresh failed');
+      }
+      
+      const data = await response.json();
+      
+      // Store new tokens
+      this.setToken(data.tokens.accessToken);
+      localStorage.setItem('refresh_token', data.tokens.refreshToken);
+      
+      return data.tokens;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+
+  async updateUser(data: { firstName?: string; lastName?: string; email?: string }): Promise<{ user: { id: string; email: string; name: string } }> {
+    const response = await this.request<{
+      user: {
+        id: string;
+        email: string;
+        firstName: string | null;
+        lastName: string | null;
+      };
+    }>('/auth/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    
+    return {
+      user: {
+        id: response.user.id,
+        email: response.user.email,
+        name: [response.user.firstName, response.user.lastName].filter(Boolean).join(' ') || response.user.email,
+      },
+    };
+  }
+
+  async changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return this.request('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  }
+
+  async getSubscription(): Promise<{
+    subscription: {
+      id: string;
+      tier: string;
+      status: string;
+      monthlyWordLimit: number;
+      monthlyApiCallLimit: number;
+      storageLimit: number;
+      currentPeriodStart: string;
+      currentPeriodEnd: string;
+    };
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: any }>('/subscription');
+      const data = response.data || {};
+      return {
+        subscription: {
+          id: data.id || '',
+          tier: data.tier || 'FREE',
+          status: data.status || 'ACTIVE',
+          monthlyWordLimit: data.monthlyWordLimit || 10000,
+          monthlyApiCallLimit: data.monthlyApiCallLimit || 100,
+          storageLimit: Number(data.storageLimit) || 104857600,
+          currentPeriodStart: data.currentPeriodStart || new Date().toISOString(),
+          currentPeriodEnd: data.currentPeriodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      };
+    } catch (error) {
+      // Return default free tier subscription on error
+      console.error('Failed to fetch subscription, using defaults:', error);
+      return {
+        subscription: {
+          id: 'default',
+          tier: 'FREE',
+          status: 'ACTIVE',
+          monthlyWordLimit: 10000,
+          monthlyApiCallLimit: 100,
+          storageLimit: 104857600,
+          currentPeriodStart: new Date().toISOString(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+      };
+    }
+  }
+
+  async getCurrentUser(): Promise<{ user: { id: string; email: string; name: string } }> {
+    const response = await this.request<{ 
+      user: { 
+        id: string; 
+        email: string; 
+        firstName: string | null;
+        lastName: string | null;
+      };
+    }>('/auth/me');
+    
+    // Transform response to match expected format
+    return {
+      user: {
+        id: response.user.id,
+        email: response.user.email,
+        name: [response.user.firstName, response.user.lastName].filter(Boolean).join(' ') || response.user.email,
+      },
+    };
   }
 
   // Projects
-  async getProjects(): Promise<{ projects: Array<{ id: string; name: string; createdAt: string; updatedAt: string; wordCount: number; status: string }> }> {
-    return this.request('/projects');
+  async getProjects(params?: { page?: number; limit?: number; status?: string; search?: string; sortBy?: string; sortOrder?: string }): Promise<{ 
+    projects: Array<{ 
+      id: string; 
+      name: string; 
+      description: string | null;
+      createdAt: string; 
+      updatedAt: string; 
+      wordCount: number; 
+      status: string;
+    }>; 
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasMore: boolean;
+    };
+  }> {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
+    if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    const query = queryParams.toString();
+    return this.request(`/projects${query ? `?${query}` : ''}`);
   }
 
-  async getProject(id: string): Promise<{ project: { id: string; name: string; content: string; humanizedContent: string } }> {
+  async getProject(id: string): Promise<{ project: { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; wordCount: number; status: string } }> {
     return this.request(`/projects/${id}`);
   }
 
-  async createProject(name: string, content: string): Promise<{ project: { id: string; name: string } }> {
+  async createProject(data: { name: string; description?: string; settings?: Record<string, unknown> }): Promise<{ project: { id: string; name: string; description: string | null; createdAt: string; updatedAt: string; wordCount: number; status: string } }> {
     return this.request('/projects', {
       method: 'POST',
-      body: JSON.stringify({ name, content }),
+      body: JSON.stringify(data),
     });
   }
 
-  async updateProject(id: string, data: { name?: string; content?: string }): Promise<{ project: { id: string } }> {
+  async updateProject(id: string, data: { name?: string; description?: string; settings?: Record<string, unknown> }): Promise<{ project: { id: string; name: string } }> {
     return this.request(`/projects/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -94,24 +460,260 @@ class ApiClient {
   async humanize(
     text: string,
     options: { level?: number; strategy?: string; protectedSegments?: string[] }
-  ): Promise<{ humanizedText: string; metrics: { detectionScore: number; perplexity: number; burstiness: number; modificationPercentage: number } }> {
-    return this.request('/transform/humanize', {
+  ): Promise<{ 
+    id: string;
+    humanizedText: string; 
+    metrics: { 
+      detectionScore: number; 
+      perplexity: number; 
+      burstiness: number; 
+      modificationPercentage: number;
+      sentencesModified?: number;
+      totalSentences?: number;
+    };
+    processingTime: number;
+    strategyUsed: string;
+    levelApplied: number;
+  }> {
+    return this.request('/transformations/humanize', {
       method: 'POST',
-      body: JSON.stringify({ text, ...options }),
+      body: JSON.stringify({ text, level: options.level, strategy: options.strategy, protectedSegments: options.protectedSegments }),
     });
   }
 
   // Detection
-  async detectAI(text: string): Promise<{ scores: { overall: number; gptZero: number; originality: number } }> {
+  async detectAI(text: string, providers?: string[]): Promise<{
+    results: Array<{
+      provider: string;
+      score: number;
+      passed: boolean;
+      confidence: number;
+    }>;
+    averageScore: number;
+    overallPassed: boolean;
+  }> {
     return this.request('/detection/analyze', {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, providers }),
+    });
+  }
+
+  // Get transformation status
+  async getTransformationStatus(jobId: string): Promise<{
+    status: string;
+    progress: number;
+    chunksProcessed: number;
+    estimatedTimeRemaining?: number;
+  }> {
+    return this.request(`/transformations/status/${jobId}`);
+  }
+
+  // Cancel transformation
+  async cancelTransformation(jobId: string): Promise<{ message: string }> {
+    return this.request(`/transformations/cancel/${jobId}`, {
+      method: 'POST',
     });
   }
 
   // Usage
-  async getUsage(): Promise<{ usage: { wordsProcessed: number; limit: number; resetDate: string } }> {
-    return this.request('/usage');
+  async getUsage(): Promise<{ 
+    usage: { 
+      wordsProcessed: number; 
+      limit: number; 
+      resetDate: string;
+      tier: string;
+      remaining: number;
+    } 
+  }> {
+    try {
+      // Use subscription/usage endpoint and transform response
+      const response = await this.request<{ success: boolean; data: { words: { used: number; limit: number; periodEnd: string }; tier: string } }>('/subscription/usage');
+      const data = response.data || { words: { used: 0, limit: 10000, periodEnd: new Date().toISOString() }, tier: 'FREE' };
+      return {
+        usage: {
+          wordsProcessed: data.words?.used || 0,
+          limit: data.words?.limit || 10000,
+          resetDate: data.words?.periodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tier: data.tier || 'FREE',
+          remaining: (data.words?.limit || 10000) - (data.words?.used || 0),
+        }
+      };
+    } catch (error) {
+      console.error('Failed to fetch usage:', error);
+      return {
+        usage: {
+          wordsProcessed: 0,
+          limit: 10000,
+          resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          tier: 'FREE',
+          remaining: 10000,
+        }
+      };
+    }
+  }
+
+  async getUsageHistory(days?: number): Promise<{
+    data: {
+      userId: string;
+      entries: Array<{
+        date: string;
+        words: number;
+        apiCalls: number;
+        storage: number;
+      }>;
+      totals: {
+        words: number;
+        apiCalls: number;
+        storage: number;
+      };
+    };
+  }> {
+    const query = days ? `?days=${days}` : '';
+    return this.request(`/usage/history${query}`);
+  }
+
+  async getUsageTrends(): Promise<{
+    data: Array<{
+      resourceType: string;
+      currentPeriod: number;
+      previousPeriod: number;
+      changePercent: number;
+      trend: 'up' | 'down' | 'stable';
+    }>;
+  }> {
+    return this.request('/usage/trends');
+  }
+
+  async getUsageStatistics(): Promise<{
+    data: {
+      userId: string;
+      period: { start: string; end: string };
+      words: {
+        resourceType: string;
+        used: number;
+        limit: number;
+        remaining: number;
+        percentUsed: number;
+      };
+      apiCalls: {
+        resourceType: string;
+        used: number;
+        limit: number;
+        remaining: number;
+        percentUsed: number;
+      };
+      storage: {
+        resourceType: string;
+        used: number;
+        limit: number;
+        remaining: number;
+        percentUsed: number;
+      };
+      tier: string;
+    };
+  }> {
+    return this.request('/usage/statistics');
+  }
+
+  // Versions
+  async getProjectVersions(projectId: string): Promise<{
+    versions: Array<{
+      id: string;
+      versionNumber: number;
+      content: string;
+      humanizedContent: string | null;
+      createdAt: string;
+      createdBy: string;
+    }>;
+  }> {
+    return this.request(`/versions/project/${projectId}`);
+  }
+
+  async getVersion(versionId: string): Promise<{
+    version: {
+      id: string;
+      versionNumber: number;
+      content: string;
+      humanizedContent: string | null;
+      createdAt: string;
+    };
+  }> {
+    return this.request(`/versions/${versionId}`);
+  }
+
+  async getLatestVersion(projectId: string): Promise<{
+    id: string;
+    versionNumber: number;
+    content: string;
+    humanizedContent: string | null;
+    createdAt: string;
+  } | null> {
+    try {
+      // Get all versions and return the latest one (first in the list)
+      const versionsResponse = await this.getProjectVersions(projectId);
+      if (versionsResponse.versions && versionsResponse.versions.length > 0) {
+        // Versions are typically sorted by version number desc, so first is latest
+        const latest = versionsResponse.versions[0];
+        return {
+          id: latest.id,
+          versionNumber: latest.versionNumber,
+          content: latest.content || '',
+          humanizedContent: latest.humanizedContent || null,
+          createdAt: latest.createdAt,
+        };
+      }
+      return null;
+    } catch (error) {
+      // If no versions found, return null
+      console.error('Failed to get latest version:', error);
+      return null;
+    }
+  }
+
+  async compareVersions(versionId1: string, versionId2: string): Promise<{
+    version1: {
+      id: string;
+      versionNumber: number;
+      content: string;
+      createdAt: string;
+    };
+    version2: {
+      id: string;
+      versionNumber: number;
+      content: string;
+      createdAt: string;
+    };
+    wordCountDiff: number;
+    changes: Array<{
+      type: 'add' | 'remove' | 'unchanged';
+      value: string;
+      lineNumber?: number;
+    }>;
+    addedLines: number;
+    removedLines: number;
+    unchangedLines: number;
+    similarityPercentage: number;
+  }> {
+    // Backend returns comparison directly, not wrapped
+    const response = await this.request('/versions/compare', {
+      method: 'POST',
+      body: JSON.stringify({ versionId1, versionId2 }),
+    });
+    return response as any; // Backend returns the comparison directly
+  }
+
+  async createVersion(projectId: string, data: { content: string; humanizedContent?: string }): Promise<{
+    version: {
+      id: string;
+      versionNumber: number;
+      content: string;
+      humanizedContent: string | null;
+    };
+  }> {
+    return this.request(`/versions`, {
+      method: 'POST',
+      body: JSON.stringify({ projectId, ...data }),
+    });
   }
 
   // Search
@@ -244,6 +846,1136 @@ class ApiClient {
     return this.request('/projects/bulk/reprocess', {
       method: 'POST',
       body: JSON.stringify({ ids, ...options }),
+    });
+  }
+
+  // Templates
+  async getTemplates(): Promise<{
+    templates: Array<{
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      level: number;
+      strategy: string;
+      isPublic: boolean;
+      useCount: number;
+    }>;
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: { templates: any[] } }>('/templates');
+      // Transform backend response to match frontend expectations
+      const templates = (response.data?.templates ?? []).map(t => ({
+        id: t.id,
+        name: t.name,
+        description: t.description || '',
+        category: t.category || 'custom',
+        level: t.settings?.level || t.level || 3,
+        strategy: t.settings?.strategy || t.strategy || 'auto',
+        isPublic: t.visibility === 'public' || t.isPublic || false,
+        useCount: t.usageCount || t.useCount || 0,
+      }));
+      return { templates };
+    } catch (error) {
+      console.error('Failed to fetch templates:', error);
+      return { templates: [] };
+    }
+  }
+
+  async getTemplate(id: string): Promise<{
+    template: {
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      level: number;
+      strategy: string;
+      settings: Record<string, unknown>;
+    };
+  }> {
+    return this.request(`/templates/${id}`);
+  }
+
+  async createTemplate(data: {
+    name: string;
+    description?: string;
+    category: string;
+    level: number;
+    strategy: string;
+    settings?: Record<string, unknown>;
+  }): Promise<{ template: { id: string; name: string } }> {
+    return this.request('/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteTemplate(id: string): Promise<{ message: string }> {
+    return this.request(`/templates/${id}`, { method: 'DELETE' });
+  }
+
+  // Plagiarism - matches backend /plagiarism/check
+  async checkPlagiarism(text: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      originalityScore: number;
+      overallSimilarity: number;
+      isOriginal: boolean;
+      matches: Array<{
+        id: string;
+        matchedText: string;
+        startPosition: number;
+        endPosition: number;
+        similarity: number;
+        source: { title: string; url?: string; type: string };
+        severity: string;
+      }>;
+      wordCount: number;
+      timestamp: string;
+    };
+  }> {
+    return this.request('/plagiarism/check', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // SEO Analysis - matches backend /seo/analyze (expects document object)
+  async analyzeSEO(text: string, keywords?: string[]): Promise<{
+    success: boolean;
+    analysis: {
+      keywords: Array<{
+        term: string;
+        originalDensity: number;
+        targetDensity: number;
+        importance: string;
+        originalCount: number;
+        wordCount: number;
+      }>;
+      readabilityScore: number;
+      wordCount: number;
+      headingStructure?: Array<{ level: number; text: string; hasKeyword: boolean }>;
+    };
+  }> {
+    // Backend expects document object with content
+    return this.request('/seo/analyze', {
+      method: 'POST',
+      body: JSON.stringify({
+        document: { content: text, title: '', url: '' },
+        options: keywords ? { targetKeywords: keywords } : undefined,
+      }),
+    });
+  }
+
+  // SEO Extract Keywords - matches backend /seo/extract-keywords
+  async extractSEOKeywords(text: string): Promise<{
+    success: boolean;
+    keywords: Array<{
+      term: string;
+      originalDensity: number;
+      targetDensity: number;
+      importance: string;
+      originalCount: number;
+      wordCount: number;
+    }>;
+    count: number;
+  }> {
+    return this.request('/seo/extract-keywords', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // Citation - matches backend /citation/extract
+  async extractCitations(text: string): Promise<{
+    success: boolean;
+    data: {
+      citations: Array<{
+        text: string;
+        format: string;
+        type: string;
+        position: { start: number; end: number };
+      }>;
+      formatDetection: {
+        primaryFormat: string;
+        confidence: number;
+        hasMixedFormats: boolean;
+      };
+      digitalIdentifiers: Array<{ type: string; value: string }>;
+    };
+  }> {
+    return this.request('/citation/extract', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // Citation format detection - matches backend /citation/detect-format
+  async detectCitationFormat(text: string): Promise<{
+    success: boolean;
+    data: {
+      primaryFormat: string;
+      confidence: number;
+      hasMixedFormats: boolean;
+      formatBreakdown: Record<string, number>;
+    };
+  }> {
+    return this.request('/citation/detect-format', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // Citation standardize - matches backend /citation/standardize
+  async standardizeCitations(text: string, targetFormat: 'APA' | 'MLA' | 'Chicago' | 'Harvard'): Promise<{
+    success: boolean;
+    data: {
+      standardizedText: string;
+      citationsConverted: number;
+      success: boolean;
+    };
+  }> {
+    return this.request('/citation/standardize', {
+      method: 'POST',
+      body: JSON.stringify({ text, targetFormat }),
+    });
+  }
+
+  // Tone Analysis - matches backend /tone/analyze
+  async analyzeTone(text: string): Promise<{
+    success: boolean;
+    data: {
+      overallSentiment: string;
+      sentimentScore: number;
+      confidence: number;
+      emotions: Record<string, number>;
+      formality: number;
+      subjectivity: number;
+    };
+  }> {
+    return this.request('/tone/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // Tone Emotions - matches backend /tone/emotions
+  async detectEmotions(text: string): Promise<{
+    success: boolean;
+    data: {
+      emotions: Record<string, number>;
+      dominantEmotion: string;
+      emotionalIntensity: number;
+    };
+  }> {
+    return this.request('/tone/emotions', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  }
+
+  // ============================================
+  // Cloud Storage
+  // ============================================
+
+  async getCloudConnections(): Promise<{ connections: Array<{ provider: string; email: string; connectedAt: string }> }> {
+    try {
+      const response = await this.request<{ connections: any[] }>('/cloud-storage/connections');
+      return { connections: response.connections || [] };
+    } catch (error) {
+      console.error('Failed to fetch cloud connections:', error);
+      return { connections: [] };
+    }
+  }
+
+  async getCloudOAuthUrl(provider: string, redirectUri: string): Promise<{ url: string; state: string }> {
+    return this.request(`/cloud-storage/oauth/${provider}?redirectUri=${encodeURIComponent(redirectUri)}`);
+  }
+
+  async connectCloudProvider(data: { provider: string; code: string; redirectUri: string }): Promise<{ provider: string; email: string }> {
+    return this.request('/cloud-storage/connect', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async disconnectCloudProvider(provider: string): Promise<void> {
+    return this.request(`/cloud-storage/disconnect/${provider}`, { method: 'DELETE' });
+  }
+
+  async listCloudFiles(provider: string, folderId?: string): Promise<{
+    files: Array<{ id: string; name: string; type: 'file' | 'folder'; size?: number; modifiedAt?: string }>;
+    nextPageToken?: string;
+  }> {
+    const query = folderId ? `?folderId=${encodeURIComponent(folderId)}` : '';
+    return this.request(`/cloud-storage/files/${provider}${query}`);
+  }
+
+  async importCloudFile(data: { provider: string; fileId: string; projectId?: string }): Promise<{
+    content: string;
+    fileName: string;
+    projectId?: string;
+  }> {
+    return this.request('/cloud-storage/import', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async exportToCloud(data: { provider: string; content: string; fileName: string; folderId?: string }): Promise<{
+    fileId: string;
+    url: string;
+  }> {
+    return this.request('/cloud-storage/export', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  // ============================================
+  // A/B Testing
+  // ============================================
+
+  async generateVariations(text: string, count: number, parameters?: { strategies?: string[]; levels?: number[] }): Promise<{
+    success: boolean;
+    data: { variations: Array<{ id: string; text: string; strategy: string; level: number; detectionScore: number }>; count: number };
+  }> {
+    return this.request('/ab-testing/variations', { method: 'POST', body: JSON.stringify({ text, count, parameters }) });
+  }
+
+  async compareVariations(variations: Array<{ id: string; text: string; strategy: string; level: number; detectionScore: number; differences: string[]; wordCount: number; createdAt: string; isOriginal: boolean }>): Promise<{
+    success: boolean;
+    data: { bestVariation: string; rankings: Array<{ id: string; rank: number; score: number }> };
+  }> {
+    return this.request('/ab-testing/compare', { method: 'POST', body: JSON.stringify({ variations }) });
+  }
+
+  async createABTest(data: { name: string; originalText: string; variationCount: number; userId: string }): Promise<{
+    success: boolean;
+    data: { id: string; name: string; status: string; variationCount: number; createdAt: string };
+  }> {
+    return this.request('/ab-testing/tests', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getABTest(testId: string): Promise<{ success: boolean; data: { id: string; name: string; status: string; variations: Array<{ id: string; text: string }> } }> {
+    return this.request(`/ab-testing/tests/${testId}`);
+  }
+
+  async selectABTestWinner(testId: string): Promise<{ success: boolean; data: { winnerId: string; strategy: string; level: number; detectionScore: number } }> {
+    return this.request(`/ab-testing/tests/${testId}/winner`, { method: 'POST' });
+  }
+
+  // ============================================
+  // Scheduling
+  // ============================================
+
+  async getScheduledJobs(userId: string): Promise<{
+    success: boolean;
+    data: { jobs: Array<{ id: string; name: string; status: string; nextExecutionAt: string; enabled: boolean }>; count: number };
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: any }>(`/scheduling/jobs?userId=${encodeURIComponent(userId)}`);
+      return {
+        success: response.success ?? true,
+        data: {
+          jobs: response.data?.jobs ?? [],
+          count: response.data?.count ?? 0,
+        },
+      };
+    } catch (error) {
+      console.error('Failed to fetch scheduled jobs:', error);
+      return { success: false, data: { jobs: [], count: 0 } };
+    }
+  }
+
+  async createScheduledJob(data: {
+    name: string;
+    userId: string;
+    schedule: { frequency: 'once' | 'daily' | 'weekly' | 'monthly'; time: string; dayOfWeek?: number; dayOfMonth?: number };
+    source: { type: 'text' | 'project' | 'url'; content?: string; projectId?: string; url?: string };
+    settings: { level: number; strategy: string };
+    notificationEmail: string;
+  }): Promise<{ success: boolean; data: { id: string; name: string; status: string; nextExecutionAt: string } }> {
+    return this.request('/scheduling/jobs', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async deleteScheduledJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/scheduling/jobs/${jobId}`, { method: 'DELETE' });
+  }
+
+  async pauseScheduledJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/scheduling/jobs/${jobId}/pause`, { method: 'POST' });
+  }
+
+  async resumeScheduledJob(jobId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/scheduling/jobs/${jobId}/resume`, { method: 'POST' });
+  }
+
+  async triggerScheduledJob(jobId: string): Promise<{ success: boolean; data: { status: string; result?: string } }> {
+    return this.request(`/scheduling/jobs/${jobId}/execute`, { method: 'POST' });
+  }
+
+  // ============================================
+  // Collaboration
+  // ============================================
+
+  async getMyInvitations(): Promise<{ invitations: Array<{ id: string; projectId: string; projectName: string; inviterEmail: string; role: string; expiresAt: string }> }> {
+    try {
+      const response = await this.request<{ invitations: any[] }>('/collaboration/invitations');
+      const invitations = (response.invitations || []).map((inv: any) => ({
+        id: inv.id || '',
+        projectId: inv.projectId || '',
+        projectName: inv.projectName || 'Unknown Project',
+        inviterEmail: inv.invitedByName || inv.inviterEmail || 'Unknown',
+        role: inv.role || 'viewer',
+        expiresAt: inv.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }));
+      return { invitations };
+    } catch (error) {
+      console.error('Failed to fetch invitations:', error);
+      return { invitations: [] };
+    }
+  }
+
+  async acceptInvitation(token: string): Promise<{ message: string; projectId: string; role: string }> {
+    return this.request('/collaboration/invitations/accept', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+
+  async declineInvitation(token: string): Promise<{ message: string }> {
+    return this.request('/collaboration/invitations/decline', { method: 'POST', body: JSON.stringify({ token }) });
+  }
+
+  async inviteCollaborator(projectId: string, data: { email: string; role: 'viewer' | 'editor' | 'admin'; message?: string }): Promise<{
+    message: string;
+    invitation: { id: string; email: string; role: string; expiresAt: string };
+  }> {
+    return this.request(`/collaboration/projects/${projectId}/invite`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getProjectCollaborators(projectId: string): Promise<{
+    collaborators: Array<{ userId: string; email: string; name: string; role: string; joinedAt: string }>;
+    total: number;
+  }> {
+    return this.request(`/collaboration/projects/${projectId}/collaborators`);
+  }
+
+  async updateCollaboratorRole(projectId: string, userId: string, role: 'viewer' | 'editor' | 'admin'): Promise<{ message: string }> {
+    return this.request(`/collaboration/projects/${projectId}/collaborators/${userId}`, { method: 'PATCH', body: JSON.stringify({ role }) });
+  }
+
+  async removeCollaborator(projectId: string, userId: string): Promise<{ message: string }> {
+    return this.request(`/collaboration/projects/${projectId}/collaborators/${userId}`, { method: 'DELETE' });
+  }
+
+  async getProjectActivity(projectId: string): Promise<{
+    activities: Array<{ id: string; action: string; userId: string; userName: string; details: string; createdAt: string }>;
+    total: number;
+  }> {
+    return this.request(`/collaboration/projects/${projectId}/activity`);
+  }
+
+  // ============================================
+  // Invoices
+  // ============================================
+
+  async getInvoices(): Promise<{
+    invoices: Array<{ id: string; number: string; amount: number; currency: string; status: string; dueDate: string; paidAt?: string; createdAt: string }>;
+  }> {
+    try {
+      const response = await this.request<{ invoices: any[]; count: number }>('/invoices');
+      const invoices = (response.invoices || []).map((inv: any) => ({
+        id: inv.id || '',
+        number: inv.invoiceNumber || inv.number || '',
+        amount: inv.amount || 0,
+        currency: inv.currency || 'USD',
+        status: inv.status || 'pending',
+        dueDate: inv.dueDate || new Date().toISOString(),
+        paidAt: inv.paidAt,
+        createdAt: inv.createdAt || new Date().toISOString(),
+      }));
+      return { invoices };
+    } catch (error) {
+      console.error('Failed to fetch invoices:', error);
+      return { invoices: [] };
+    }
+  }
+
+  async getInvoice(invoiceId: string): Promise<{
+    invoice: { id: string; number: string; amount: number; currency: string; status: string; items: Array<{ description: string; quantity: number; unitPrice: number; total: number }>; dueDate: string; paidAt?: string };
+  }> {
+    return this.request(`/invoices/${invoiceId}`);
+  }
+
+  async downloadInvoice(invoiceId: string): Promise<Blob> {
+    const response = await fetch(`${this.baseUrl}/invoices/${invoiceId}/download`, {
+      headers: { Authorization: `Bearer ${this.getToken()}` },
+    });
+    return response.blob();
+  }
+
+  // ============================================
+  // MFA
+  // ============================================
+
+  async getMFAStatus(): Promise<{ enabled: boolean; methods: Array<{ type: string; enabled: boolean; verifiedAt?: string }> }> {
+    try {
+      const response = await this.request<{ success: boolean; data: { enabled: boolean; deviceCount: number; backupCodesRemaining: number } }>('/mfa/status');
+      // Transform backend response to expected format
+      const data = response.data || { enabled: false, deviceCount: 0 };
+      return {
+        enabled: data.enabled || false,
+        methods: [
+          { type: 'totp', enabled: data.deviceCount > 0 },
+          { type: 'sms', enabled: false },
+        ],
+      };
+    } catch (error) {
+      console.error('Failed to fetch MFA status:', error);
+      return { enabled: false, methods: [{ type: 'totp', enabled: false }, { type: 'sms', enabled: false }] };
+    }
+  }
+
+  async setupMFA(method: 'totp' | 'sms'): Promise<{ secret?: string; qrCode?: string; phoneNumber?: string }> {
+    return this.request('/mfa/setup', { method: 'POST', body: JSON.stringify({ method }) });
+  }
+
+  async verifyMFASetup(method: 'totp' | 'sms', code: string): Promise<{ success: boolean; backupCodes?: string[] }> {
+    return this.request('/mfa/verify-setup', { method: 'POST', body: JSON.stringify({ method, code }) });
+  }
+
+  async disableMFA(method: 'totp' | 'sms', code: string): Promise<{ success: boolean }> {
+    return this.request('/mfa/disable', { method: 'POST', body: JSON.stringify({ method, code }) });
+  }
+
+  // ============================================
+  // Localization
+  // ============================================
+
+  async localizeContent(data: { text: string; sourceLocale: string; targetLocale: string; options?: { preserveTone?: boolean; adaptCulturally?: boolean } }): Promise<{
+    success: boolean;
+    data: { localizedText: string; sourceLocale: string; targetLocale: string; adaptations: string[] };
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: any }>('/localization/localize', { method: 'POST', body: JSON.stringify(data) });
+      return {
+        success: response.success ?? true,
+        data: {
+          localizedText: response.data?.localizedText ?? data.text,
+          sourceLocale: response.data?.sourceLocale ?? data.sourceLocale,
+          targetLocale: response.data?.targetLocale ?? data.targetLocale,
+          adaptations: response.data?.adaptations ?? [],
+        },
+      };
+    } catch (error) {
+      console.error('Failed to localize content:', error);
+      throw error;
+    }
+  }
+
+  async getSupportedLocales(): Promise<{ locales: Array<{ code: string; name: string; nativeName: string }> }> {
+    return this.request('/localization/locales');
+  }
+
+  // ============================================
+  // Repurposing
+  // ============================================
+
+  async repurposeContent(data: { text: string; targetPlatform: 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'blog'; options?: { tone?: string; maxLength?: number } }): Promise<{
+    success: boolean;
+    data: { repurposedContent: string; platform: string; characterCount: number; suggestions: string[] };
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: any }>('/repurposing/repurpose', { method: 'POST', body: JSON.stringify(data) });
+      return {
+        success: response.success ?? true,
+        data: {
+          repurposedContent: response.data?.repurposedContent ?? data.text,
+          platform: response.data?.platform ?? data.targetPlatform,
+          characterCount: response.data?.characterCount ?? data.text.length,
+          suggestions: response.data?.suggestions ?? [],
+        },
+      };
+    } catch (error) {
+      console.error('Failed to repurpose content:', error);
+      throw error;
+    }
+  }
+
+  async getSupportedPlatforms(): Promise<{ platforms: Array<{ id: string; name: string; maxLength: number; features: string[] }> }> {
+    return this.request('/repurposing/platforms');
+  }
+
+  // ============================================
+  // Webhooks
+  // ============================================
+
+  async getWebhooks(userId: string): Promise<{
+    success: boolean;
+    data: {
+      webhooks: Array<{
+        id: string;
+        name: string;
+        url: string;
+        events: string[];
+        status: string;
+        enabled: boolean;
+        deliveryCount: number;
+        failedCount: number;
+        successRate: number;
+      }>;
+      count: number;
+    };
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: any }>(`/webhooks?userId=${encodeURIComponent(userId)}`);
+      return {
+        success: response.success ?? true,
+        data: {
+          webhooks: response.data?.webhooks ?? [],
+          count: response.data?.count ?? 0,
+        },
+      };
+    } catch (error) {
+      console.error('Failed to fetch webhooks:', error);
+      return { success: false, data: { webhooks: [], count: 0 } };
+    }
+  }
+
+  async createWebhook(data: {
+    userId: string;
+    name: string;
+    url: string;
+    events: string[];
+    headers?: Record<string, string>;
+  }): Promise<{
+    success: boolean;
+    data: { id: string; name: string; url: string; events: string[]; secret: string; enabled: boolean };
+  }> {
+    return this.request('/webhooks', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateWebhook(webhookId: string, data: { name?: string; url?: string; events?: string[]; enabled?: boolean }): Promise<{
+    success: boolean;
+    data: { id: string; name: string; url: string; events: string[]; enabled: boolean };
+  }> {
+    return this.request(`/webhooks/${webhookId}`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  async deleteWebhook(webhookId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/webhooks/${webhookId}`, { method: 'DELETE' });
+  }
+
+  async testWebhook(webhookId: string): Promise<{
+    success: boolean;
+    data: { deliveryId: string; statusCode: number; durationMs: number; error?: string };
+  }> {
+    return this.request(`/webhooks/${webhookId}/test`, { method: 'POST' });
+  }
+
+  async getWebhookEventTypes(): Promise<{ success: boolean; data: { eventTypes: string[] } }> {
+    return this.request('/webhooks/events/types');
+  }
+
+  // ============================================
+  // Branches (Version Control)
+  // ============================================
+
+  async getProjectBranches(projectId: string): Promise<{
+    branches: Array<{ id: string; name: string; isDefault: boolean; createdAt: string; lastCommitAt: string }>;
+  }> {
+    return this.request(`/branches/project/${projectId}`);
+  }
+
+  async createBranch(data: { projectId: string; name: string; sourceBranchId?: string }): Promise<{
+    branch: { id: string; name: string; isDefault: boolean };
+  }> {
+    return this.request('/branches', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async mergeBranch(branchId: string, targetBranchId: string): Promise<{
+    success: boolean;
+    mergedVersion: { id: string; versionNumber: number };
+  }> {
+    return this.request(`/branches/${branchId}/merge`, { method: 'POST', body: JSON.stringify({ targetBranchId }) });
+  }
+
+  async deleteBranch(branchId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/branches/${branchId}`, { method: 'DELETE' });
+  }
+
+  async getBranch(branchId: string): Promise<{
+    branch: {
+      id: string;
+      name: string;
+      isDefault: boolean;
+      createdAt: string;
+      lastCommitAt: string;
+    };
+  }> {
+    return this.request(`/branches/${branchId}`);
+  }
+
+  async switchBranch(branchId: string): Promise<{ success: boolean; message: string }> {
+    return this.request('/branches/switch', {
+      method: 'POST',
+      body: JSON.stringify({ branchId }),
+    });
+  }
+
+  async setDefaultBranch(branchId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/branches/${branchId}/default`, {
+      method: 'PUT',
+    });
+  }
+
+  async renameBranch(branchId: string, name: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/branches/${branchId}/rename`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async compareBranches(branchId1: string, branchId2: string): Promise<{
+    differences: Array<{
+      type: 'add' | 'remove' | 'modify';
+      path: string;
+      content: string;
+    }>;
+    similarity: number;
+  }> {
+    return this.request('/branches/compare', {
+      method: 'POST',
+      body: JSON.stringify({ branchId1, branchId2 }),
+    });
+  }
+
+  async getBranchTree(projectId: string): Promise<{
+    tree: Array<{
+      id: string;
+      name: string;
+      isDefault: boolean;
+      parentId?: string;
+    }>;
+  }> {
+    return this.request(`/branches/tree/${projectId}`);
+  }
+
+  async getDefaultBranch(projectId: string): Promise<{
+    branch: {
+      id: string;
+      name: string;
+      isDefault: boolean;
+    };
+  }> {
+    return this.request(`/branches/default/${projectId}`);
+  }
+
+  // ============================================
+  // Template Advanced Features
+  // ============================================
+
+  async getTemplateCategories(): Promise<{
+    categories: Array<{ id: string; name: string; description: string }>;
+  }> {
+    try {
+      const response = await this.request<{ success: boolean; data: { categories: string[] } }>('/templates/categories');
+      const categoryStrings = response.data?.categories ?? [];
+      const categoryMap: Record<string, { name: string; description: string }> = {
+        'blog-posts': { name: 'Blog Posts', description: 'Templates for blog posts' },
+        'academic-papers': { name: 'Academic Papers', description: 'Templates for academic papers' },
+        'creative-writing': { name: 'Creative Writing', description: 'Templates for creative writing' },
+        'business-content': { name: 'Business Content', description: 'Templates for business content' },
+        'technical-docs': { name: 'Technical Docs', description: 'Templates for technical documentation' },
+        'social-media': { name: 'Social Media', description: 'Templates for social media' },
+        'marketing': { name: 'Marketing', description: 'Templates for marketing' },
+        'custom': { name: 'Custom', description: 'Custom templates' },
+      };
+      return {
+        categories: categoryStrings.map(cat => ({
+          id: cat,
+          name: categoryMap[cat]?.name || cat,
+          description: categoryMap[cat]?.description || `Templates for ${cat}`,
+        })),
+      };
+    } catch (error) {
+      console.error('Failed to fetch template categories:', error);
+      return { categories: [] };
+    }
+  }
+
+  async applyTemplate(templateId: string, projectId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/templates/${templateId}/apply`, {
+      method: 'POST',
+      body: JSON.stringify({ projectId }),
+    });
+  }
+
+  async exportTemplate(templateId: string): Promise<{
+    template: {
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      level: number;
+      strategy: string;
+      settings: Record<string, unknown>;
+    };
+  }> {
+    return this.request(`/templates/${templateId}/export`);
+  }
+
+  async importTemplate(data: {
+    template: {
+      name: string;
+      description: string;
+      category: string;
+      level: number;
+      strategy: string;
+      settings: Record<string, unknown>;
+    };
+  }): Promise<{
+    template: {
+      id: string;
+      name: string;
+    };
+  }> {
+    return this.request('/templates/import', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async shareTemplate(templateId: string, userId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/templates/${templateId}/share`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async unshareTemplate(shareId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/templates/shares/${shareId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getTemplateShares(templateId: string): Promise<{
+    shares: Array<{
+      id: string;
+      userId: string;
+      userName: string;
+      sharedAt: string;
+    }>;
+  }> {
+    return this.request(`/templates/${templateId}/shares`);
+  }
+
+  async rateTemplate(templateId: string, rating: number): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/templates/${templateId}/rate`, {
+      method: 'POST',
+      body: JSON.stringify({ rating }),
+    });
+  }
+
+  async duplicateTemplate(templateId: string): Promise<{
+    template: {
+      id: string;
+      name: string;
+    };
+  }> {
+    return this.request(`/templates/${templateId}/duplicate`, {
+      method: 'POST',
+    });
+  }
+
+  async updateTemplate(id: string, data: {
+    name?: string;
+    description?: string;
+    category?: string;
+    level?: number;
+    strategy?: string;
+    settings?: Record<string, unknown>;
+  }): Promise<{ template: { id: string; name: string } }> {
+    return this.request(`/templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ============================================
+  // Subscription Management
+  // ============================================
+
+  async updateSubscription(tier: string): Promise<{
+    subscription: {
+      id: string;
+      tier: string;
+      status: string;
+    };
+  }> {
+    return this.request('/subscription', {
+      method: 'PUT',
+      body: JSON.stringify({ tier }),
+    });
+  }
+
+  async cancelSubscription(): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request('/subscription', {
+      method: 'DELETE',
+    });
+  }
+
+  async getSubscriptionTiers(): Promise<{
+    tiers: Array<{
+      id: string;
+      name: string;
+      monthlyWordLimit: number;
+      monthlyApiCallLimit: number;
+      storageLimit: number;
+      price: number;
+      features: string[];
+    }>;
+  }> {
+    return this.request('/subscription/tiers');
+  }
+
+  async getUpgradePreview(tier: string): Promise<{
+    preview: {
+      currentTier: string;
+      newTier: string;
+      priceDifference: number;
+      newLimits: {
+        monthlyWordLimit: number;
+        monthlyApiCallLimit: number;
+        storageLimit: number;
+      };
+    };
+  }> {
+    return this.request(`/subscription/upgrade-preview?tier=${encodeURIComponent(tier)}`);
+  }
+
+  async checkQuota(resourceType: 'words' | 'apiCalls' | 'storage', amount: number): Promise<{
+    allowed: boolean;
+    remaining: number;
+    limit: number;
+  }> {
+    return this.request(`/subscription/quota/check?resourceType=${resourceType}&amount=${amount}`);
+  }
+
+  async getBillingDashboard(): Promise<{
+    dashboard: {
+      currentPeriod: {
+        start: string;
+        end: string;
+        usage: {
+          words: number;
+          apiCalls: number;
+          storage: number;
+        };
+      };
+      upcomingInvoice: {
+        amount: number;
+        date: string;
+      } | null;
+      paymentMethod: {
+        type: string;
+        last4: string;
+      } | null;
+    };
+  }> {
+    return this.request('/subscription/billing');
+  }
+
+  // ============================================
+  // A/B Testing Advanced Features
+  // ============================================
+
+  async updateABTestStatus(testId: string, status: 'draft' | 'running' | 'paused' | 'completed'): Promise<{
+    success: boolean;
+    data: { id: string; status: string };
+  }> {
+    return this.request(`/ab-testing/tests/${testId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async deleteABTest(testId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/ab-testing/tests/${testId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async trackPerformance(variationId: string, metrics: {
+    views?: number;
+    clicks?: number;
+    conversions?: number;
+  }): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request('/ab-testing/track', {
+      method: 'POST',
+      body: JSON.stringify({ variationId, metrics }),
+    });
+  }
+
+  async getPerformanceMetrics(variationId: string): Promise<{
+    success: boolean;
+    data: {
+      variationId: string;
+      views: number;
+      clicks: number;
+      conversions: number;
+      conversionRate: number;
+      clickThroughRate: number;
+    };
+  }> {
+    return this.request(`/ab-testing/metrics/${variationId}`);
+  }
+
+  async selectWinner(testId: string, variationId: string): Promise<{
+    success: boolean;
+    data: {
+      winnerId: string;
+      strategy: string;
+      level: number;
+      detectionScore: number;
+    };
+  }> {
+    return this.request(`/ab-testing/tests/${testId}/winner`, {
+      method: 'POST',
+      body: JSON.stringify({ variationId }),
+    });
+  }
+
+  async generateTestReport(testId: string): Promise<{
+    success: boolean;
+    data: {
+      testId: string;
+      report: {
+        summary: string;
+        winner: string;
+        metrics: Record<string, number>;
+      };
+    };
+  }> {
+    return this.request(`/ab-testing/tests/${testId}/report`);
+  }
+
+  // ============================================
+  // Scheduled Jobs Update
+  // ============================================
+
+  async updateScheduledJob(jobId: string, data: {
+    name?: string;
+    schedule?: {
+      frequency: 'once' | 'daily' | 'weekly' | 'monthly';
+      time?: string;
+      dayOfWeek?: number;
+      dayOfMonth?: number;
+    };
+    settings?: {
+      level?: number;
+      strategy?: string;
+    };
+    enabled?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: { id: string; name: string; status: string };
+  }> {
+    return this.request(`/scheduling/jobs/${jobId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ============================================
+  // Collaboration Advanced Features
+  // ============================================
+
+  async getProjectInvitations(projectId: string): Promise<{
+    invitations: Array<{
+      id: string;
+      email: string;
+      role: string;
+      status: string;
+      expiresAt: string;
+      createdAt: string;
+    }>;
+  }> {
+    return this.request(`/collaboration/projects/${projectId}/invitations`);
+  }
+
+  async revokeInvitation(projectId: string, invitationId: string): Promise<{
+    success: boolean;
+    message: string;
+  }> {
+    return this.request(`/collaboration/projects/${projectId}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============================================
+  // Tone Analysis Advanced Features
+  // ============================================
+
+  async adjustTone(text: string, targetTone: {
+    sentiment?: 'positive' | 'neutral' | 'negative';
+    formality?: number;
+    emotion?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      adjustedText: string;
+      changes: string[];
+    };
+  }> {
+    return this.request('/tone/adjust', {
+      method: 'POST',
+      body: JSON.stringify({ text, targetTone }),
+    });
+  }
+
+  async checkToneConsistency(texts: string[]): Promise<{
+    success: boolean;
+    data: {
+      consistencyScore: number;
+      inconsistencies: Array<{
+        textIndex: number;
+        issue: string;
+      }>;
+    };
+  }> {
+    return this.request('/tone/consistency', {
+      method: 'POST',
+      body: JSON.stringify({ texts }),
+    });
+  }
+
+  async targetTone(text: string, targetTone: {
+    sentiment: 'positive' | 'neutral' | 'negative';
+    formality: number;
+    emotion: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      targetedText: string;
+      adjustments: string[];
+    };
+  }> {
+    return this.request('/tone/target', {
+      method: 'POST',
+      body: JSON.stringify({ text, targetTone }),
     });
   }
 }

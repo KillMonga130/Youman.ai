@@ -118,20 +118,24 @@ export async function bulkExport(
         projectFolder.file('metadata.json', JSON.stringify(metadata, null, 2));
       }
 
-      // Fetch full project content if not already available
-      let content = project.content;
-      let humanizedContent = project.humanizedContent;
+      // Fetch project content from latest version
+      let content = '';
+      let humanizedContent = '';
 
-      if (!content || !humanizedContent) {
-        try {
-          const fullProject = await apiClient.getProject(project.id);
-          content = fullProject.project.content;
-          humanizedContent = fullProject.project.humanizedContent;
-        } catch {
-          // Use empty strings if fetch fails
-          content = content || '';
-          humanizedContent = humanizedContent || '';
+      try {
+        // Get latest version to fetch content
+        const versions = await apiClient.getProjectVersions(project.id);
+        if (versions.versions && versions.versions.length > 0) {
+          const latestVersion = versions.versions[0]; // Versions are sorted by version number desc
+          if (latestVersion) {
+            content = latestVersion.content || '';
+            humanizedContent = latestVersion.humanizedContent || '';
+          }
         }
+      } catch {
+        // Use empty strings if fetch fails
+        content = '';
+        humanizedContent = '';
       }
 
       // Add content based on format
@@ -254,14 +258,33 @@ export async function bulkReprocess(
     onProgress?.(progress);
 
     try {
-      // Fetch project content
+      // Fetch project to verify it exists
       const { project } = await apiClient.getProject(id);
       
-      // Re-humanize the content
-      const result = await apiClient.humanize(project.content, options);
+      // Get latest version to fetch content
+      const versions = await apiClient.getProjectVersions(id);
+      if (!versions.versions || versions.versions.length === 0) {
+        throw new Error('No versions found for this project');
+      }
       
-      // Update project with new humanized content
-      await apiClient.updateProject(id, { content: result.humanizedText });
+      const latestVersion = versions.versions[0]; // Versions are sorted by version number desc
+      if (!latestVersion) {
+        throw new Error('No versions found for this project');
+      }
+      const content = latestVersion.content || '';
+      
+      if (!content) {
+        throw new Error('No content found in latest version');
+      }
+      
+      // Re-humanize the content
+      const result = await apiClient.humanize(content, options);
+      
+      // Create a new version with the re-humanized content
+      await apiClient.createVersion(id, {
+        content: content,
+        humanizedContent: result.humanizedText,
+      });
       
       progress.completed++;
     } catch (error) {

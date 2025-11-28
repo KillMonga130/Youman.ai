@@ -221,6 +221,9 @@ export class CasualStrategy implements ITransformationStrategy {
       result = this.addConversationalPhrases(result, intensity, modifications);
     }
 
+    // Vary sentence lengths for better burstiness (at all levels)
+    result = this.varySentenceLengths(result, intensity, modifications);
+
     return { text: result, modifications };
   }
 
@@ -352,6 +355,81 @@ export class CasualStrategy implements ITransformationStrategy {
       }
       return sentence;
     });
+
+    return result.join(' ');
+  }
+
+  /**
+   * Varies sentence lengths to increase burstiness
+   * Splits long sentences and combines short ones for more natural variation
+   */
+  private varySentenceLengths(
+    text: string,
+    intensity: number,
+    modifications: StrategyModification[]
+  ): string {
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    if (sentences.length < 2) return text;
+
+    const result: string[] = [];
+    
+    for (let i = 0; i < sentences.length; i++) {
+      const sentence = sentences[i];
+      if (!sentence) continue;
+      
+      const words = sentence.split(/\s+/);
+      
+      // Split very long sentences (>20 words) at natural break points
+      if (words.length > 20 && Math.random() < intensity) {
+        const breakPoints = [' and ', ' but ', ' which ', ' because ', ' although ', ' while '];
+        let split = false;
+        
+        for (const bp of breakPoints) {
+          if (sentence.includes(bp)) {
+            const parts = sentence.split(bp);
+            if (parts.length === 2 && parts[0] && parts[1]) {
+              // Capitalize second part and add period to first
+              const firstPart = parts[0].trim().replace(/[,;]$/, '') + '.';
+              const secondPart = parts[1].trim().charAt(0).toUpperCase() + parts[1].trim().slice(1);
+              result.push(firstPart);
+              result.push(secondPart);
+              modifications.push({
+                type: 'structure',
+                original: sentence,
+                replacement: `${firstPart} ${secondPart}`,
+                position: -1,
+              });
+              split = true;
+              break;
+            }
+          }
+        }
+        
+        if (!split) {
+          result.push(sentence);
+        }
+      }
+      // Combine very short sentences (< 5 words) with next sentence
+      else if (words.length < 5 && i < sentences.length - 1 && Math.random() < intensity * 0.5) {
+        const nextSentence = sentences[i + 1];
+        if (nextSentence) {
+          const combined = sentence.replace(/[.!?]$/, '') + ' — ' + nextSentence.charAt(0).toLowerCase() + nextSentence.slice(1);
+          result.push(combined);
+          modifications.push({
+            type: 'structure',
+            original: `${sentence} ${nextSentence}`,
+            replacement: combined,
+            position: -1,
+          });
+          i++; // Skip next sentence since we combined it
+        } else {
+          result.push(sentence);
+        }
+      }
+      else {
+        result.push(sentence);
+      }
+    }
 
     return result.join(' ');
   }

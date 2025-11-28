@@ -2,6 +2,12 @@
   "name": "ai-humanizer",
   "version": "1.0.0",
   "description": "AI Humanizer - Transform AI-generated text into natural, human-like content",
+  "author": {
+    "name": "Mubvafhi Mueletshedzi Moses",
+    "email": "mubvafhimoses813@gmail.com"
+  },
+  "license": "MIT",
+  "softwareId": "AIH-2024-MMM-001",
   "private": true,
   "workspaces": [
     "packages/shared",

@@ -1,6 +1,9 @@
-import { useState } from 'react';
-import { Clock, FileText, ChevronRight, Search, Filter } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Clock, FileText, ChevronRight, Search, Filter, AlertCircle } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { useProjectVersions } from '../api/hooks';
+import { useProjects } from '../api/hooks';
+import { Spinner, Alert } from '../components/ui';
 
 interface HistoryItem {
   id: string;
@@ -12,45 +15,6 @@ interface HistoryItem {
   strategy: string;
 }
 
-// Mock data
-const mockHistory: HistoryItem[] = [
-  {
-    id: '1',
-    projectName: 'Blog Post Draft',
-    versionNumber: 3,
-    createdAt: '2024-01-15T14:20:00Z',
-    wordCount: 1250,
-    detectionScore: 12,
-    strategy: 'professional',
-  },
-  {
-    id: '2',
-    projectName: 'Blog Post Draft',
-    versionNumber: 2,
-    createdAt: '2024-01-15T12:30:00Z',
-    wordCount: 1180,
-    detectionScore: 25,
-    strategy: 'professional',
-  },
-  {
-    id: '3',
-    projectName: 'Research Paper',
-    versionNumber: 5,
-    createdAt: '2024-01-14T16:45:00Z',
-    wordCount: 5420,
-    detectionScore: 8,
-    strategy: 'academic',
-  },
-  {
-    id: '4',
-    projectName: 'Marketing Copy',
-    versionNumber: 1,
-    createdAt: '2024-01-13T11:15:00Z',
-    wordCount: 320,
-    detectionScore: 18,
-    strategy: 'casual',
-  },
-];
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
@@ -79,14 +43,54 @@ function getStrategyBadge(strategy: string): JSX.Element {
 }
 
 export function History(): JSX.Element {
+  const { projectId } = useParams<{ projectId?: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStrategy, setFilterStrategy] = useState<string>('all');
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projectId || null);
 
-  const filteredHistory = mockHistory.filter((item) => {
-    const matchesSearch = item.projectName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStrategy === 'all' || item.strategy === filterStrategy;
-    return matchesSearch && matchesFilter;
+  // Get all projects for the dropdown
+  const { data: projectsData, isLoading: isLoadingProjects } = useProjects({ page: 1, limit: 100 });
+  const projects = projectsData?.projects || [];
+
+  // Get versions for selected project
+  const { data: versionsData, isLoading: isLoadingVersions, error: versionsError } = useProjectVersions(selectedProjectId);
+
+  const versions = versionsData?.versions || [];
+  
+  // Create history items from versions
+  const historyItems: HistoryItem[] = versions.map((version) => {
+    const project = projects.find(p => p.id === selectedProjectId);
+    const wordCount = version.content ? version.content.split(/\s+/).length : 0;
+    
+    // Try to get detection score and strategy from version metadata
+    // If not available, use defaults
+    const versionData = version as any;
+    const detectionScore = versionData.detectionScore ?? versionData.metrics?.detectionScore ?? 0;
+    const strategy = versionData.strategy ?? versionData.metrics?.strategy ?? 'auto';
+    
+    return {
+      id: version.id,
+      projectName: project?.name || 'Unknown Project',
+      versionNumber: version.versionNumber,
+      createdAt: version.createdAt,
+      wordCount,
+      detectionScore,
+      strategy,
+    };
   });
+
+  const filteredHistory = historyItems.filter((item) => {
+    const matchesSearch = item.projectName.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesSearch;
+  });
+
+  if (isLoadingProjects || isLoadingVersions) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -97,77 +101,105 @@ export function History(): JSX.Element {
         </p>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="input pl-10"
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <select
-            value={filterStrategy}
-            onChange={(e) => setFilterStrategy(e.target.value)}
-            className="input pl-10 pr-8 appearance-none"
-          >
-            <option value="all">All Strategies</option>
-            <option value="casual">Casual</option>
-            <option value="professional">Professional</option>
-            <option value="academic">Academic</option>
-          </select>
-        </div>
+      {/* Project Selector */}
+      <div className="card p-4">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Select Project
+        </label>
+        <select
+          value={selectedProjectId || ''}
+          onChange={(e) => setSelectedProjectId(e.target.value || null)}
+          className="input w-full"
+        >
+          <option value="">-- Select a project --</option>
+          {projects.map(project => (
+            <option key={project.id} value={project.id}>
+              {project.name}
+            </option>
+          ))}
+        </select>
       </div>
 
-      {/* History list */}
-      <div className="card divide-y divide-gray-200 dark:divide-gray-700">
-        {filteredHistory.length === 0 ? (
-          <div className="p-8 text-center">
-            <Clock className="w-12 h-12 mx-auto text-gray-400 mb-3" />
-            <p className="text-gray-500 dark:text-gray-400">No history found</p>
+      {versionsError && (
+        <Alert variant="error">
+          <AlertCircle className="w-4 h-4" />
+          <span>Failed to load versions. Please try again.</span>
+        </Alert>
+      )}
+
+      {!selectedProjectId && (
+        <div className="card p-8 text-center">
+          <Clock className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+          <p className="text-gray-500 dark:text-gray-400">Select a project to view its version history</p>
+        </div>
+      )}
+
+      {selectedProjectId && (
+        <>
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search versions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-10"
+              />
+            </div>
           </div>
-        ) : (
-          filteredHistory.map((item) => (
-            <Link
-              key={item.id}
-              to={`/editor/${item.id}`}
-              className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-start gap-3">
-                <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-                  <FileText className="w-5 h-5 text-gray-500" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{item.projectName}</h3>
-                    <span className="text-sm text-gray-500">v{item.versionNumber}</span>
-                    {getStrategyBadge(item.strategy)}
-                  </div>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    <span>{item.wordCount.toLocaleString()} words</span>
-                    <span
-                      className={
-                        item.detectionScore < 20
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-amber-600 dark:text-amber-400'
-                      }
-                    >
-                      {item.detectionScore}% AI detected
-                    </span>
-                    <span>{formatDate(item.createdAt)}</span>
-                  </div>
-                </div>
+
+          {/* History list */}
+          <div className="card divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredHistory.length === 0 ? (
+              <div className="p-8 text-center">
+                <Clock className="w-12 h-12 mx-auto text-gray-400 mb-3" />
+                <p className="text-gray-500 dark:text-gray-400">
+                  {searchQuery ? 'No versions match your search' : 'No version history for this project'}
+                </p>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400" />
-            </Link>
-          ))
-        )}
-      </div>
+            ) : (
+              filteredHistory.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/editor/${selectedProjectId}?version=${item.id}`}
+                  className="flex items-center justify-between p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                      <FileText className="w-5 h-5 text-gray-500" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium">{item.projectName}</h3>
+                        <span className="text-sm text-gray-500">v{item.versionNumber}</span>
+                        {getStrategyBadge(item.strategy)}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
+                        <span>{item.wordCount.toLocaleString()} words</span>
+                        {item.detectionScore > 0 && (
+                          <span
+                            className={
+                              item.detectionScore < 20
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-amber-600 dark:text-amber-400'
+                            }
+                          >
+                            {item.detectionScore}% AI detected
+                          </span>
+                        )}
+                        <span>{formatDate(item.createdAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </Link>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

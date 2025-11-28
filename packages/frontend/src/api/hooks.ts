@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
 // Projects
-export function useProjects() {
+export function useProjects(params?: { page?: number; limit?: number; status?: string; search?: string; sortBy?: string; sortOrder?: string }) {
   return useQuery({
-    queryKey: ['projects'],
-    queryFn: () => apiClient.getProjects(),
+    queryKey: ['projects', params],
+    queryFn: () => apiClient.getProjects(params),
   });
 }
 
@@ -20,8 +20,8 @@ export function useProject(id: string | null) {
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, content }: { name: string; content: string }) =>
-      apiClient.createProject(name, content),
+    mutationFn: (data: { name: string; description?: string; settings?: Record<string, unknown> }) =>
+      apiClient.createProject(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
@@ -31,7 +31,7 @@ export function useCreateProject() {
 export function useUpdateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name?: string; content?: string } }) =>
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; description?: string; settings?: Record<string, unknown> } }) =>
       apiClient.updateProject(id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -66,7 +66,8 @@ export function useHumanize() {
 // Detection
 export function useDetectAI() {
   return useMutation({
-    mutationFn: (text: string) => apiClient.detectAI(text),
+    mutationFn: ({ text, providers }: { text: string; providers?: string[] }) => 
+      apiClient.detectAI(text, providers),
   });
 }
 
@@ -78,11 +79,70 @@ export function useUsage() {
   });
 }
 
+export function useUsageHistory(days?: number) {
+  return useQuery({
+    queryKey: ['usageHistory', days],
+    queryFn: () => apiClient.getUsageHistory(days),
+  });
+}
+
+export function useUsageTrends() {
+  return useQuery({
+    queryKey: ['usageTrends'],
+    queryFn: () => apiClient.getUsageTrends(),
+  });
+}
+
+export function useUsageStatistics() {
+  return useQuery({
+    queryKey: ['usageStatistics'],
+    queryFn: () => apiClient.getUsageStatistics(),
+  });
+}
+
+// Versions
+export function useProjectVersions(projectId: string | null) {
+  return useQuery({
+    queryKey: ['versions', projectId],
+    queryFn: () => (projectId ? apiClient.getProjectVersions(projectId) : null),
+    enabled: !!projectId,
+  });
+}
+
+export function useVersion(versionId: string | null) {
+  return useQuery({
+    queryKey: ['version', versionId],
+    queryFn: () => (versionId ? apiClient.getVersion(versionId) : null),
+    enabled: !!versionId,
+  });
+}
+
+export function useCreateVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { projectId: string; content: string; humanizedContent?: string }) =>
+      apiClient.createVersion(data.projectId, { content: data.content, humanizedContent: data.humanizedContent }),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['versions', variables.projectId] });
+    },
+  });
+}
+
+export function useCompareVersions() {
+  return useMutation({
+    mutationFn: ({ versionId1, versionId2 }: { versionId1: string; versionId2: string }) =>
+      apiClient.compareVersions(versionId1, versionId2),
+  });
+}
+
 // Auth
 export function useLogin() {
   return useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) =>
       apiClient.login(email, password),
+    onSuccess: (data) => {
+      apiClient.setToken(data.token);
+    },
   });
 }
 
@@ -90,6 +150,67 @@ export function useRegister() {
   return useMutation({
     mutationFn: ({ email, password, name }: { email: string; password: string; name: string }) =>
       apiClient.register(email, password, name),
+    onSuccess: (data) => {
+      apiClient.setToken(data.token);
+    },
+  });
+}
+
+export function useCurrentUser() {
+  return useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => apiClient.getCurrentUser(),
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    enabled: true, // Explicitly enable
+  });
+}
+
+export function useLogout() {
+  return useMutation({
+    mutationFn: () => apiClient.logout(),
+  });
+}
+
+export function useRefreshToken() {
+  return useMutation({
+    mutationFn: (refreshToken: string) => apiClient.refreshToken(refreshToken),
+    onSuccess: (data) => {
+      apiClient.setToken(data.accessToken);
+      localStorage.setItem('refresh_token', data.refreshToken);
+    },
+  });
+}
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { firstName?: string; lastName?: string; email?: string }) =>
+      apiClient.updateUser(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['currentUser'] });
+    },
+  });
+}
+
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+      apiClient.changePassword(currentPassword, newPassword),
+  });
+}
+
+export function useSubscription() {
+  return useQuery({
+    queryKey: ['subscription'],
+    queryFn: () => apiClient.getSubscription(),
+    retry: 1,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 }
 

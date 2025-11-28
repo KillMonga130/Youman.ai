@@ -2,6 +2,12 @@
  * AI Humanizer Backend Server
  * Main entry point for the Express.js API server
  * 
+ * @copyright 2024 Mubvafhi Mueletshedzi Moses
+ * @author Mubvafhi Mueletshedzi Moses <mubvafhimoses813@gmail.com>
+ * @license MIT
+ * @version 1.0.0
+ * 
+ * Software ID: AIH-2024-MMM-001
  * Requirements: 21.3 - Real-time collaboration with WebSocket support
  */
 
@@ -12,6 +18,7 @@ import { logger } from './utils/logger';
 import { initializeDatabases } from './database';
 import { createApiGateway } from './api';
 import { initializeRealtimeServer, RealtimeServer } from './realtime';
+import { validateOwnership, getOwnershipSignature } from './ownership/ownership';
 
 const app: Express = express();
 
@@ -29,6 +36,13 @@ let realtimeServer: RealtimeServer | null = null;
 // Initialize databases and start server
 async function startServer(): Promise<void> {
   try {
+    // Verify software ownership
+    if (!validateOwnership()) {
+      logger.error('Software ownership verification failed');
+      process.exit(1);
+    }
+    logger.info(getOwnershipSignature());
+    
     // Initialize database connections
     await initializeDatabases();
     

@@ -1,6 +1,6 @@
 /**
  * Detection Module
- * Exports AI detection service and types
+ * Exports AI detection service, routes, and types
  * Requirements: 26, 52
  */
 
@@ -9,6 +9,8 @@ export {
   createDetectionService,
   getDetectionService,
 } from './detection.service';
+
+export { detectionRouter } from './detection.routes';
 
 export type {
   DetectionProvider,

@@ -4,18 +4,17 @@ import { Header } from './Header';
 
 interface LayoutProps {
   children: ReactNode;
-  onOpenTutorials?: () => void;
 }
 
-export function Layout({ children, onOpenTutorials }: LayoutProps): JSX.Element {
+export function Layout({ children }: LayoutProps): JSX.Element {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar onOpenTutorials={onOpenTutorials} />
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      <Sidebar />
       <div className="lg:pl-64">
-        <Header onOpenTutorials={onOpenTutorials} />
+        <Header />
         <main 
           id="main-content" 
-          className="p-4 lg:p-6"
+          className="p-4 lg:p-8 max-w-7xl mx-auto"
           role="main"
           tabIndex={-1}
         >

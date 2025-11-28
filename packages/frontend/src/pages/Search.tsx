@@ -13,110 +13,7 @@ import { SearchResults } from '../components/SearchResults';
 import { SavedSearches } from '../components/SavedSearches';
 import { Button } from '../components/ui/Button';
 
-// Mock API functions - replace with actual API calls
-async function searchProjectsApi(params: {
-  query: string;
-  filters: SearchFilters;
-  page: number;
-  limit: number;
-  sortBy: string;
-  sortOrder: string;
-}) {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Mock response
-  return {
-    results: [
-      {
-        id: '1',
-        name: 'Blog Post Draft',
-        description: 'A comprehensive guide to AI content creation',
-        status: 'ACTIVE',
-        wordCount: 1250,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        highlights: params.query ? [
-          {
-            field: 'name',
-            snippet: `Blog Post <mark>${params.query}</mark>`,
-            matchedTerms: [params.query],
-          },
-        ] : [],
-        score: 10,
-      },
-      {
-        id: '2',
-        name: 'Research Paper',
-        description: 'Academic research on natural language processing',
-        status: 'completed',
-        wordCount: 5420,
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - 86400000).toISOString(),
-        highlights: [],
-        score: 5,
-      },
-    ],
-    pagination: {
-      page: params.page,
-      limit: params.limit,
-      total: 2,
-      totalPages: 1,
-      hasMore: false,
-    },
-    query: params.query,
-    filters: params.filters,
-    executionTimeMs: 45,
-  };
-}
-
-async function getSavedSearchesApi() {
-  await new Promise(resolve => setTimeout(resolve, 200));
-  return {
-    savedSearches: [
-      {
-        id: '1',
-        name: 'Active Projects',
-        query: '',
-        filters: { status: ['ACTIVE'] },
-        useCount: 5,
-        lastUsedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: '2',
-        name: 'Large Documents',
-        query: '',
-        filters: { wordCountRange: { min: 5000 } },
-        useCount: 3,
-        lastUsedAt: new Date(Date.now() - 86400000).toISOString(),
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    total: 2,
-  };
-}
-
-async function saveSearchApi(name: string, query: string, filters: SearchFilters) {
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return {
-    id: Date.now().toString(),
-    name,
-    query,
-    filters,
-    useCount: 0,
-    lastUsedAt: null,
-    createdAt: new Date().toISOString(),
-  };
-}
-
-async function deleteSavedSearchApi(_id: string) {
-  await new Promise(resolve => setTimeout(resolve, 200));
-}
-
-async function updateSavedSearchApi(_id: string, _name: string) {
-  await new Promise(resolve => setTimeout(resolve, 200));
-}
+import { apiClient } from '../api/client';
 
 function SearchPageContent(): JSX.Element {
   const {
@@ -138,8 +35,10 @@ function SearchPageContent(): JSX.Element {
 
   // Load saved searches on mount
   useEffect(() => {
-    getSavedSearchesApi().then(data => {
+    apiClient.getSavedSearches().then(data => {
       setSavedSearches(data.savedSearches);
+    }).catch(error => {
+      console.error('Failed to load saved searches:', error);
     });
   }, [setSavedSearches]);
 
@@ -148,15 +47,18 @@ function SearchPageContent(): JSX.Element {
     setIsSearching(true);
     
     try {
-      const data = await searchProjectsApi({
+      const data = await apiClient.searchProjects({
         query: searchQuery,
-        filters,
+        filters: filters as Record<string, unknown>,
         page,
         limit: 20,
         sortBy,
         sortOrder,
       });
       setResults(data);
+    } catch (error) {
+      console.error('Search failed:', error);
+      setResults(null);
     } finally {
       setIsSearching(false);
     }
@@ -187,20 +89,36 @@ function SearchPageContent(): JSX.Element {
 
   // Handle save search
   const handleSaveSearch = useCallback(async (name: string, searchQuery: string, searchFilters: SearchFilters) => {
-    const newSearch = await saveSearchApi(name, searchQuery, searchFilters);
-    setSavedSearches([newSearch, ...savedSearches]);
+    try {
+      const result = await apiClient.saveSearch({
+        name,
+        query: searchQuery,
+        filters: searchFilters as Record<string, unknown>,
+      });
+      setSavedSearches([result.savedSearch, ...savedSearches]);
+    } catch (error) {
+      console.error('Failed to save search:', error);
+    }
   }, [savedSearches, setSavedSearches]);
 
   // Handle delete saved search
   const handleDeleteSavedSearch = useCallback(async (id: string) => {
-    await deleteSavedSearchApi(id);
-    setSavedSearches(savedSearches.filter(s => s.id !== id));
+    try {
+      await apiClient.deleteSavedSearch(id);
+      setSavedSearches(savedSearches.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Failed to delete saved search:', error);
+    }
   }, [savedSearches, setSavedSearches]);
 
   // Handle update saved search
   const handleUpdateSavedSearch = useCallback(async (id: string, name: string) => {
-    await updateSavedSearchApi(id, name);
-    setSavedSearches(savedSearches.map(s => s.id === id ? { ...s, name } : s));
+    try {
+      await apiClient.updateSavedSearch(id, { name });
+      setSavedSearches(savedSearches.map(s => s.id === id ? { ...s, name } : s));
+    } catch (error) {
+      console.error('Failed to update saved search:', error);
+    }
   }, [savedSearches, setSavedSearches]);
 
   return (

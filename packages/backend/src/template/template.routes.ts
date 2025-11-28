@@ -16,8 +16,12 @@ import {
   TemplateExport,
 } from './types';
 import { logger } from '../utils/logger';
+import { authenticate } from '../auth/auth.middleware';
 
 const router = Router();
+
+// All template routes require authentication
+router.use(authenticate);
 
 /**
  * GET /api/templates

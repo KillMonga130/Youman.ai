@@ -363,6 +363,68 @@ export async function validateSession(sessionId: string): Promise<SessionData | 
 /**
  * Get user by ID
  */
+export async function updateUser(
+  userId: string,
+  data: { firstName?: string; lastName?: string; email?: string }
+): Promise<AuthUser> {
+  const updateData: { firstName?: string | null; lastName?: string | null; email?: string } = {};
+  
+  if (data.firstName !== undefined) {
+    updateData.firstName = data.firstName || null;
+  }
+  if (data.lastName !== undefined) {
+    updateData.lastName = data.lastName || null;
+  }
+  if (data.email !== undefined) {
+    // Check if email is already taken
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email.toLowerCase() },
+    });
+    if (existingUser && existingUser.id !== userId) {
+      throw new AuthError('Email already in use', 'EMAIL_EXISTS');
+    }
+    updateData.email = data.email.toLowerCase();
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: updateData,
+  });
+
+  return toAuthUser(user);
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AuthError('User not found', 'USER_NOT_FOUND');
+  }
+
+  // Verify current password
+  const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
+  if (!isValidPassword) {
+    throw new AuthError('Current password is incorrect', 'INVALID_PASSWORD');
+  }
+
+  // Hash new password
+  const newPasswordHash = await hashPassword(newPassword);
+
+  // Update password
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: newPasswordHash },
+  });
+
+  logger.info('Password changed successfully', { userId });
+}
+
 export async function getUserById(userId: string): Promise<AuthUser | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },

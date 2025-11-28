@@ -131,6 +131,19 @@ export type TrackUsageInput = z.infer<typeof trackUsageSchema>;
 // Response Types
 // ============================================
 
+// Serializable version of TierLimits (for JSON responses)
+export interface SerializableTierLimits {
+  monthlyWordLimit: number;
+  monthlyApiCallLimit: number;
+  storageLimit: number; // Converted from bigint for JSON serialization
+  maxConcurrentProjects: number;
+  priorityProcessing: boolean;
+  customAiModels: boolean;
+  advancedAnalytics: boolean;
+  teamCollaboration: boolean;
+  apiAccess: boolean;
+}
+
 export interface SubscriptionResponse {
   id: string;
   userId: string;
@@ -138,7 +151,7 @@ export interface SubscriptionResponse {
   status: SubscriptionStatus;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
-  limits: TierLimits;
+  limits: SerializableTierLimits; // Use serializable version for JSON responses
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
@@ -198,7 +211,7 @@ export interface UpgradePreview {
   proratedAmount: number;
   newMonthlyAmount: number;
   effectiveDate: Date;
-  newLimits: TierLimits;
+  newLimits: SerializableTierLimits;
 }
 
 // ============================================

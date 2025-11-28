@@ -85,6 +85,9 @@ export async function disconnectRedis(): Promise<void> {
  */
 export async function checkRedisHealth(): Promise<boolean> {
   try {
+    if (!redis || redis.status !== 'ready') {
+      return false;
+    }
     const result = await redis.ping();
     return result === 'PONG';
   } catch {
@@ -104,6 +107,10 @@ export async function storeSession(
   userId: string,
   metadata: Record<string, string> = {}
 ): Promise<void> {
+  if (!redis || redis.status !== 'ready') {
+    logger.debug('Redis not available, skipping session store');
+    return;
+  }
   const key = `${SESSION_PREFIX}${sessionId}`;
   const data = {
     userId,
@@ -121,6 +128,10 @@ export async function getSession(sessionId: string): Promise<{
   createdAt: string;
   [key: string]: string;
 } | null> {
+  if (!redis || redis.status !== 'ready') {
+    logger.debug('Redis not available, returning null session');
+    return null;
+  }
   const key = `${SESSION_PREFIX}${sessionId}`;
   const data = await redis.get(key);
   if (!data) return null;
@@ -131,6 +142,10 @@ export async function getSession(sessionId: string): Promise<{
  * Delete a session from Redis
  */
 export async function deleteSession(sessionId: string): Promise<void> {
+  if (!redis || redis.status !== 'ready') {
+    logger.debug('Redis not available, skipping session delete');
+    return;
+  }
   const key = `${SESSION_PREFIX}${sessionId}`;
   await redis.del(key);
 }
@@ -139,6 +154,10 @@ export async function deleteSession(sessionId: string): Promise<void> {
  * Delete all sessions for a user
  */
 export async function deleteUserSessions(userId: string): Promise<void> {
+  if (!redis || redis.status !== 'ready') {
+    logger.debug('Redis not available, skipping user sessions delete');
+    return;
+  }
   const keys = await redis.keys(`${SESSION_PREFIX}*`);
   for (const key of keys) {
     const data = await redis.get(key);
@@ -155,6 +174,10 @@ export async function deleteUserSessions(userId: string): Promise<void> {
  * Refresh session TTL
  */
 export async function refreshSession(sessionId: string): Promise<boolean> {
+  if (!redis || redis.status !== 'ready') {
+    logger.debug('Redis not available, skipping session refresh');
+    return false;
+  }
   const key = `${SESSION_PREFIX}${sessionId}`;
   const exists = await redis.exists(key);
   if (exists) {

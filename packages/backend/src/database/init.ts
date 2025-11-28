@@ -21,14 +21,23 @@ export async function initializeDatabases(): Promise<void> {
   logger.info('Initializing database connections...');
 
   try {
-    // Connect to all databases in parallel
+    // Connect to PostgreSQL and MongoDB (required)
     await Promise.all([
       connectPostgres(),
       connectMongoDB(),
-      connectRedis(),
     ]);
 
-    logger.info('All database connections established successfully');
+    // Redis is optional - try to connect but don't fail if unavailable
+    try {
+      await connectRedis();
+    } catch (redisError) {
+      logger.warn('Redis connection failed - continuing without Redis cache', {
+        error: redisError instanceof Error ? redisError.message : 'Unknown error',
+      });
+      logger.warn('Some features requiring Redis (caching, sessions) may not work');
+    }
+
+    logger.info('Database connections established successfully');
   } catch (error) {
     logger.error('Failed to initialize databases:', error);
     throw error;
@@ -69,7 +78,7 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealth> {
     postgres: postgresHealth,
     mongodb: mongodbHealth,
     redis: redisHealth,
-    overall: postgresHealth && mongodbHealth && redisHealth,
+    overall: postgresHealth && mongodbHealth, // Redis is optional
   };
 }
 

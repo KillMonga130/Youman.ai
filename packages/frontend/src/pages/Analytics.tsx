@@ -1,4 +1,7 @@
-import { TrendingUp, TrendingDown, FileText, Zap, Target, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, FileText, Zap, Target, Clock, AlertCircle } from 'lucide-react';
+import { useUsage, useProjects, useUsageHistory, useUsageTrends } from '../api/hooks';
+import { Spinner, Alert } from '../components/ui';
+import { useMemo } from 'react';
 
 interface StatCard {
   label: string;
@@ -8,29 +11,219 @@ interface StatCard {
   color: string;
 }
 
-const stats: StatCard[] = [
-  { label: 'Total Words Processed', value: '125,420', change: 12.5, icon: FileText, color: 'bg-blue-500' },
-  { label: 'Avg Detection Score', value: '9.2%', change: -3.2, icon: Target, color: 'bg-green-500' },
-  { label: 'Projects Completed', value: '24', change: 8.3, icon: Zap, color: 'bg-teal-500' },
-  { label: 'Time Saved', value: '18.5 hrs', change: 15.0, icon: Clock, color: 'bg-amber-500' },
-];
-
-const recentActivity = [
-  { date: 'Today', projects: 3, words: 4520, avgScore: 8 },
-  { date: 'Yesterday', projects: 5, words: 8240, avgScore: 11 },
-  { date: 'Jan 13', projects: 2, words: 3100, avgScore: 9 },
-  { date: 'Jan 12', projects: 4, words: 6800, avgScore: 12 },
-  { date: 'Jan 11', projects: 3, words: 5200, avgScore: 7 },
-];
-
-const strategyUsage = [
-  { strategy: 'Professional', percentage: 45, count: 11 },
-  { strategy: 'Academic', percentage: 30, count: 7 },
-  { strategy: 'Casual', percentage: 20, count: 5 },
-  { strategy: 'Auto', percentage: 5, count: 1 },
-];
-
 export function Analytics(): JSX.Element {
+  const { data: usageData, isLoading: isLoadingUsage, error: usageError } = useUsage();
+  const { data: projectsData, isLoading: isLoadingProjects } = useProjects({ page: 1, limit: 100 });
+  const { data: usageHistoryData, isLoading: isLoadingHistory } = useUsageHistory(7);
+  const { data: usageTrendsData, isLoading: isLoadingTrends } = useUsageTrends();
+  
+  const projects = projectsData?.projects || [];
+  const wordsProcessed = usageData?.usage?.wordsProcessed || 0;
+  const totalProjects = projectsData?.pagination?.total || 0;
+  const usageHistory = usageHistoryData?.data?.entries || [];
+  const usageTrends = usageTrendsData?.data || [];
+
+  // Calculate stats from real data with trends
+  const stats: StatCard[] = useMemo(() => {
+    const avgDetectionScore = projects.length > 0
+      ? projects.reduce((sum, p) => sum + ((p as { detectionScore?: number }).detectionScore || 0), 0) / projects.length
+      : 0;
+    
+    // Get words trend
+    const wordsTrend = usageTrends.find(t => t.resourceType === 'WORDS');
+    const wordsChange = wordsTrend ? wordsTrend.changePercent : 0;
+    
+    return [
+      { 
+        label: 'Total Words Processed', 
+        value: wordsProcessed > 1000 ? `${(wordsProcessed / 1000).toFixed(1)}K` : wordsProcessed.toString(), 
+        change: Math.round(wordsChange),
+        icon: FileText, 
+        color: 'bg-blue-500' 
+      },
+      { 
+        label: 'Avg Detection Score', 
+        value: avgDetectionScore > 0 ? `${avgDetectionScore.toFixed(1)}%` : 'N/A', 
+        change: 0, 
+        icon: Target, 
+        color: 'bg-green-500' 
+      },
+      { 
+        label: 'Projects Completed', 
+        value: totalProjects.toString(), 
+        change: 0, 
+        icon: Zap, 
+        color: 'bg-teal-500' 
+      },
+      { 
+        label: 'Usage Limit', 
+        value: usageData?.usage?.limit ? `${((wordsProcessed / usageData.usage.limit) * 100).toFixed(0)}%` : 'N/A', 
+        change: 0, 
+        icon: Clock, 
+        color: 'bg-amber-500' 
+      },
+    ];
+  }, [wordsProcessed, projects, totalProjects, usageData, usageTrends]);
+
+  // Calculate recent activity from usage history
+  const recentActivity = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const todayEntry = usageHistory.find(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === today.getTime();
+    });
+    
+    const yesterdayEntry = usageHistory.find(entry => {
+      const entryDate = new Date(entry.date);
+      entryDate.setHours(0, 0, 0, 0);
+      return entryDate.getTime() === yesterday.getTime();
+    });
+
+    // Count projects created today/yesterday
+    const todayProjects = projects.filter(p => {
+      const created = new Date(p.createdAt);
+      created.setHours(0, 0, 0, 0);
+      return created.getTime() === today.getTime();
+    }).length;
+    
+    const yesterdayProjects = projects.filter(p => {
+      const created = new Date(p.createdAt);
+      created.setHours(0, 0, 0, 0);
+      return created.getTime() === yesterday.getTime();
+    }).length;
+
+    // Calculate average detection scores
+    const todayAvgScore = todayProjects > 0
+      ? projects.filter(p => {
+          const created = new Date(p.createdAt);
+          created.setHours(0, 0, 0, 0);
+          return created.getTime() === today.getTime();
+        }).reduce((sum, p) => sum + ((p as { detectionScore?: number }).detectionScore || 0), 0) / todayProjects
+      : 0;
+    
+    const yesterdayAvgScore = yesterdayProjects > 0
+      ? projects.filter(p => {
+          const created = new Date(p.createdAt);
+          created.setHours(0, 0, 0, 0);
+          return created.getTime() === yesterday.getTime();
+        }).reduce((sum, p) => sum + ((p as { detectionScore?: number }).detectionScore || 0), 0) / yesterdayProjects
+      : 0;
+
+    return [
+      { 
+        date: 'Today', 
+        projects: todayProjects, 
+        words: todayEntry?.words || 0, 
+        avgScore: Math.round(todayAvgScore) 
+      },
+      { 
+        date: 'Yesterday', 
+        projects: yesterdayProjects, 
+        words: yesterdayEntry?.words || 0, 
+        avgScore: Math.round(yesterdayAvgScore) 
+      },
+    ];
+  }, [usageHistory, projects]);
+
+  // Calculate strategy usage from projects (if they have strategy metadata)
+  const strategyUsage = useMemo(() => {
+    const strategyCounts: Record<string, number> = {
+      professional: 0,
+      academic: 0,
+      casual: 0,
+      auto: 0,
+    };
+    
+    // Count strategies from projects that have strategy metadata
+    projects.forEach((project: any) => {
+      const strategy = (project.strategy || project.settings?.strategy || 'auto').toLowerCase();
+      if (strategyCounts.hasOwnProperty(strategy)) {
+        strategyCounts[strategy]++;
+      } else {
+        strategyCounts.auto++;
+      }
+    });
+    
+    const total = projects.length;
+    if (total === 0) {
+      return [
+        { strategy: 'Professional', percentage: 0, count: 0 },
+        { strategy: 'Academic', percentage: 0, count: 0 },
+        { strategy: 'Casual', percentage: 0, count: 0 },
+        { strategy: 'Auto', percentage: 0, count: 0 },
+      ];
+    }
+    
+    // Calculate percentages
+    return [
+      { 
+        strategy: 'Professional', 
+        percentage: Math.round((strategyCounts.professional / total) * 100), 
+        count: strategyCounts.professional 
+      },
+      { 
+        strategy: 'Academic', 
+        percentage: Math.round((strategyCounts.academic / total) * 100), 
+        count: strategyCounts.academic 
+      },
+      { 
+        strategy: 'Casual', 
+        percentage: Math.round((strategyCounts.casual / total) * 100), 
+        count: strategyCounts.casual 
+      },
+      { 
+        strategy: 'Auto', 
+        percentage: Math.round((strategyCounts.auto / total) * 100), 
+        count: strategyCounts.auto 
+      },
+    ];
+  }, [projects]);
+
+  // Calculate detection score trend from last 7 days
+  const detectionScoreTrend = useMemo(() => {
+    const scores: number[] = [];
+    const today = new Date();
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      date.setHours(0, 0, 0, 0);
+      
+      const dayProjects = projects.filter(p => {
+        const created = new Date(p.createdAt);
+        created.setHours(0, 0, 0, 0);
+        return created.getTime() === date.getTime();
+      });
+      
+      if (dayProjects.length > 0) {
+        const avgScore = dayProjects.reduce((sum, p) => 
+          sum + ((p as { detectionScore?: number }).detectionScore || 0), 0) / dayProjects.length;
+        scores.push(Math.round(avgScore));
+      } else {
+        scores.push(0);
+      }
+    }
+    
+    // If no data, return zeros (no fake data)
+    if (scores.every(s => s === 0)) {
+      return [0, 0, 0, 0, 0, 0, 0];
+    }
+    
+    return scores;
+  }, [projects]);
+
+  if (isLoadingUsage || isLoadingProjects || isLoadingHistory || isLoadingTrends) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
   return (
     <div className="space-y-6">
       <div>
@@ -39,6 +232,13 @@ export function Analytics(): JSX.Element {
           Track your humanization performance and usage
         </p>
       </div>
+
+      {usageError && (
+        <Alert variant="error">
+          <AlertCircle className="w-4 h-4" />
+          <span>Failed to load usage data. Please try again.</span>
+        </Alert>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -139,15 +339,24 @@ export function Analytics(): JSX.Element {
         </div>
         <div className="p-4">
           <div className="h-48 flex items-end justify-between gap-2">
-            {[15, 12, 18, 9, 11, 8, 10].map((score, index) => (
+            {detectionScoreTrend.map((score, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className={`w-full rounded-t transition-all duration-500 ${
-                    score < 15 ? 'bg-green-500' : 'bg-amber-500'
-                  }`}
-                  style={{ height: `${(score / 20) * 100}%` }}
-                />
-                <span className="text-xs text-gray-500">{score}%</span>
+                {score > 0 ? (
+                  <>
+                    <div
+                      className={`w-full rounded-t transition-all duration-500 ${
+                        score < 15 ? 'bg-green-500' : 'bg-amber-500'
+                      }`}
+                      style={{ height: `${Math.min(100, (score / 20) * 100)}%` }}
+                    />
+                    <span className="text-xs text-gray-500">{score}%</span>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-full rounded-t bg-gray-200 dark:bg-gray-700" style={{ height: '10%' }} />
+                    <span className="text-xs text-gray-400">-</span>
+                  </>
+                )}
               </div>
             ))}
           </div>

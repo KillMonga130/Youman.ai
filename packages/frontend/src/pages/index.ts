@@ -5,3 +5,6 @@ export { Settings } from './Settings';
 export { History } from './History';
 export { Analytics } from './Analytics';
 export { Search } from './Search';
+export { Login } from './Login';
+export { Advanced } from './Advanced';
+export { Templates } from './Templates';

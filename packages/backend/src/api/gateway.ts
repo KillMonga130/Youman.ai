@@ -30,6 +30,10 @@ import { repurposingRoutes } from '../repurposing';
 import { localizationRoutes } from '../localization';
 import { searchRouter } from '../search';
 import { adminRoutes } from '../admin';
+import { transformRouter } from '../transform/transform.routes';
+import { toneRoutes } from '../tone';
+import { detectionRouter } from '../detection';
+import { templateRoutes } from '../template';
 import { 
   standardRateLimiter, 
   strictRateLimiter,
@@ -235,6 +239,10 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 61 - Advanced search and filtering
   apiRouter.use('/search', standardRateLimiter, searchRouter);
   
+  // Tone analysis routes (standard rate limiting)
+  // Requirements: 32, 47, 108, 116 - Tone adjustment and sentiment analysis
+  apiRouter.use('/tone', standardRateLimiter, toneRoutes);
+  
   // Admin routes (standard rate limiting)
   // Requirements: 19 - Monitor system performance and user activity
   apiRouter.use('/admin', standardRateLimiter, adminRoutes);
@@ -259,23 +267,26 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 70 - Performance optimization
   apiRouter.use('/performance', strictRateLimiter, performanceRoutes);
   
+  // Transformations routes (standard rate limiting)
+  // Requirements: 2.1, 2.2, 2.3, 2.4 - Text humanization API
+  apiRouter.use('/transformations', standardRateLimiter, transformRouter);
+  
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
-  
-  // Transformations routes (standard rate limiting)
-  apiRouter.use('/transformations', standardRateLimiter, createPlaceholderRouter('transformations'));
   
   // Analytics routes (relaxed rate limiting - read-heavy)
   apiRouter.use('/analytics', relaxedRateLimiter, createPlaceholderRouter('analytics'));
   
   // Detection routes (standard rate limiting)
-  apiRouter.use('/detection', standardRateLimiter, createPlaceholderRouter('detection'));
+  // Requirements: 26 - Real-time AI detection testing
+  apiRouter.use('/detection', standardRateLimiter, detectionRouter);
   
   // Users routes (standard rate limiting)
   apiRouter.use('/users', standardRateLimiter, createPlaceholderRouter('users'));
   
   // Templates routes (relaxed rate limiting)
-  apiRouter.use('/templates', relaxedRateLimiter, createPlaceholderRouter('templates'));
+  // Requirements: 25 - Template system with presets and custom templates
+  apiRouter.use('/templates', relaxedRateLimiter, templateRoutes);
 
   // Mount API router
   app.use(API_PREFIX, apiRouter);
@@ -345,6 +356,7 @@ function createVersionHandler(): express.RequestHandler {
         repurposing: `${API_PREFIX}/repurposing`,
         localization: `${API_PREFIX}/localization`,
         search: `${API_PREFIX}/search`,
+        tone: `${API_PREFIX}/tone`,
         admin: `${API_PREFIX}/admin`,
         support: `${API_PREFIX}/support`,
         autoScaling: `${API_PREFIX}/auto-scaling`,

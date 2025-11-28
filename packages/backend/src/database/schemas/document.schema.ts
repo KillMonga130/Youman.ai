@@ -130,7 +130,6 @@ const DocumentSchema = new Schema<IDocument>(
     contentHash: {
       type: String,
       required: true,
-      index: true,
     },
     wordCount: {
       type: Number,

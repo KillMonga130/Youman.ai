@@ -53,7 +53,6 @@ const StorageQuotaSchema = new Schema<IStorageQuota>(
       type: String,
       required: true,
       unique: true,
-      index: true,
     },
     totalBytesUsed: {
       type: Number,

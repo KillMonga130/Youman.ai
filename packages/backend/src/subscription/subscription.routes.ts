@@ -51,6 +51,14 @@ router.get(
       const subscription = await getSubscription(userId);
       res.json({ success: true, data: subscription });
     } catch (error) {
+      logger.error('Error in GET /subscription', { 
+        error: error instanceof Error ? {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        } : error,
+        userId: req.user?.id 
+      });
       next(error);
     }
   }
@@ -318,12 +326,19 @@ router.use((error: Error, _req: Request, res: Response, _next: NextFunction) => 
     return;
   }
 
-  logger.error('Subscription route error', { error });
+  // Log error with proper serialization
+  logger.error('Subscription route error', { 
+    error: {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    }
+  });
   res.status(500).json({
     success: false,
     error: {
       code: 'INTERNAL_ERROR',
-      message: 'An unexpected error occurred',
+      message: error.message || 'An unexpected error occurred',
     },
   });
 });
