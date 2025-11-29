@@ -1,10 +1,18 @@
-import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search, Sparkles, LayoutTemplate, FlaskConical } from 'lucide-react';
+import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search, Sparkles, LayoutTemplate, FlaskConical, Shield, Brain, type LucideIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
+import { useIsAdmin } from '../../api/hooks';
 
-const navItems = [
+interface NavItem {
+  path: string;
+  icon: LucideIcon;
+  label: string;
+  adminOnly?: boolean;
+}
+
+const allNavItems: NavItem[] = [
   { path: '/', icon: Home, label: 'Dashboard' },
   { path: '/editor', icon: FileText, label: 'Editor' },
   { path: '/templates', icon: LayoutTemplate, label: 'Templates' },
@@ -13,6 +21,8 @@ const navItems = [
   { path: '/history', icon: Clock, label: 'History' },
   { path: '/analytics', icon: BarChart2, label: 'Analytics' },
   { path: '/advanced', icon: Sparkles, label: 'Advanced' },
+  { path: '/models', icon: Brain, label: 'Model Management' },
+  { path: '/admin', icon: Shield, label: 'Admin Panel', adminOnly: true },
   { path: '/settings', icon: Settings, label: 'Settings' },
 ];
 
@@ -21,6 +31,10 @@ export function Sidebar(): JSX.Element {
   const navigate = useNavigate();
   const { sidebarOpen, setSidebarOpen, user, setUser } = useAppStore();
   const queryClient = useQueryClient();
+  const { data: isAdmin = false } = useIsAdmin();
+
+  // Filter nav items based on admin status
+  const navItems = allNavItems.filter(item => !item.adminOnly || isAdmin);
 
   const handleLogout = async (): Promise<void> => {
     try {

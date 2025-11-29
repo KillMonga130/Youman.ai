@@ -9,3 +9,5 @@ export { Login } from './Login';
 export { Advanced } from './Advanced';
 export { Templates } from './Templates';
 export { ABTesting } from './ABTesting';
+export { Admin } from './Admin';
+export { ModelManagement } from './ModelManagement';

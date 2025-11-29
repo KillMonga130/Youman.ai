@@ -2218,9 +2218,11 @@ class ApiClient {
 
   async getModelVersions(modelId: string): Promise<Array<{
     id: string;
+    modelId: string;
     version: string;
     status: string;
     createdAt: string;
+    description?: string;
   }>> {
     return this.request(`/ml-models/${modelId}/versions`);
   }
@@ -2299,6 +2301,483 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ modelIds }),
     });
+  }
+
+  // ============================================
+  // Admin Panel
+  // ============================================
+
+  async getAdminDashboard(): Promise<{
+    success: boolean;
+    data: {
+      systemMetrics: {
+        timestamp: string;
+        activeUsers: number;
+        totalUsers: number;
+        processingQueueLength: number;
+        resourceUtilization: {
+          cpuUsage: number;
+          memoryUsage: number;
+          memoryUsedMB: number;
+          memoryTotalMB: number;
+          diskUsage: number;
+          diskUsedGB: number;
+          diskTotalGB: number;
+        };
+        performance: {
+          averageProcessingTimePer1000Words: number;
+          requestsPerMinute: number;
+          averageResponseTime: number;
+          errorRate: number;
+          successRate: number;
+        };
+      };
+      userActivity: {
+        totalTransformations: number;
+        totalWordsProcessed: number;
+        totalApiCalls: number;
+        totalErrors: number;
+        activeUsersToday: number;
+        activeUsersThisWeek: number;
+        activeUsersThisMonth: number;
+        newUsersToday: number;
+        newUsersThisWeek: number;
+        newUsersThisMonth: number;
+      };
+      errorSummary: {
+        totalErrors: number;
+        errorsToday: number;
+        errorsThisWeek: number;
+        errorsByType: Record<string, number>;
+        topErrors: Array<{
+          errorCode: string;
+          count: number;
+          lastOccurrence: string;
+        }>;
+      };
+      recentAlerts: Array<{
+        id: string;
+        alertType: string;
+        severity: string;
+        message: string;
+        currentValue: number;
+        threshold: number;
+        triggeredAt: string;
+        acknowledged: boolean;
+        acknowledgedAt?: string;
+        acknowledgedBy?: string;
+      }>;
+      performanceHistory: Array<{
+        timestamp: string;
+        processingTime: number;
+        requestCount: number;
+        errorCount: number;
+        averageResponseTime: number;
+      }>;
+    };
+  }> {
+    return this.request('/admin/dashboard');
+  }
+
+  async getSystemMetrics(): Promise<{
+    success: boolean;
+    data: {
+      timestamp: string;
+      activeUsers: number;
+      totalUsers: number;
+      processingQueueLength: number;
+      resourceUtilization: {
+        cpuUsage: number;
+        memoryUsage: number;
+        memoryUsedMB: number;
+        memoryTotalMB: number;
+        diskUsage: number;
+        diskUsedGB: number;
+        diskTotalGB: number;
+      };
+      performance: {
+        averageProcessingTimePer1000Words: number;
+        requestsPerMinute: number;
+        averageResponseTime: number;
+        errorRate: number;
+        successRate: number;
+      };
+    };
+  }> {
+    return this.request('/admin/metrics');
+  }
+
+  async getPerformanceHistory(params: {
+    startDate?: string;
+    endDate?: string;
+    interval?: 'hour' | 'day' | 'week' | 'month';
+  }): Promise<{
+    success: boolean;
+    data: Array<{
+      timestamp: string;
+      averageProcessingTime: number;
+      requestsPerInterval: number;
+    }>;
+  }> {
+    const query = new URLSearchParams();
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.interval) query.append('interval', params.interval);
+    return this.request(`/admin/metrics/performance?${query.toString()}`);
+  }
+
+  async getUserActivitySummary(): Promise<{
+    success: boolean;
+    data: {
+      totalTransformations: number;
+      totalWordsProcessed: number;
+      totalApiCalls: number;
+      totalErrors: number;
+      activeUsersToday: number;
+      activeUsersThisWeek: number;
+      activeUsersThisMonth: number;
+      newUsersToday: number;
+      newUsersThisWeek: number;
+      newUsersThisMonth: number;
+    };
+  }> {
+    return this.request('/admin/activity');
+  }
+
+  async getUserActivityList(limit = 50, offset = 0): Promise<{
+    success: boolean;
+    data: Array<{
+      userId: string;
+      email: string;
+      lastActive: string;
+      transformationsCount: number;
+      wordsProcessed: number;
+      apiCallsCount: number;
+      errorsCount: number;
+      subscriptionTier: string;
+    }>;
+  }> {
+    return this.request(`/admin/activity/users?limit=${limit}&offset=${offset}`);
+  }
+
+  async getLogs(params: {
+    level?: string;
+    startDate?: string;
+    endDate?: string;
+    userId?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    success: boolean;
+    data: {
+      logs: Array<{
+        id: string;
+        level: string;
+        message: string;
+        userId?: string;
+        endpoint?: string;
+        timestamp: string;
+      }>;
+      total: number;
+    };
+  }> {
+    const query = new URLSearchParams();
+    if (params.level) query.append('level', params.level);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.userId) query.append('userId', params.userId);
+    if (params.limit) query.append('limit', params.limit.toString());
+    if (params.offset) query.append('offset', params.offset.toString());
+    return this.request(`/admin/logs?${query.toString()}`);
+  }
+
+  async getErrorSummary(): Promise<{
+    success: boolean;
+    data: {
+      totalErrors: number;
+      errorsToday: number;
+      errorsThisWeek: number;
+      errorsByType: Record<string, number>;
+      topErrors: Array<{
+        errorCode: string;
+        count: number;
+        lastOccurrence: string;
+      }>;
+    };
+  }> {
+    return this.request('/admin/errors');
+  }
+
+  async getErrorLogs(limit = 100, offset = 0, filters?: {
+    errorCode?: string;
+    userId?: string;
+    resolved?: boolean;
+  }): Promise<{
+    success: boolean;
+    data: {
+      logs: Array<{
+        id: string;
+        timestamp: string;
+        errorCode: string;
+        message: string;
+        userId?: string;
+        endpoint?: string;
+        stackTrace?: string;
+        metadata?: Record<string, unknown>;
+        resolved: boolean;
+      }>;
+      total: number;
+    };
+  }> {
+    const query = new URLSearchParams();
+    query.append('limit', limit.toString());
+    query.append('offset', offset.toString());
+    if (filters?.errorCode) query.append('errorCode', filters.errorCode);
+    if (filters?.userId) query.append('userId', filters.userId);
+    if (filters?.resolved !== undefined) query.append('resolved', filters.resolved.toString());
+    return this.request(`/admin/errors/logs?${query.toString()}`);
+  }
+
+  async resolveError(errorId: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      resolved: boolean;
+      resolvedAt: string;
+    };
+  }> {
+    return this.request(`/admin/errors/${errorId}/resolve`, { method: 'POST' });
+  }
+
+  async getAlertConfigs(): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      type: string;
+      threshold: number;
+      enabled: boolean;
+    }>;
+  }> {
+    return this.request('/admin/alerts/config');
+  }
+
+  async configureAlert(config: {
+    type: string;
+    threshold: number;
+    enabled: boolean;
+  }): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      type: string;
+      threshold: number;
+      enabled: boolean;
+    };
+  }> {
+    return this.request('/admin/alerts/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async getAlerts(acknowledged?: boolean): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string;
+      type: string;
+      severity: string;
+      message: string;
+      createdAt: string;
+      acknowledged: boolean;
+      acknowledgedAt?: string;
+      acknowledgedBy?: string;
+    }>;
+  }> {
+    const query = acknowledged !== undefined ? `?acknowledged=${acknowledged}` : '';
+    return this.request(`/admin/alerts${query}`);
+  }
+
+  async acknowledgeAlert(alertId: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      acknowledged: boolean;
+      acknowledgedAt: string;
+    };
+  }> {
+    return this.request(`/admin/alerts/${alertId}/acknowledge`, { method: 'POST' });
+  }
+
+  // ============================================
+  // ML Model Management (Additional)
+  // ============================================
+
+  async getLatestModelVersion(modelId: string): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request(`/ml-models/${modelId}/versions/latest`);
+  }
+
+  async getModelVersion(versionId: string): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    createdAt: string;
+    description?: string;
+    config?: Record<string, unknown>;
+    trainingMetrics?: Record<string, unknown>;
+  }> {
+    return this.request(`/ml-models/versions/${versionId}`);
+  }
+
+  async updateModelVersionStatus(versionId: string, status: string): Promise<{
+    success: boolean;
+    versionId: string;
+    status: string;
+  }> {
+    return this.request(`/ml-models/versions/${versionId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getDeploymentHistory(modelId: string): Promise<Array<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    deploymentType: string;
+    environment: string;
+    deployedAt: string;
+  }>> {
+    return this.request(`/ml-models/${modelId}/deployments`);
+  }
+
+  async getActiveDeployment(modelId: string): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    deploymentType: string;
+    environment: string;
+    deployedAt: string;
+  }> {
+    return this.request(`/ml-models/${modelId}/deployments/active`);
+  }
+
+  async getDeployment(deploymentId: string): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    deploymentType: string;
+    environment: string;
+    deployedAt: string;
+  }> {
+    return this.request(`/ml-models/deployments/${deploymentId}`);
+  }
+
+  async rollbackModel(modelId: string, previousVersion: string): Promise<{
+    success: boolean;
+    modelId: string;
+    rolledBackTo: string;
+  }> {
+    return this.request(`/ml-models/${modelId}/rollback`, {
+      method: 'POST',
+      body: JSON.stringify({ previousVersion }),
+    });
+  }
+
+  async getMetricsHistory(modelId: string, limit?: number): Promise<Array<{
+    timestamp: string;
+    accuracy: number;
+    latency: number;
+    throughput: number;
+    errorRate: number;
+  }>> {
+    const query = limit ? `?limit=${limit}` : '';
+    return this.request(`/ml-models/${modelId}/metrics/history${query}`);
+  }
+
+  async recordPrediction(modelId: string, data: {
+    prediction?: unknown;
+    groundTruth?: unknown;
+    latencyMs: number;
+    success: boolean;
+    detectionScore?: number;
+    features?: Record<string, unknown>;
+    errorMessage?: string;
+  }): Promise<{ success: boolean }> {
+    return this.request(`/ml-models/${modelId}/predictions`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getABTests(status?: string): Promise<Array<{
+    id: string;
+    name: string;
+    status: string;
+    modelIds: string[];
+    trafficAllocation: Record<string, number>;
+    createdAt: string;
+  }>> {
+    const query = status ? `?status=${status}` : '';
+    return this.request(`/ml-models/ab-tests${query}`);
+  }
+
+  async getABTest(testId: string): Promise<{
+    id: string;
+    name: string;
+    status: string;
+    modelIds: string[];
+    trafficAllocation: Record<string, number>;
+    createdAt: string;
+    results?: Record<string, unknown>;
+  }> {
+    return this.request(`/ml-models/ab-tests/${testId}`);
+  }
+
+  async createABTest(data: {
+    name: string;
+    modelIds: string[];
+    trafficAllocation: Record<string, number>;
+    minSampleSize?: number;
+    primaryMetric?: string;
+    autoStart?: boolean;
+  }): Promise<{
+    id: string;
+    name: string;
+    status: string;
+    modelIds: string[];
+    trafficAllocation: Record<string, number>;
+    createdAt: string;
+  }> {
+    return this.request('/ml-models/ab-tests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async startABTest(testId: string): Promise<{
+    success: boolean;
+    testId: string;
+    status: string;
+  }> {
+    return this.request(`/ml-models/ab-tests/${testId}/start`, { method: 'POST' });
+  }
+
+  async stopABTest(testId: string): Promise<{
+    success: boolean;
+    testId: string;
+    status: string;
+  }> {
+    return this.request(`/ml-models/ab-tests/${testId}/stop`, { method: 'POST' });
   }
 }
 

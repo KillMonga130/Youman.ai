@@ -28,6 +28,8 @@ const Search = lazy(() => import('./pages').then(m => ({ default: m.Search })));
 const Advanced = lazy(() => import('./pages').then(m => ({ default: m.Advanced })));
 const Templates = lazy(() => import('./pages').then(m => ({ default: m.Templates })));
 const ABTesting = lazy(() => import('./pages').then(m => ({ default: m.ABTesting })));
+const Admin = lazy(() => import('./pages').then(m => ({ default: m.Admin })));
+const ModelManagement = lazy(() => import('./pages').then(m => ({ default: m.ModelManagement })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -112,6 +114,8 @@ function AppContent(): JSX.Element {
                     <Route path="/advanced" element={<Advanced />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="/settings/cloud-callback" element={<Settings />} />
+                    <Route path="/admin" element={<Admin />} />
+                    <Route path="/models" element={<ModelManagement />} />
                   </Routes>
                 </Suspense>
               </Layout>

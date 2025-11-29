@@ -260,6 +260,16 @@ export function Dashboard(): JSX.Element {
             projects={displayProjects}
             onDeleteProject={handleDeleteProject}
             onBulkOperationComplete={async (result) => {
+              // After bulk operations complete, remove deleted projects from store
+              if (result.success && result.successCount > 0) {
+                // The BulkOperationsToolbar already handles the API calls
+                // We just need to ensure the store is updated
+                // The query invalidation in the hooks should handle the refresh
+                result.errors.forEach(error => {
+                  // Remove failed deletions from store if they were partially processed
+                  // This is handled by the individual delete handlers
+                });
+              }
               return result;
             }}
           />

@@ -153,6 +153,16 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   // Get admin emails from environment variable (comma-separated)
   const adminEmails = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase());
   
+  // Debug logging (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[Admin Check]', {
+      userEmail: req.user.email.toLowerCase(),
+      adminEmails,
+      isAdmin: adminEmails.includes(req.user.email.toLowerCase()),
+      ADMIN_EMAILS_env: process.env.ADMIN_EMAILS,
+    });
+  }
+  
   // Check if user's email is in the admin list
   const isAdmin = adminEmails.includes(req.user.email.toLowerCase());
 
