@@ -1040,3 +1040,10 @@ interface PredictionLog {
 
 // Export singleton instance
 export const mlModelService = new MLModelService();
+
+/**
+ * Gets the singleton ML model service instance
+ */
+export function getMLModelService(): MLModelService {
+  return mlModelService;
+}

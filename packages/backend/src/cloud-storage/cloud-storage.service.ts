@@ -122,6 +122,12 @@ export function getOAuthUrl(
 ): OAuthUrlResponse {
   switch (provider) {
     case CloudProvider.GOOGLE_DRIVE: {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+        throw new CloudStorageError(
+          'Google Drive OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET environment variables.',
+          'OAUTH_NOT_CONFIGURED'
+        );
+      }
       const oauth2Client = createGoogleOAuth2Client(redirectUri);
       const url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
@@ -138,11 +144,23 @@ export function getOAuthUrl(
     }
 
     case CloudProvider.DROPBOX: {
+      if (!DROPBOX_CLIENT_ID || !DROPBOX_CLIENT_SECRET) {
+        throw new CloudStorageError(
+          'Dropbox OAuth is not configured. Please set DROPBOX_CLIENT_ID and DROPBOX_CLIENT_SECRET environment variables.',
+          'OAUTH_NOT_CONFIGURED'
+        );
+      }
       const url = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&state=${state}&token_access_type=offline`;
       return { url, state };
     }
 
     case CloudProvider.ONEDRIVE: {
+      if (!ONEDRIVE_CLIENT_ID || !ONEDRIVE_CLIENT_SECRET) {
+        throw new CloudStorageError(
+          'OneDrive OAuth is not configured. Please set ONEDRIVE_CLIENT_ID and ONEDRIVE_CLIENT_SECRET environment variables.',
+          'OAUTH_NOT_CONFIGURED'
+        );
+      }
       const scope = encodeURIComponent('files.readwrite.all offline_access user.read');
       const url = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=${ONEDRIVE_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}`;
       return { url, state };

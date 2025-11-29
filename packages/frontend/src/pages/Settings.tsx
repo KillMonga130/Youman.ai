@@ -252,13 +252,71 @@ export function Settings(): JSX.Element {
   const [isLoadingMFA, setIsLoadingMFA] = useState(false);
   const [showMFASetupModal, setShowMFASetupModal] = useState(false);
   const [mfaSetupMethod, setMfaSetupMethod] = useState<'totp' | 'sms' | null>(null);
-  const [mfaSetupData, setMfaSetupData] = useState<{ secret?: string; qrCode?: string; phoneNumber?: string } | null>(null);
+  const [mfaSetupData, setMfaSetupData] = useState<{ 
+    deviceId: string;
+    method: string;
+    secret?: string;
+    qrCodeUrl?: string;
+    phoneNumber?: string;
+    verificationRequired: boolean;
+  } | null>(null);
   const [mfaVerificationCode, setMfaVerificationCode] = useState('');
+  const [mfaPhoneNumber, setMfaPhoneNumber] = useState('');
   const [isSettingUpMFA, setIsSettingUpMFA] = useState(false);
+  const [showPhoneInput, setShowPhoneInput] = useState(false);
   
   // Invoices state
   const [invoices, setInvoices] = useState<Array<{ id: string; number: string; amount: number; status: string; createdAt: string }>>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const error = urlParams.get('error');
+      const state = urlParams.get('state');
+
+      if (error) {
+        alert(`OAuth error: ${error}`);
+        // Clean up URL
+        window.history.replaceState({}, document.title, '/settings');
+        return;
+      }
+
+      if (code && state) {
+        const provider = sessionStorage.getItem('cloudProvider');
+        if (provider) {
+          setIsLoadingCloud(true);
+          try {
+            const redirectUri = `${window.location.origin}/settings/cloud-callback`;
+            await apiClient.connectCloudProvider({
+              provider: provider.toLowerCase(),
+              code,
+              redirectUri,
+            });
+            // Reload connections
+            const result = await apiClient.getCloudConnections();
+            setCloudConnections(result.connections ?? []);
+            // Clean up
+            sessionStorage.removeItem('cloudProvider');
+            window.history.replaceState({}, document.title, '/settings');
+            setSaved(true);
+            setTimeout(() => setSaved(false), 2000);
+          } catch (error) {
+            console.error('Failed to connect cloud provider:', error);
+            alert('Failed to connect cloud storage. Please try again.');
+            sessionStorage.removeItem('cloudProvider');
+            window.history.replaceState({}, document.title, '/settings');
+          } finally {
+            setIsLoadingCloud(false);
+          }
+        }
+      }
+    };
+
+    handleOAuthCallback();
+  }, []);
 
   // Load cloud connections
   useEffect(() => {
@@ -319,19 +377,28 @@ export function Settings(): JSX.Element {
   const handleConnectCloud = async (provider: string) => {
     try {
       const redirectUri = `${window.location.origin}/settings/cloud-callback`;
-      const result = await apiClient.getCloudOAuthUrl(provider, redirectUri);
+      const result = await apiClient.getCloudOAuthUrl(provider.toLowerCase(), redirectUri);
+      // Store provider in sessionStorage for callback handling
+      sessionStorage.setItem('cloudProvider', provider);
       window.location.href = result.url;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to get OAuth URL:', error);
+      const errorMessage = error?.message || error?.error || 'Failed to initiate cloud storage connection.';
+      if (errorMessage.includes('not configured') || errorMessage.includes('OAUTH_NOT_CONFIGURED')) {
+        alert(`${errorMessage}\n\nPlease configure OAuth credentials in the backend environment variables.`);
+      } else {
+        alert(`Failed to initiate cloud storage connection: ${errorMessage}`);
+      }
     }
   };
 
   const handleDisconnectCloud = async (provider: string) => {
-    if (!confirm(`Are you sure you want to disconnect ${provider}?`)) {
+    const displayName = provider === 'GOOGLE_DRIVE' ? 'Google Drive' : provider === 'ONEDRIVE' ? 'OneDrive' : 'Dropbox';
+    if (!confirm(`Are you sure you want to disconnect ${displayName}?`)) {
       return;
     }
     try {
-      await apiClient.disconnectCloudProvider(provider);
+      await apiClient.disconnectCloudProvider(provider.toLowerCase());
       setCloudConnections(cloudConnections.filter(c => c.provider !== provider));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -341,13 +408,19 @@ export function Settings(): JSX.Element {
     }
   };
 
-  const handleSetupMFA = async (method: 'totp' | 'sms') => {
+  const handleSetupMFA = async (method: 'totp' | 'sms', phoneNumber?: string) => {
     setIsSettingUpMFA(true);
     try {
-      const result = await apiClient.setupMFA(method);
+      // Generate a device name based on method
+      const deviceName = method === 'totp' 
+        ? `${user?.name || 'User'}'s Authenticator App`
+        : `${user?.name || 'User'}'s Phone`;
+      
+      const result = await apiClient.setupMFA(method, deviceName, phoneNumber);
       setMfaSetupData(result);
       setMfaSetupMethod(method);
       setShowMFASetupModal(true);
+      setShowPhoneInput(false);
     } catch (error) {
       console.error('Failed to setup MFA:', error);
       alert('Failed to setup MFA. Please try again.');
@@ -356,12 +429,31 @@ export function Settings(): JSX.Element {
     }
   };
 
+  const handleStartSMSSetup = () => {
+    setShowPhoneInput(true);
+    setMfaSetupMethod('sms');
+  };
+
+  const handleSubmitPhoneNumber = () => {
+    if (!mfaPhoneNumber.trim()) {
+      alert('Please enter a phone number');
+      return;
+    }
+    // Validate phone number format (basic validation)
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(mfaPhoneNumber.replace(/[\s-()]/g, ''))) {
+      alert('Please enter a valid phone number (e.g., +1234567890)');
+      return;
+    }
+    handleSetupMFA('sms', mfaPhoneNumber);
+  };
+
   const handleVerifyMFASetup = async () => {
-    if (!mfaSetupMethod || !mfaVerificationCode) return;
+    if (!mfaSetupData?.deviceId || !mfaVerificationCode) return;
     
     setIsSettingUpMFA(true);
     try {
-      await apiClient.verifyMFASetup(mfaSetupMethod, mfaVerificationCode);
+      await apiClient.verifyMFASetup(mfaSetupData.deviceId, mfaVerificationCode);
       setShowMFASetupModal(false);
       setMfaSetupData(null);
       setMfaSetupMethod(null);
@@ -1191,7 +1283,7 @@ export function Settings(): JSX.Element {
                     </button>
                   ) : (
                     <button
-                      onClick={() => handleSetupMFA('sms')}
+                      onClick={handleStartSMSSetup}
                       disabled={isSettingUpMFA}
                       className="btn btn-primary btn-sm"
                     >
@@ -1289,6 +1381,70 @@ export function Settings(): JSX.Element {
         </div>
       </div>
 
+      {/* Phone Number Input Modal for SMS */}
+      {showPhoneInput && mfaSetupMethod === 'sms' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Setup SMS MFA</h2>
+              <button
+                onClick={() => {
+                  setShowPhoneInput(false);
+                  setMfaSetupMethod(null);
+                  setMfaPhoneNumber('');
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+              >
+                <span className="text-2xl leading-none">&times;</span>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Phone Number</label>
+                <input
+                  type="tel"
+                  value={mfaPhoneNumber}
+                  onChange={(e) => setMfaPhoneNumber(e.target.value)}
+                  className="input w-full"
+                  placeholder="+1234567890"
+                  disabled={isSettingUpMFA}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Enter your phone number with country code (e.g., +1234567890)
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setShowPhoneInput(false);
+                    setMfaSetupMethod(null);
+                    setMfaPhoneNumber('');
+                  }}
+                  className="btn btn-outline"
+                  disabled={isSettingUpMFA}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitPhoneNumber}
+                  disabled={isSettingUpMFA || !mfaPhoneNumber.trim()}
+                  className="btn btn-primary"
+                >
+                  {isSettingUpMFA ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Setting up...
+                    </>
+                  ) : (
+                    'Continue'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MFA Setup Modal */}
       {showMFASetupModal && mfaSetupMethod && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -1301,6 +1457,7 @@ export function Settings(): JSX.Element {
                   setMfaSetupData(null);
                   setMfaSetupMethod(null);
                   setMfaVerificationCode('');
+                  setMfaPhoneNumber('');
                 }}
                 className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
               >
@@ -1308,12 +1465,12 @@ export function Settings(): JSX.Element {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              {mfaSetupMethod === 'totp' && mfaSetupData?.qrCode && (
+              {mfaSetupMethod === 'totp' && mfaSetupData?.qrCodeUrl && (
                 <div className="text-center">
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                     Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)
                   </p>
-                  <img src={mfaSetupData.qrCode} alt="QR Code" className="mx-auto border border-gray-200 dark:border-gray-700 rounded" />
+                  <img src={mfaSetupData.qrCodeUrl} alt="QR Code" className="mx-auto border border-gray-200 dark:border-gray-700 rounded" />
                   {mfaSetupData.secret && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                       Or enter this code manually: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{mfaSetupData.secret}</code>
@@ -1324,7 +1481,7 @@ export function Settings(): JSX.Element {
               {mfaSetupMethod === 'sms' && (
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    A verification code will be sent to your phone number.
+                    A verification code has been sent to your phone number.
                   </p>
                   {mfaSetupData?.phoneNumber && (
                     <p className="text-sm font-medium">Phone: {mfaSetupData.phoneNumber}</p>
@@ -1349,6 +1506,7 @@ export function Settings(): JSX.Element {
                     setMfaSetupData(null);
                     setMfaSetupMethod(null);
                     setMfaVerificationCode('');
+                    setMfaPhoneNumber('');
                   }}
                   className="btn btn-outline"
                 >

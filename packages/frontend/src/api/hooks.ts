@@ -1,11 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 
+// Helper to check if user is authenticated
+function hasAuthToken(): boolean {
+  return !!localStorage.getItem('auth_token');
+}
+
 // Projects
 export function useProjects(params?: { page?: number; limit?: number; status?: string; search?: string; sortBy?: string; sortOrder?: string }) {
   return useQuery({
     queryKey: ['projects', params],
     queryFn: () => apiClient.getProjects(params),
+    enabled: hasAuthToken(),
   });
 }
 
@@ -13,7 +19,7 @@ export function useProject(id: string | null) {
   return useQuery({
     queryKey: ['project', id],
     queryFn: () => (id ? apiClient.getProject(id) : null),
-    enabled: !!id,
+    enabled: !!id && hasAuthToken(),
   });
 }
 
@@ -69,6 +75,7 @@ export function useAvailableModels() {
     queryKey: ['availableModels'],
     queryFn: () => apiClient.getAvailableModels(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    enabled: hasAuthToken(),
   });
 }
 
@@ -76,7 +83,7 @@ export function useModelMetrics(modelId: string | null) {
   return useQuery({
     queryKey: ['modelMetrics', modelId],
     queryFn: () => apiClient.getModelMetrics(modelId!),
-    enabled: !!modelId,
+    enabled: !!modelId && hasAuthToken(),
     staleTime: 1 * 60 * 1000, // 1 minute
   });
 }
@@ -94,6 +101,7 @@ export function useUsage() {
   return useQuery({
     queryKey: ['usage'],
     queryFn: () => apiClient.getUsage(),
+    enabled: hasAuthToken(),
   });
 }
 
@@ -101,6 +109,7 @@ export function useUsageHistory(days?: number) {
   return useQuery({
     queryKey: ['usageHistory', days],
     queryFn: () => apiClient.getUsageHistory(days),
+    enabled: hasAuthToken(),
   });
 }
 
@@ -108,6 +117,7 @@ export function useUsageTrends() {
   return useQuery({
     queryKey: ['usageTrends'],
     queryFn: () => apiClient.getUsageTrends(),
+    enabled: hasAuthToken(),
   });
 }
 
@@ -115,6 +125,7 @@ export function useUsageStatistics() {
   return useQuery({
     queryKey: ['usageStatistics'],
     queryFn: () => apiClient.getUsageStatistics(),
+    enabled: hasAuthToken(),
   });
 }
 
@@ -123,7 +134,7 @@ export function useProjectVersions(projectId: string | null) {
   return useQuery({
     queryKey: ['versions', projectId],
     queryFn: () => (projectId ? apiClient.getProjectVersions(projectId) : null),
-    enabled: !!projectId,
+    enabled: !!projectId && hasAuthToken(),
   });
 }
 
@@ -131,7 +142,7 @@ export function useVersion(versionId: string | null) {
   return useQuery({
     queryKey: ['version', versionId],
     queryFn: () => (versionId ? apiClient.getVersion(versionId) : null),
-    enabled: !!versionId,
+    enabled: !!versionId && hasAuthToken(),
   });
 }
 
@@ -184,7 +195,7 @@ export function useCurrentUser() {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: false,
-    enabled: true, // Explicitly enable
+    enabled: hasAuthToken(), // Only fetch if authenticated
   });
 }
 
@@ -229,6 +240,7 @@ export function useSubscription() {
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes
     refetchOnWindowFocus: false,
+    enabled: hasAuthToken(),
   });
 }
 

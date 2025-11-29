@@ -374,6 +374,7 @@ function getStatusCodeForError(code: string): number {
     INVALID_PROVIDER: 400,
     MISSING_REDIRECT_URI: 400,
     VALIDATION_ERROR: 400,
+    OAUTH_NOT_CONFIGURED: 503, // Service Unavailable - configuration issue
     TOKEN_EXCHANGE_FAILED: 401,
     TOKEN_REFRESH_FAILED: 401,
     USER_INFO_FAILED: 401,

@@ -1,6 +1,8 @@
 import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search, Sparkles, LayoutTemplate, FlaskConical } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../store';
+import { useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../../api/client';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Dashboard' },
@@ -16,10 +18,29 @@ const navItems = [
 
 export function Sidebar(): JSX.Element {
   const location = useLocation();
+  const navigate = useNavigate();
   const { sidebarOpen, setSidebarOpen, user, setUser } = useAppStore();
+  const queryClient = useQueryClient();
 
-  const handleLogout = (): void => {
-    setUser(null);
+  const handleLogout = async (): Promise<void> => {
+    try {
+      // Clear tokens via API client
+      await apiClient.logout();
+      
+      // Clear user from store
+      setUser(null);
+      
+      // Clear all React Query cache
+      queryClient.clear();
+      
+      // Navigate to login page
+      navigate('/login', { replace: true });
+    } catch (error) {
+      // Even if logout fails, clear local state
+      setUser(null);
+      queryClient.clear();
+      navigate('/login', { replace: true });
+    }
   };
 
   return (

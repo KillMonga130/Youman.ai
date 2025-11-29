@@ -69,7 +69,7 @@ import { disasterRecoveryRoutes } from '../disaster-recovery';
 import { cdnRoutes } from '../cdn';
 import { performanceRoutes } from '../performance';
 import { customerSuccessRoutes } from '../customer-success';
-import { mlModelRoutes } from '../ml-model';
+import { mlModelRoutes, trainingDataRoutes, trainingJobRoutes } from '../ml-model';
 import { whiteLabelRoutes } from '../white-label';
 import { partnerRoutes } from '../partner';
 import { contentModerationRoutes } from '../content-moderation';
@@ -297,6 +297,14 @@ function mountApiRoutes(app: Express): void {
   // ML Model Management routes (standard rate limiting)
   // Requirements: 88 - Model versioning, blue-green deployment, performance tracking, drift detection
   apiRouter.use('/ml-models', standardRateLimiter, mlModelRoutes);
+  
+  // Training Data routes (standard rate limiting)
+  // Phase 2: Training data collection and management
+  apiRouter.use('/training-data', standardRateLimiter, trainingDataRoutes);
+  
+  // Training Job routes (standard rate limiting)
+  // Phase 2: Training job management and orchestration
+  apiRouter.use('/training-jobs', standardRateLimiter, trainingJobRoutes);
 
   // White-Label routes (standard rate limiting)
   // Requirements: 60 - Branding customization, custom domains, branded reports

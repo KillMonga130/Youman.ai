@@ -1134,11 +1134,21 @@ class ApiClient {
   }
 
   async connectCloudProvider(data: { provider: string; code: string; redirectUri: string }): Promise<{ provider: string; email: string }> {
-    return this.request('/cloud-storage/connect', { method: 'POST', body: JSON.stringify(data) });
+    // Backend expects uppercase provider name
+    const backendData = {
+      ...data,
+      provider: data.provider.toUpperCase(),
+    };
+    const response = await this.request<{ provider: string; email: string }>('/cloud-storage/connect', { 
+      method: 'POST', 
+      body: JSON.stringify(backendData) 
+    });
+    return response;
   }
 
   async disconnectCloudProvider(provider: string): Promise<void> {
-    return this.request(`/cloud-storage/disconnect/${provider}`, { method: 'DELETE' });
+    // Backend route expects lowercase in path, then converts to uppercase
+    return this.request(`/cloud-storage/disconnect/${provider.toLowerCase()}`, { method: 'DELETE' });
   }
 
   async listCloudFiles(provider: string, folderId?: string): Promise<{
@@ -1427,16 +1437,41 @@ class ApiClient {
     }
   }
 
-  async setupMFA(method: 'totp' | 'sms'): Promise<{ secret?: string; qrCode?: string; phoneNumber?: string }> {
-    return this.request('/mfa/setup', { method: 'POST', body: JSON.stringify({ method }) });
+  async setupMFA(method: 'totp' | 'sms', name: string, phoneNumber?: string): Promise<{ 
+    deviceId: string;
+    method: string;
+    secret?: string;
+    qrCodeUrl?: string;
+    phoneNumber?: string;
+    verificationRequired: boolean;
+  }> {
+    // Convert frontend method names to backend format
+    const backendMethod = method === 'totp' ? 'AUTHENTICATOR' : 'SMS';
+    const response = await this.request<{ success: boolean; data: any }>('/mfa/enable', { 
+      method: 'POST', 
+      body: JSON.stringify({ 
+        method: backendMethod,
+        name,
+        ...(phoneNumber && { phoneNumber })
+      }) 
+    });
+    // Backend returns { success: true, data: {...} }
+    return response.data || response;
   }
 
-  async verifyMFASetup(method: 'totp' | 'sms', code: string): Promise<{ success: boolean; backupCodes?: string[] }> {
-    return this.request('/mfa/verify-setup', { method: 'POST', body: JSON.stringify({ method, code }) });
+  async verifyMFASetup(deviceId: string, code: string): Promise<{ success: boolean; backupCodes?: string[] }> {
+    const response = await this.request<{ success: boolean; data: any }>('/mfa/verify-setup', { 
+      method: 'POST', 
+      body: JSON.stringify({ deviceId, code }) 
+    });
+    // Backend returns { success: true, data: {...} }
+    return response.data || response;
   }
 
-  async disableMFA(method: 'totp' | 'sms', code: string): Promise<{ success: boolean }> {
-    return this.request('/mfa/disable', { method: 'POST', body: JSON.stringify({ method, code }) });
+  async disableMFA(deviceId: string, code: string): Promise<{ success: boolean }> {
+    // Backend doesn't have a disable endpoint, we need to remove the device instead
+    await this.request(`/mfa/devices/${deviceId}`, { method: 'DELETE' });
+    return { success: true };
   }
 
   // ============================================

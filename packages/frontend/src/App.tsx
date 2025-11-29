@@ -111,6 +111,7 @@ function AppContent(): JSX.Element {
                     <Route path="/search" element={<Search />} />
                     <Route path="/advanced" element={<Advanced />} />
                     <Route path="/settings" element={<Settings />} />
+                    <Route path="/settings/cloud-callback" element={<Settings />} />
                   </Routes>
                 </Suspense>
               </Layout>

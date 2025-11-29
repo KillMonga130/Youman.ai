@@ -1079,3 +1079,168 @@ model ModerationAuditLog {
   @@index([createdAt])
   @@map("moderation_audit_logs")
 }
+
+// ============================================
+// ML Model Training Infrastructure
+// Phase 2: Training data, jobs, and artifacts
+// ============================================
+
+model TrainingDataPoint {
+  id                        String    @id @default(uuid())
+  transformationId          String?   @map("transformation_id")
+  userId                    String?   @map("user_id")
+  projectId                 String?   @map("project_id")
+  
+  // Text content (stored as references to MongoDB documents for large content)
+  originalText              String    @db.Text @map("original_text")
+  humanizedText             String    @db.Text @map("humanized_text")
+  
+  // Training metadata
+  strategy                  String    // TransformStrategy enum value
+  level                     Int       // HumanizationLevel
+  inputDetectionScore       Float?    @map("input_detection_score")
+  outputDetectionScore      Float?    @map("output_detection_score")
+  detectionScoreImprovement Float?    @map("detection_score_improvement")
+  qualityScore              Float?    @map("quality_score")
+  
+  // User feedback
+  userFeedback              Json?     @map("user_feedback") // {rating, accepted, comments, etc}
+  
+  // Content metadata
+  metadata                  Json      // {contentType, language, wordCount, qualityMetrics, etc}
+  
+  // Training usage tracking
+  usedInTraining            String[]  @default([]) @map("used_in_training") // Model version IDs
+  
+  createdAt                 DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([transformationId])
+  @@index([strategy])
+  @@index([qualityScore])
+  @@index([detectionScoreImprovement])
+  @@index([createdAt])
+  @@map("training_data_points")
+}
+
+model TrainingJob {
+  id                    String          @id @default(uuid())
+  name                  String
+  description           String?
+  modelId               String          @map("model_id")
+  baseVersionId         String?         @map("base_version_id") // For fine-tuning
+  
+  // Training configuration
+  config                Json            // Training configuration (hyperparameters, etc)
+  dataQuery             Json?           @map("data_query") // Query options for training data
+  dataPointIds          String[]        @default([]) @map("data_point_ids") // Specific data points to use
+  
+  // Job status
+  status                TrainingJobStatus @default(PENDING)
+  progress              Float           @default(0) // 0-100
+  currentEpoch          Int?            @map("current_epoch")
+  totalEpochs           Int?            @map("total_epochs")
+  
+  // Execution info
+  startedAt             DateTime?       @map("started_at")
+  completedAt           DateTime?       @map("completed_at")
+  failedAt              DateTime?       @map("failed_at")
+  errorMessage          String?         @db.Text @map("error_message")
+  
+  // Results
+  resultingVersionId    String?         @map("resulting_version_id")
+  trainingMetrics       Json?           @map("training_metrics")
+  validationMetrics     Json?           @map("validation_metrics")
+  
+  // Execution context
+  executorType          String          @default("local") @map("executor_type") // local, kubernetes, sagemaker, etc
+  executorConfig        Json?           @map("executor_config")
+  resourceRequirements  Json?           @map("resource_requirements") // CPU, GPU, memory requirements
+  
+  // Created by
+  createdBy             String          @map("created_by")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  @@index([modelId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([createdBy])
+  @@map("training_jobs")
+}
+
+enum TrainingJobStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  PAUSED
+}
+
+model ModelArtifact {
+  id                    String          @id @default(uuid())
+  modelId               String          @map("model_id")
+  versionId             String?         @map("version_id")
+  trainingJobId         String?         @map("training_job_id")
+  
+  // Artifact information
+  artifactType          String          @map("artifact_type") // model, checkpoint, metadata, etc
+  artifactPath          String          @map("artifact_path") // S3 path or local path
+  artifactSize          BigInt?         @map("artifact_size") // in bytes
+  artifactHash          String?         @map("artifact_hash") // SHA-256 hash
+  
+  // Storage info
+  storageProvider       String          @default("s3") @map("storage_provider") // s3, local, etc
+  storageLocation       Json            @map("storage_location") // {bucket, key, region, etc}
+  
+  // Metadata
+  metadata              Json?           // Additional metadata
+  lineage               Json?           // Training lineage information
+  
+  createdAt             DateTime        @default(now()) @map("created_at")
+
+  @@index([modelId])
+  @@index([versionId])
+  @@index([trainingJobId])
+  @@index([artifactType])
+  @@map("model_artifacts")
+}
+
+model ModelRegistry {
+  id                    String          @id @default(uuid())
+  modelId               String          @unique @map("model_id")
+  name                  String
+  description           String?
+  
+  // Model metadata
+  modelType             String          @map("model_type") // transformer, lstm, etc
+  framework             String          // pytorch, tensorflow, etc
+  architecture          Json?           // Architecture configuration
+  
+  // Lineage
+  parentModelId         String?         @map("parent_model_id")
+  baseModelId           String?         @map("base_model_id") // For fine-tuned models
+  
+  // Metadata
+  tags                  String[]
+  metadata              Json?           // Additional metadata
+  
+  // Versioning
+  latestVersion         String?         @map("latest_version")
+  totalVersions         Int             @default(0) @map("total_versions")
+  
+  // Status
+  isActive              Boolean         @default(true) @map("is_active")
+  
+  createdBy             String          @map("created_by")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  @@index([modelType])
+  @@index([framework])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("model_registry")
+}

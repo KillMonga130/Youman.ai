@@ -6,7 +6,7 @@ import { useAppStore } from '../store';
 import { FileUpload, type UploadedFile } from '../components/ui';
 import { useKeyboardShortcuts } from '../context/KeyboardShortcutsContext';
 import { ShortcutHint } from '../components/KeyboardShortcutsModal';
-import { useHumanize, useDetectAI, useProject, useCreateProject, useUpdateProject } from '../api/hooks';
+import { useHumanize, useDetectAI, useProject, useCreateProject, useUpdateProject, useAvailableModels } from '../api/hooks';
 import { apiClient } from '../api/client';
 import { Alert } from '../components/ui';
 import { BranchManager } from '../components/BranchManager';
@@ -19,6 +19,7 @@ interface TransformOptions {
   level: number;
   strategy: Strategy;
   protectedSegments: string[];
+  mlModelId?: string;
 }
 
 export function Editor(): JSX.Element {
@@ -34,7 +35,9 @@ export function Editor(): JSX.Element {
     level: settings.defaultLevel,
     strategy: settings.defaultStrategy,
     protectedSegments: [],
+    mlModelId: undefined,
   });
+  const [selectedModelId, setSelectedModelId] = useState<string | undefined>(undefined);
   const [metrics, setMetrics] = useState<{
     detectionScore: number;
     perplexity: number;
@@ -135,6 +138,7 @@ export function Editor(): JSX.Element {
   const updateProject = useUpdateProject();
   const humanizeMutation = useHumanize();
   const detectAIMutation = useDetectAI();
+  const { data: availableModels, isLoading: isLoadingModels } = useAvailableModels();
 
   // Load project data when project is fetched
   useEffect(() => {
@@ -276,6 +280,7 @@ export function Editor(): JSX.Element {
           level: options.level,
           strategy: options.strategy,
           protectedSegments: options.protectedSegments,
+          mlModelId: selectedModelId,
         },
       });
       
@@ -765,6 +770,32 @@ export function Editor(): JSX.Element {
               <option value="casual">Casual</option>
               <option value="professional">Professional</option>
               <option value="academic">Academic</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Model selector */}
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Model:</label>
+          <div className="relative">
+            <select
+              value={selectedModelId || ''}
+              onChange={(e) => {
+                const modelId = e.target.value || undefined;
+                setSelectedModelId(modelId);
+                setOptions({ ...options, mlModelId: modelId });
+              }}
+              disabled={isLoadingModels}
+              className="input py-1.5 text-sm pr-8 appearance-none min-w-[180px]"
+              title="Select ML model for humanization"
+            >
+              <option value="">Auto-select (Recommended)</option>
+              {availableModels?.models?.map((model: any) => (
+                <option key={model.id} value={model.id}>
+                  {model.name} {model.tier ? `(${model.tier})` : ''}
+                </option>
+              ))}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
