@@ -21,6 +21,7 @@ import {
 import { apiClient } from '../api/client';
 import { Alert } from '../components/ui';
 import { useAppStore } from '../store';
+import { useProjects } from '../api/hooks';
 
 export function Templates(): JSX.Element {
   const { user } = useAppStore();
@@ -47,7 +48,23 @@ export function Templates(): JSX.Element {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [showSharesModal, setShowSharesModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [applyProjectId, setApplyProjectId] = useState<string>('');
+  const [templateShares, setTemplateShares] = useState<Array<{
+    id: string;
+    userId: string;
+    userEmail: string;
+    userName: string | null;
+    sharedAt: string;
+  }>>([]);
+  const [isLoadingShares, setIsLoadingShares] = useState(false);
+  
+  // Get projects for apply modal
+  const { data: projectsData } = useProjects({ page: 1, limit: 100 });
+  const projects = projectsData?.projects || [];
   
   // Form states
   const [templateForm, setTemplateForm] = useState({
@@ -160,11 +177,21 @@ export function Templates(): JSX.Element {
   };
 
   const handleApplyTemplate = async (templateId: string) => {
-    const projectId = prompt('Enter project ID to apply template to:');
-    if (!projectId) return;
+    setSelectedTemplate(templateId);
+    setShowApplyModal(true);
+  };
+
+  const handleConfirmApply = async () => {
+    if (!selectedTemplate || !applyProjectId) {
+      setError('Please select a project');
+      return;
+    }
     try {
-      await apiClient.applyTemplate(templateId, projectId);
+      await apiClient.applyTemplate(selectedTemplate, applyProjectId);
       setSuccess('Template applied successfully');
+      setShowApplyModal(false);
+      setApplyProjectId('');
+      setSelectedTemplate(null);
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
       setError('Failed to apply template');
@@ -215,9 +242,46 @@ export function Templates(): JSX.Element {
       setSuccess('Template shared successfully');
       setShowShareModal(false);
       setShareForm({ userId: '', userEmail: '' });
+      // Reload shares if modal is open
+      if (showSharesModal && selectedTemplate) {
+        loadTemplateShares(selectedTemplate);
+      }
       setTimeout(() => setSuccess(null), 2000);
     } catch (err) {
       setError('Failed to share template');
+    }
+  };
+
+  const loadTemplateShares = async (templateId: string) => {
+    setIsLoadingShares(true);
+    try {
+      const result = await apiClient.getTemplateShares(templateId);
+      setTemplateShares(result.shares || []);
+    } catch (err) {
+      console.error('Failed to load template shares:', err);
+      setError('Failed to load template shares');
+    } finally {
+      setIsLoadingShares(false);
+    }
+  };
+
+  const handleViewShares = async (templateId: string) => {
+    setSelectedTemplate(templateId);
+    setShowSharesModal(true);
+    await loadTemplateShares(templateId);
+  };
+
+  const handleRemoveShare = async (shareId: string) => {
+    if (!confirm('Are you sure you want to remove this share?')) return;
+    try {
+      await apiClient.unshareTemplate(shareId);
+      setSuccess('Share removed successfully');
+      if (selectedTemplate) {
+        await loadTemplateShares(selectedTemplate);
+      }
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      setError('Failed to remove share');
     }
   };
 
@@ -333,11 +397,11 @@ export function Templates(): JSX.Element {
           {filteredTemplates.map((template) => (
             <div
               key={template.id}
-              className={`card p-4 hover:shadow-lg transition-shadow ${
-                viewMode === 'list' ? 'flex items-center justify-between' : ''
+              className={`card p-4 hover:shadow-lg transition-shadow flex flex-col ${
+                viewMode === 'list' ? 'flex-row items-center justify-between' : ''
               }`}
             >
-              <div className={viewMode === 'list' ? 'flex-1' : ''}>
+              <div className={viewMode === 'list' ? 'flex-1' : 'flex-1'}>
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-semibold text-lg">{template.name}</h3>
                   <div className="flex items-center gap-1">
@@ -364,52 +428,62 @@ export function Templates(): JSX.Element {
                     {template.strategy}
                   </span>
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-gray-500 mb-3">
                   Used {template.useCount} times
                 </div>
               </div>
-              <div className={`flex gap-2 mt-3 ${viewMode === 'list' ? 'ml-4' : ''}`}>
+              <div className={`flex flex-wrap gap-2 ${viewMode === 'list' ? 'ml-4 flex-shrink-0' : 'mt-auto pt-2'}`}>
                 <button
-                  onClick={() => handleApplyTemplate(template.id)}
-                  className="btn btn-primary btn-sm flex-1"
-                  title="Apply to project"
+                  onClick={() => {
+                    setSelectedTemplate(template.id);
+                    setShowPreviewModal(true);
+                  }}
+                  className={`btn btn-primary btn-sm ${viewMode === 'list' ? '' : 'flex-1 min-w-[60px]'}`}
+                  title="Preview template"
                 >
                   <Eye className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleExportTemplate(template.id)}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-outline btn-sm min-w-[40px]"
                   title="Export"
                 >
                   <Download className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleViewShares(template.id)}
+                  className="btn btn-outline btn-sm min-w-[40px]"
+                  title="View shares"
+                >
+                  <Share2 className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => {
                     setSelectedTemplate(template.id);
                     setShowShareModal(true);
                   }}
-                  className="btn btn-outline btn-sm"
-                  title="Share"
+                  className="btn btn-outline btn-sm min-w-[40px]"
+                  title="Share with user"
                 >
-                  <Share2 className="w-4 h-4" />
+                  <Plus className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDuplicateTemplate(template.id)}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-outline btn-sm min-w-[40px]"
                   title="Duplicate"
                 >
                   <Copy className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => openEditModal(template)}
-                  className="btn btn-outline btn-sm"
+                  className="btn btn-outline btn-sm min-w-[40px]"
                   title="Edit"
                 >
                   <Edit className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteTemplate(template.id)}
-                  className="btn btn-outline btn-sm text-red-600"
+                  className="btn btn-outline btn-sm text-red-600 min-w-[40px]"
                   title="Delete"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -648,6 +722,215 @@ export function Templates(): JSX.Element {
           </div>
         </div>
       )}
+
+      {/* Apply Template Modal */}
+      {showApplyModal && selectedTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Apply Template to Project</h2>
+              <button
+                onClick={() => {
+                  setShowApplyModal(false);
+                  setApplyProjectId('');
+                  setSelectedTemplate(null);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Select Project</label>
+                <select
+                  value={applyProjectId}
+                  onChange={(e) => setApplyProjectId(e.target.value)}
+                  className="input w-full"
+                >
+                  <option value="">Choose a project...</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+                {projects.length === 0 && (
+                  <p className="text-sm text-gray-500 mt-2">No projects available. Create a project first.</p>
+                )}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
+                    setShowApplyModal(false);
+                    setApplyProjectId('');
+                    setSelectedTemplate(null);
+                  }}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmApply}
+                  disabled={!applyProjectId}
+                  className="btn btn-primary"
+                >
+                  Apply Template
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template Shares Management Modal */}
+      {showSharesModal && selectedTemplate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Template Shares</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setSelectedTemplate(selectedTemplate);
+                    setShowShareModal(true);
+                  }}
+                  className="btn btn-sm btn-primary"
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add Share
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSharesModal(false);
+                    setSelectedTemplate(null);
+                    setTemplateShares([]);
+                  }}
+                  className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              {isLoadingShares ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : templateShares.length > 0 ? (
+                <div className="space-y-3">
+                  {templateShares.map((share) => (
+                    <div
+                      key={share.id}
+                      className="card p-4 flex items-center justify-between"
+                    >
+                      <div>
+                        <p className="font-medium">{share.userName || share.userEmail}</p>
+                        <p className="text-sm text-gray-500">{share.userEmail}</p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Shared {new Date(share.sharedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveShare(share.id)}
+                        className="btn btn-outline btn-sm text-red-600"
+                        title="Remove share"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Share2 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-500">No shares yet</p>
+                  <button
+                    onClick={() => {
+                      setShowShareModal(true);
+                    }}
+                    className="btn btn-primary btn-sm mt-4"
+                  >
+                    Share Template
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Template Modal */}
+      {showPreviewModal && selectedTemplate && (() => {
+        const template = templates.find(t => t.id === selectedTemplate);
+        if (!template) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-auto">
+              <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold">Template Preview</h2>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      handleApplyTemplate(template.id);
+                    }}
+                    className="btn btn-primary btn-sm"
+                    title="Apply to project"
+                  >
+                    Apply Template
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      setSelectedTemplate(null);
+                    }}
+                    className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <h3 className="font-semibold text-lg mb-2">{template.name}</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">{template.description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Category</p>
+                    <p className="text-base">{template.category}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Level</p>
+                    <p className="text-base">Level {template.level}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Strategy</p>
+                    <p className="text-base capitalize">{template.strategy}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Usage</p>
+                    <p className="text-base">Used {template.useCount} times</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Rating:</span>
+                  {[1, 2, 3, 4, 5].map(rating => (
+                    <button
+                      key={rating}
+                      onClick={() => handleRateTemplate(template.id, rating)}
+                      className="text-yellow-400 hover:text-yellow-500"
+                    >
+                      <Star className={`w-4 h-4 ${rating <= 3 ? 'fill-current' : ''}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Import Template Modal */}
       {showImportModal && (

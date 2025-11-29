@@ -55,9 +55,11 @@ export function Advanced(): JSX.Element {
 
   // Repurposing state
   const [repurposeText, setRepurposeText] = useState('');
-  const [targetPlatform, setTargetPlatform] = useState<'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'blog'>('twitter');
+  const [targetPlatform, setTargetPlatform] = useState<string>('twitter');
   const [repurposedResult, setRepurposedResult] = useState<{ content: string; characterCount: number } | null>(null);
   const [isRepurposing, setIsRepurposing] = useState(false);
+  const [supportedPlatforms, setSupportedPlatforms] = useState<Array<{ id: string; name: string; maxLength: number; features: string[] }>>([]);
+  const [isLoadingPlatforms, setIsLoadingPlatforms] = useState(false);
 
   // Webhooks state
   const [webhooks, setWebhooks] = useState<Array<{
@@ -69,6 +71,8 @@ export function Advanced(): JSX.Element {
     successRate: number;
   }>>([]);
   const [isLoadingWebhooks, setIsLoadingWebhooks] = useState(false);
+  const [webhookEventTypes, setWebhookEventTypes] = useState<string[]>([]);
+  const [isLoadingEventTypes, setIsLoadingEventTypes] = useState(false);
   
   // Modal states
   const [showNewJobModal, setShowNewJobModal] = useState(false);
@@ -136,8 +140,68 @@ export function Advanced(): JSX.Element {
   useEffect(() => {
     if (activeTab === 'webhooks' && user?.id) {
       loadWebhooks();
+      loadWebhookEventTypes();
     }
   }, [activeTab, user?.id]);
+
+  const loadWebhookEventTypes = async () => {
+    setIsLoadingEventTypes(true);
+    try {
+      const result = await apiClient.getWebhookEventTypes().catch(() => null);
+      if (result?.data?.eventTypes) {
+        setWebhookEventTypes(result.data.eventTypes);
+      } else {
+        // Fallback to hardcoded list
+        setWebhookEventTypes([
+          'project.created',
+          'project.updated',
+          'transformation.completed',
+          'version.created',
+        ]);
+      }
+    } catch (err) {
+      console.error('Failed to load webhook event types:', err);
+      // Fallback to hardcoded list
+      setWebhookEventTypes([
+        'project.created',
+        'project.updated',
+        'transformation.completed',
+        'version.created',
+      ]);
+    } finally {
+      setIsLoadingEventTypes(false);
+    }
+  };
+
+  // Load supported platforms
+  useEffect(() => {
+    if (activeTab === 'repurposing') {
+      loadPlatforms();
+    }
+  }, [activeTab]);
+
+  const loadPlatforms = async () => {
+    setIsLoadingPlatforms(true);
+    try {
+      const result = await apiClient.getSupportedPlatforms();
+      if (result?.platforms && result.platforms.length > 0) {
+        setSupportedPlatforms(result.platforms);
+        // Set default platform if not set
+        if (!targetPlatform && result.platforms.length > 0) {
+          setTargetPlatform(result.platforms[0].id);
+        }
+      } else {
+        console.error('No platforms returned from API');
+        setSupportedPlatforms([]);
+      }
+    } catch (error) {
+      console.error('Failed to load platforms:', error);
+      // Show error but don't fallback to hardcoded list
+      setSupportedPlatforms([]);
+    } finally {
+      setIsLoadingPlatforms(false);
+    }
+  };
 
   const loadJobs = async () => {
     if (!user?.id) return;
@@ -251,6 +315,40 @@ export function Advanced(): JSX.Element {
 
   const handleLocalize = async () => {
     if (!localizeText.trim()) return;
+    
+    // Check quota before localization
+    const wordCount = localizeText.trim().split(/\s+/).length;
+    try {
+      const quotaCheck = await apiClient.checkQuota('words', wordCount);
+      if (!quotaCheck.allowed) {
+        setError(`Quota exceeded: You have ${quotaCheck.remaining.toLocaleString()} words remaining, but need ${wordCount.toLocaleString()}. Please upgrade your plan.`);
+        return;
+      }
+      // Warn if using significant portion of remaining quota
+      if (quotaCheck.remaining > 0 && wordCount > quotaCheck.remaining * 0.5) {
+        if (!confirm(`Warning: You have ${quotaCheck.remaining.toLocaleString()} words remaining. This operation will use ${wordCount.toLocaleString()} words. Continue?`)) {
+          return;
+        }
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('402')) {
+        try {
+          const errorData = JSON.parse(errorMessage);
+          setError(errorData.message || 'Quota exceeded. Please upgrade your plan.');
+          return;
+        } catch {
+          setError('Quota exceeded. Please upgrade your plan.');
+          return;
+        }
+      }
+      console.error('Failed to check quota:', err);
+      // Continue with warning
+      if (!confirm('Unable to check quota. Continue anyway?')) {
+        return;
+      }
+    }
+    
     setIsLocalizing(true);
     setError(null);
     try {
@@ -270,6 +368,40 @@ export function Advanced(): JSX.Element {
 
   const handleRepurpose = async () => {
     if (!repurposeText.trim()) return;
+    
+    // Check quota before repurposing
+    const wordCount = repurposeText.trim().split(/\s+/).length;
+    try {
+      const quotaCheck = await apiClient.checkQuota('words', wordCount);
+      if (!quotaCheck.allowed) {
+        setError(`Quota exceeded: You have ${quotaCheck.remaining.toLocaleString()} words remaining, but need ${wordCount.toLocaleString()}. Please upgrade your plan.`);
+        return;
+      }
+      // Warn if using significant portion of remaining quota
+      if (quotaCheck.remaining > 0 && wordCount > quotaCheck.remaining * 0.5) {
+        if (!confirm(`Warning: You have ${quotaCheck.remaining.toLocaleString()} words remaining. This operation will use ${wordCount.toLocaleString()} words. Continue?`)) {
+          return;
+        }
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('402')) {
+        try {
+          const errorData = JSON.parse(errorMessage);
+          setError(errorData.message || 'Quota exceeded. Please upgrade your plan.');
+          return;
+        } catch {
+          setError('Quota exceeded. Please upgrade your plan.');
+          return;
+        }
+      }
+      console.error('Failed to check quota:', err);
+      // Continue with warning
+      if (!confirm('Unable to check quota. Continue anyway?')) {
+        return;
+      }
+    }
+    
     setIsRepurposing(true);
     setError(null);
     try {
@@ -517,14 +649,21 @@ export function Advanced(): JSX.Element {
               <label className="block text-sm font-medium mb-2">Target Platform</label>
               <select
                 value={targetPlatform}
-                onChange={(e) => setTargetPlatform(e.target.value as typeof targetPlatform)}
+                onChange={(e) => setTargetPlatform(e.target.value)}
                 className="input w-full"
+                disabled={isLoadingPlatforms}
               >
-                <option value="twitter">Twitter/X (280 chars)</option>
-                <option value="linkedin">LinkedIn (3000 chars)</option>
-                <option value="instagram">Instagram (2200 chars)</option>
-                <option value="facebook">Facebook (63,206 chars)</option>
-                <option value="blog">Blog Post</option>
+                {isLoadingPlatforms ? (
+                  <option>Loading platforms...</option>
+                ) : supportedPlatforms.length > 0 ? (
+                  supportedPlatforms.map((platform) => (
+                    <option key={platform.id} value={platform.id}>
+                      {platform.name} {platform.maxLength > 0 ? `(${platform.maxLength.toLocaleString()} chars)` : ''}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Failed to load platforms. Please refresh the page.</option>
+                )}
               </select>
             </div>
             <div>
@@ -896,23 +1035,29 @@ export function Advanced(): JSX.Element {
               <div>
                 <label className="block text-sm font-medium mb-2">Events</label>
                 <div className="space-y-2">
-                  {['project.created', 'project.updated', 'transformation.completed', 'version.created'].map(event => (
-                    <label key={event} className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={newWebhookData.events.includes(event)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setNewWebhookData({ ...newWebhookData, events: [...newWebhookData.events, event] });
-                          } else {
-                            setNewWebhookData({ ...newWebhookData, events: newWebhookData.events.filter(e => e !== event) });
-                          }
-                        }}
-                        className="rounded"
-                      />
-                      <span className="text-sm">{event}</span>
-                    </label>
-                  ))}
+                  {isLoadingEventTypes ? (
+                    <div className="text-sm text-gray-500">Loading event types...</div>
+                  ) : webhookEventTypes.length > 0 ? (
+                    webhookEventTypes.map(event => (
+                      <label key={event} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={newWebhookData.events.includes(event)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setNewWebhookData({ ...newWebhookData, events: [...newWebhookData.events, event] });
+                            } else {
+                              setNewWebhookData({ ...newWebhookData, events: newWebhookData.events.filter(e => e !== event) });
+                            }
+                          }}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{event}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-500">No event types available</div>
+                  )}
                 </div>
               </div>
               <div className="flex gap-2 justify-end">

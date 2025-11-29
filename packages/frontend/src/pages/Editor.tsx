@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Wand2, Copy, Download, RotateCcw, ChevronDown, Shield, Upload, Save, AlertCircle, CheckCircle, XCircle, Loader2, FileSearch, Target, BookOpen, GitBranch } from 'lucide-react';
+import { Wand2, Copy, Download, RotateCcw, ChevronDown, Shield, Upload, Save, AlertCircle, CheckCircle, XCircle, Loader2, FileSearch, Target, BookOpen, GitBranch, Volume2, Sparkles, X, History, Users } from 'lucide-react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
@@ -10,9 +10,10 @@ import { useHumanize, useDetectAI, useProject, useCreateProject, useUpdateProjec
 import { apiClient } from '../api/client';
 import { Alert } from '../components/ui';
 import { BranchManager } from '../components/BranchManager';
+import { CollaboratorManager } from '../components/CollaboratorManager';
 
 type Strategy = 'auto' | 'casual' | 'professional' | 'academic';
-type AnalysisTab = 'detection' | 'plagiarism' | 'seo' | 'citations' | 'variations';
+type AnalysisTab = 'detection' | 'plagiarism' | 'seo' | 'citations' | 'variations' | 'tone';
 
 interface TransformOptions {
   level: number;
@@ -83,9 +84,50 @@ export function Editor(): JSX.Element {
   const [variations, setVariations] = useState<Array<{ id: string; text: string; strategy: string; level: number; detectionScore: number }>>([]);
   const [isGeneratingVariations, setIsGeneratingVariations] = useState(false);
   
+  // Tone Analysis state
+  const [toneAnalysisResult, setToneAnalysisResult] = useState<{
+    overallSentiment: string;
+    sentimentScore: number;
+    confidence: number;
+    emotions: Record<string, number>;
+    formality: number;
+    subjectivity: number;
+  } | null>(null);
+  const [emotionsResult, setEmotionsResult] = useState<{
+    emotions: Record<string, number>;
+    dominantEmotion: string;
+    emotionalIntensity: number;
+  } | null>(null);
+  const [adjustedText, setAdjustedText] = useState<string | null>(null);
+  const [toneAdjustmentChanges, setToneAdjustmentChanges] = useState<string[]>([]);
+  const [consistencyResult, setConsistencyResult] = useState<{
+    consistencyScore: number;
+    inconsistencies: Array<{ textIndex: number; issue: string }>;
+  } | null>(null);
+  const [targetedText, setTargetedText] = useState<string | null>(null);
+  const [targetAdjustments, setTargetAdjustments] = useState<string[]>([]);
+  const [isToneAnalyzing, setIsToneAnalyzing] = useState(false);
+  const [toneMode, setToneMode] = useState<'analyze' | 'adjust' | 'emotions' | 'consistency' | 'target'>('analyze');
+  
   // Branch management state
   const [showBranchManager, setShowBranchManager] = useState(false);
   const [currentBranchId, setCurrentBranchId] = useState<string | undefined>(undefined);
+  
+  // Collaboration state
+  const [showCollaboratorManager, setShowCollaboratorManager] = useState(false);
+  
+  // Activity log state
+  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [activityLog, setActivityLog] = useState<Array<{
+    id: string;
+    action: string;
+    userId: string;
+    userName: string | null;
+    userEmail: string;
+    details: Record<string, unknown> | null;
+    createdAt: string;
+  }>>([]);
+  const [isLoadingActivity, setIsLoadingActivity] = useState(false);
 
   // Load project if ID is provided
   const { data: projectData, isLoading: isLoadingProject } = useProject(id || null);
@@ -110,8 +152,14 @@ export function Editor(): JSX.Element {
               setHumanizedText(latestVersion.humanizedContent);
             }
           }
+          // If latestVersion is null, it means the project has no versions yet
+          // This is normal for new projects - they start empty
         } catch (error) {
-          console.error('Failed to load project content:', error);
+          // Only log unexpected errors (getLatestVersion should handle NO_VERSIONS gracefully)
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (!errorMessage.includes('NO_VERSIONS') && !errorMessage.includes('No versions')) {
+            console.error('Failed to load project content:', error);
+          }
           // Continue without content if loading fails
         }
       };
@@ -179,6 +227,42 @@ export function Editor(): JSX.Element {
     if (!originalText.trim()) {
       setError('Please enter some text to humanize');
       return;
+    }
+    
+    // Check quota before humanization
+    const wordCount = originalText.trim().split(/\s+/).length;
+    try {
+      const quotaCheck = await apiClient.checkQuota('words', wordCount);
+      if (!quotaCheck.allowed) {
+        setError(`Quota exceeded: You have ${quotaCheck.remaining.toLocaleString()} words remaining, but need ${wordCount.toLocaleString()}. ${quotaCheck.upgradeRequired ? 'Please upgrade your plan to continue.' : 'Please try again later.'}`);
+        return;
+      }
+      // Warn if using more than 50% of remaining quota
+      if (quotaCheck.remaining > 0 && wordCount > quotaCheck.remaining * 0.5) {
+        const confirmMessage = `Warning: You have ${quotaCheck.remaining.toLocaleString()} words remaining. This operation will use ${wordCount.toLocaleString()} words (${Math.round((wordCount / quotaCheck.remaining) * 100)}% of remaining quota). Continue?`;
+        if (!confirm(confirmMessage)) {
+          return;
+        }
+      }
+    } catch (err: unknown) {
+      // Check if it's a quota exceeded error (402)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      if (errorMessage.includes('QUOTA_EXCEEDED') || errorMessage.includes('402')) {
+        try {
+          const errorData = JSON.parse(errorMessage);
+          setError(errorData.message || `Quota exceeded. Please upgrade your plan to continue.`);
+          return;
+        } catch {
+          setError('Quota exceeded. Please upgrade your plan to continue.');
+          return;
+        }
+      }
+      console.error('Failed to check quota:', err);
+      // For other errors, show a warning but allow the operation to proceed
+      const shouldContinue = confirm('Unable to check quota. Continue anyway?');
+      if (!shouldContinue) {
+        return;
+      }
     }
     
     setError(null);
@@ -349,19 +433,168 @@ export function Editor(): JSX.Element {
     setHumanizedText(text);
   }, [setHumanizedText]);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard.writeText(humanizedText);
-  }, [humanizedText]);
+  // Tone Analysis Handlers
+  const handleAnalyzeTone = useCallback(async () => {
+    const textToAnalyze = humanizedText.trim() || originalText.trim();
+    if (!textToAnalyze) {
+      setError('Please enter text to analyze');
+      return;
+    }
+    setIsToneAnalyzing(true);
+    setError(null);
+    try {
+      const result = await apiClient.analyzeTone(textToAnalyze);
+      setToneAnalysisResult(result.data);
+      setToneMode('analyze');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Tone analysis failed';
+      setError(errorMessage);
+    } finally {
+      setIsToneAnalyzing(false);
+    }
+  }, [humanizedText, originalText]);
+
+  const handleDetectEmotions = useCallback(async () => {
+    const textToAnalyze = humanizedText.trim() || originalText.trim();
+    if (!textToAnalyze) {
+      setError('Please enter text to analyze');
+      return;
+    }
+    setIsToneAnalyzing(true);
+    setError(null);
+    try {
+      const result = await apiClient.detectEmotions(textToAnalyze);
+      setEmotionsResult(result.data);
+      setToneMode('emotions');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Emotion detection failed';
+      setError(errorMessage);
+    } finally {
+      setIsToneAnalyzing(false);
+    }
+  }, [humanizedText, originalText]);
+
+  const handleAdjustTone = useCallback(async (targetTone: { sentiment?: 'positive' | 'neutral' | 'negative'; formality?: number; emotion?: string }) => {
+    const textToAdjust = humanizedText.trim() || originalText.trim();
+    if (!textToAdjust) {
+      setError('Please enter text to adjust');
+      return;
+    }
+    setIsToneAnalyzing(true);
+    setError(null);
+    try {
+      const result = await apiClient.adjustTone(textToAdjust, targetTone);
+      setAdjustedText(result.data.adjustedText);
+      setToneAdjustmentChanges(result.data.changes);
+      setToneMode('adjust');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Tone adjustment failed';
+      setError(errorMessage);
+    } finally {
+      setIsToneAnalyzing(false);
+    }
+  }, [humanizedText, originalText]);
+
+  const handleCheckToneConsistency = useCallback(async (texts: string[]) => {
+    if (texts.length < 2) {
+      setError('Please provide at least 2 texts to check consistency');
+      return;
+    }
+    setIsToneAnalyzing(true);
+    setError(null);
+    try {
+      const result = await apiClient.checkToneConsistency(texts);
+      setConsistencyResult(result.data);
+      setToneMode('consistency');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Consistency check failed';
+      setError(errorMessage);
+    } finally {
+      setIsToneAnalyzing(false);
+    }
+  }, []);
+
+  const handleTargetTone = useCallback(async (targetTone: { sentiment: 'positive' | 'neutral' | 'negative'; formality: number; emotion: string }) => {
+    const textToTarget = humanizedText.trim() || originalText.trim();
+    if (!textToTarget) {
+      setError('Please enter text to target');
+      return;
+    }
+    setIsToneAnalyzing(true);
+    setError(null);
+    try {
+      const result = await apiClient.targetTone(textToTarget, targetTone);
+      setTargetedText(result.data.targetedText);
+      setTargetAdjustments(result.data.adjustments);
+      setToneMode('target');
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Tone targeting failed';
+      setError(errorMessage);
+    } finally {
+      setIsToneAnalyzing(false);
+    }
+  }, [humanizedText, originalText]);
+
+  // Load activity log
+  const loadActivityLog = useCallback(async () => {
+    if (!id) return;
+    setIsLoadingActivity(true);
+    try {
+      const result = await apiClient.getProjectActivity(id, { page: 1, limit: 50 });
+      setActivityLog(result.activities || []);
+    } catch (err: unknown) {
+      console.error('Failed to load activity log:', err);
+      setError('Failed to load activity log');
+    } finally {
+      setIsLoadingActivity(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (showActivityLog && id) {
+      loadActivityLog();
+    }
+  }, [showActivityLog, id, loadActivityLog]);
+
+  const handleCopy = useCallback(async () => {
+    if (!humanizedText) {
+      setError('No text to copy');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(humanizedText);
+      // Show success feedback
+      const originalError = error;
+      setError(null);
+      setTimeout(() => {
+        if (originalError) setError(originalError);
+      }, 2000);
+    } catch (err) {
+      setError('Failed to copy to clipboard');
+      console.error('Copy error:', err);
+    }
+  }, [humanizedText, error]);
 
   const handleDownload = useCallback(() => {
-    const blob = new Blob([humanizedText], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'humanized-text.txt';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [humanizedText]);
+    if (!humanizedText) {
+      setError('No text to download');
+      return;
+    }
+    try {
+      const blob = new Blob([humanizedText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${projectName || 'humanized-text'}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to download file');
+      console.error('Download error:', err);
+    }
+  }, [humanizedText, projectName]);
 
   const handleReset = useCallback(() => {
     setOriginalText('');
@@ -475,8 +708,9 @@ export function Editor(): JSX.Element {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading project...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 dark:border-primary-800 border-t-primary-600 mx-auto mb-6"></div>
+          <p className="text-gray-600 dark:text-gray-400 text-lg font-semibold">Loading project...</p>
+          <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">Please wait while we fetch your project</p>
         </div>
       </div>
     );
@@ -493,18 +727,18 @@ export function Editor(): JSX.Element {
       )}
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3 mb-6 p-4 glass-card rounded-2xl backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-4 mb-6 p-5 glass-card rounded-2xl backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50">
         {/* Project Name */}
         <input
           type="text"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
           placeholder="Project Name"
-          className="input flex-1 min-w-[200px] max-w-[300px] bg-white/80 dark:bg-gray-800/80"
+          className="input flex-1 min-w-[200px] max-w-[300px] bg-white/90 dark:bg-gray-800/90 font-semibold"
         />
         {/* Level selector */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Level:</label>
+          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Level:</label>
           <select
             value={options.level}
             onChange={(e) => setOptions({ ...options, level: Number(e.target.value) })}
@@ -520,7 +754,7 @@ export function Editor(): JSX.Element {
 
         {/* Strategy selector */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Strategy:</label>
+          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Strategy:</label>
           <div className="relative">
             <select
               value={options.strategy}
@@ -550,12 +784,37 @@ export function Editor(): JSX.Element {
           </button>
         )}
 
+        {/* Collaborator Manager Button */}
+        {id && (
+          <button
+            onClick={() => setShowCollaboratorManager(true)}
+            className="btn btn-outline btn-sm flex items-center gap-2"
+            title="Manage collaborators"
+          >
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">Collaborators</span>
+          </button>
+        )}
+
+        {/* Activity Log Button */}
+        {id && (
+          <button
+            onClick={() => setShowActivityLog(true)}
+            className="btn btn-outline btn-sm flex items-center gap-2"
+            title="View activity log"
+          >
+            <History className="w-4 h-4" />
+            <span className="hidden sm:inline">Activity</span>
+          </button>
+        )}
+
         {/* Action buttons */}
         <button
           onClick={() => setShowFileUpload(true)}
           className="btn btn-outline flex items-center gap-2"
           title="Upload File"
-          >
+          aria-label="Upload document file"
+        >
           <Upload className="w-4 h-4" />
           <span className="hidden sm:inline">Upload</span>
           <ShortcutHint shortcutId="upload" />
@@ -563,19 +822,25 @@ export function Editor(): JSX.Element {
 
         <button
           onClick={handleSave}
-          disabled={isSaving}
-          className="btn btn-outline flex items-center gap-2"
+          disabled={isSaving || !projectName.trim()}
+          className="btn btn-outline flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Save Project"
+          aria-label={isSaving ? 'Saving project...' : 'Save project'}
         >
-          <Save className={`w-4 h-4 ${isSaving ? 'animate-spin' : ''}`} />
+          {isSaving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
           <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
         </button>
 
         <button
           onClick={handleReset}
-          className="btn btn-outline flex items-center gap-2"
+          className="btn btn-outline flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={!originalText && !humanizedText}
           title="Reset Editor"
+          aria-label="Reset editor and clear all text"
         >
           <RotateCcw className="w-4 h-4" />
           <span className="hidden sm:inline">Reset</span>
@@ -585,12 +850,17 @@ export function Editor(): JSX.Element {
         <button
           onClick={handleHumanize}
           disabled={!originalText.trim() || isProcessing}
-          className="btn btn-primary flex items-center gap-2"
+          className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Humanize Text"
+          aria-label={isProcessing ? 'Processing humanization...' : 'Humanize text'}
         >
-          <Wand2 className={`w-4 h-4 ${isProcessing ? 'animate-spin' : ''}`} />
+          {isProcessing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Wand2 className="w-4 h-4" />
+          )}
           {isProcessing ? 'Processing...' : 'Humanize'}
-          <ShortcutHint shortcutId="humanize" />
+          {!isProcessing && <ShortcutHint shortcutId="humanize" />}
         </button>
       </div>
 
@@ -598,16 +868,16 @@ export function Editor(): JSX.Element {
       {showFileUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
                 Upload Document
               </h2>
               <button
                 onClick={() => setShowFileUpload(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
-                aria-label="Close"
+                className="btn btn-ghost btn-sm p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                aria-label="Close upload modal"
               >
-                <span className="text-2xl leading-none">&times;</span>
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6">
@@ -626,52 +896,64 @@ export function Editor(): JSX.Element {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
         {/* Original text */}
         <div className="card flex flex-col min-h-[300px] overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-800/50">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Original Text</h3>
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">{wordCount} words</span>
+          <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-800/50">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Original Text</h3>
+            <span className="text-sm font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">{wordCount} words</span>
           </div>
           <textarea
             value={originalText}
             onChange={(e) => setOriginalText(e.target.value)}
             placeholder="Paste your AI-generated text here..."
-            className="flex-1 p-6 resize-none bg-transparent focus:outline-none text-gray-900 dark:text-gray-100 scrollbar-modern"
+            className="flex-1 p-6 resize-none bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-gray-900 dark:text-gray-100 scrollbar-modern textarea border-0 text-base leading-relaxed"
+            aria-label="Original text input"
           />
         </div>
 
         {/* Humanized text */}
         <div className="card flex flex-col min-h-[300px] overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-primary-50/50 to-transparent dark:from-primary-900/20">
-            <h3 className="font-semibold text-gray-900 dark:text-white">Humanized Text</h3>
+          <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-primary-50/50 to-transparent dark:from-primary-900/20">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Humanized Text</h3>
             <div className="flex items-center gap-2">
               {humanizedText && (
                 <>
                   <button
                     onClick={handleCopy}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-1"
+                    disabled={!humanizedText}
+                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Copy to clipboard"
+                    aria-label="Copy humanized text to clipboard"
                   >
                     <Copy className="w-4 h-4" />
-                    <span className="sr-only">Copy</span>
+                    <span className="hidden sm:inline">Copy</span>
                   </button>
                   <button
                     onClick={handleDownload}
-                    className="p-1.5 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded flex items-center gap-1"
-                    title="Download"
+                    disabled={!humanizedText}
+                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Download as text file"
+                    aria-label="Download humanized text"
                   >
                     <Download className="w-4 h-4" />
-                    <span className="sr-only">Download</span>
+                    <span className="hidden sm:inline">Download</span>
                   </button>
                 </>
               )}
             </div>
           </div>
-          <div className="flex-1 p-4 overflow-auto">
+          <div className="flex-1 p-6 overflow-auto">
             {humanizedText ? (
-              <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100">{humanizedText}</p>
+              <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed text-base">{humanizedText}</p>
             ) : (
-              <p className="text-gray-400 dark:text-gray-500 italic">
-                Humanized text will appear here...
-              </p>
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary-500/10 to-primary-600/10 mb-4">
+                  <Sparkles className="w-10 h-10 text-primary-600 dark:text-primary-400" />
+                </div>
+                <p className="text-gray-400 dark:text-gray-500 text-center text-base font-medium">
+                  Humanized text will appear here...
+                  <br />
+                  <span className="text-sm">Click "Humanize" to transform your text</span>
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -751,58 +1033,75 @@ export function Editor(): JSX.Element {
           <div className="flex gap-2 mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
             <button
               onClick={() => setActiveAnalysisTab('detection')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
                 activeAnalysisTab === 'detection'
-                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                  ? 'btn-primary'
+                  : 'btn-outline'
               }`}
+              aria-pressed={activeAnalysisTab === 'detection'}
             >
               <Shield className="w-4 h-4" />
               Detection
             </button>
             <button
               onClick={() => setActiveAnalysisTab('plagiarism')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
                 activeAnalysisTab === 'plagiarism'
-                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                  ? 'btn-primary'
+                  : 'btn-outline'
               }`}
+              aria-pressed={activeAnalysisTab === 'plagiarism'}
             >
               <FileSearch className="w-4 h-4" />
               Plagiarism
             </button>
             <button
               onClick={() => setActiveAnalysisTab('seo')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
                 activeAnalysisTab === 'seo'
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                  ? 'btn-primary'
+                  : 'btn-outline'
               }`}
+              aria-pressed={activeAnalysisTab === 'seo'}
             >
               <Target className="w-4 h-4" />
               SEO
             </button>
             <button
               onClick={() => setActiveAnalysisTab('citations')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
                 activeAnalysisTab === 'citations'
-                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                  ? 'btn-primary'
+                  : 'btn-outline'
               }`}
+              aria-pressed={activeAnalysisTab === 'citations'}
             >
               <BookOpen className="w-4 h-4" />
               Citations
             </button>
             <button
               onClick={() => setActiveAnalysisTab('variations')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
                 activeAnalysisTab === 'variations'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-                  : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800'
+                  ? 'btn-primary'
+                  : 'btn-outline'
               }`}
+              aria-pressed={activeAnalysisTab === 'variations'}
             >
               <GitBranch className="w-4 h-4" />
               A/B Test
+            </button>
+            <button
+              onClick={() => setActiveAnalysisTab('tone')}
+              className={`btn btn-sm flex items-center gap-2 transition-all ${
+                activeAnalysisTab === 'tone'
+                  ? 'btn-primary'
+                  : 'btn-outline'
+              }`}
+              aria-pressed={activeAnalysisTab === 'tone'}
+            >
+              <Volume2 className="w-4 h-4" />
+              Tone
             </button>
           </div>
 
@@ -812,7 +1111,8 @@ export function Editor(): JSX.Element {
               <button
                 onClick={handleTestDetection}
                 disabled={detectAIMutation.isPending || !humanizedText}
-                className="btn btn-outline w-full flex items-center justify-center gap-2 mb-4"
+                className="btn btn-outline w-full flex items-center justify-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Test AI detection on humanized text"
               >
                 {detectAIMutation.isPending ? (
                   <>
@@ -859,7 +1159,8 @@ export function Editor(): JSX.Element {
               <button
                 onClick={handleCheckPlagiarism}
                 disabled={isAnalyzing || !humanizedText}
-                className="btn btn-outline w-full flex items-center justify-center gap-2 mb-4"
+                className="btn btn-outline w-full flex items-center justify-center gap-2 mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Check plagiarism in humanized text"
               >
                 {isAnalyzing ? (
                   <>
@@ -1038,6 +1339,368 @@ export function Editor(): JSX.Element {
               )}
             </div>
           )}
+
+          {/* Tone Analysis Tab */}
+          {activeAnalysisTab === 'tone' && (
+            <div className="space-y-4">
+              {/* Mode Selection */}
+              <div className="flex gap-2 flex-wrap">
+                <button
+                  onClick={() => { setToneMode('analyze'); handleAnalyzeTone(); }}
+                  disabled={isToneAnalyzing}
+                  className={`btn btn-sm ${toneMode === 'analyze' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Analyze Tone
+                </button>
+                <button
+                  onClick={() => { setToneMode('emotions'); handleDetectEmotions(); }}
+                  disabled={isToneAnalyzing}
+                  className={`btn btn-sm ${toneMode === 'emotions' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Detect Emotions
+                </button>
+                <button
+                  onClick={() => setToneMode('adjust')}
+                  className={`btn btn-sm ${toneMode === 'adjust' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Adjust Tone
+                </button>
+                <button
+                  onClick={() => setToneMode('target')}
+                  className={`btn btn-sm ${toneMode === 'target' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Target Tone
+                </button>
+                <button
+                  onClick={() => setToneMode('consistency')}
+                  className={`btn btn-sm ${toneMode === 'consistency' ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Check Consistency
+                </button>
+              </div>
+
+              {isToneAnalyzing && (
+                <div className="flex items-center justify-center gap-2 py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Analyzing tone...</span>
+                </div>
+              )}
+
+              {/* Analyze Tone Results */}
+              {toneMode === 'analyze' && toneAnalysisResult && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <span className="font-medium">Overall Sentiment</span>
+                    <span className={`font-bold capitalize ${
+                      toneAnalysisResult.overallSentiment === 'positive' ? 'text-green-600' :
+                      toneAnalysisResult.overallSentiment === 'negative' ? 'text-red-600' :
+                      'text-gray-600'
+                    }`}>
+                      {toneAnalysisResult.overallSentiment}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Sentiment Score</p>
+                      <p className="text-xl font-bold">{toneAnalysisResult.sentimentScore.toFixed(1)}</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Confidence</p>
+                      <p className="text-xl font-bold">{(toneAnalysisResult.confidence * 100).toFixed(0)}%</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Formality</p>
+                      <p className="text-xl font-bold">{(toneAnalysisResult.formality * 100).toFixed(0)}%</p>
+                    </div>
+                    <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Subjectivity</p>
+                      <p className="text-xl font-bold">{(toneAnalysisResult.subjectivity * 100).toFixed(0)}%</p>
+                    </div>
+                  </div>
+                  {Object.keys(toneAnalysisResult.emotions).length > 0 && (
+                    <div>
+                      <p className="text-sm font-medium mb-2">Emotions Detected:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(toneAnalysisResult.emotions)
+                          .sort(([, a], [, b]) => b - a)
+                          .slice(0, 5)
+                          .map(([emotion, score]) => (
+                            <span key={emotion} className="px-2 py-1 bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 rounded text-sm">
+                              {emotion}: {(score * 100).toFixed(0)}%
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Emotions Results */}
+              {toneMode === 'emotions' && emotionsResult && (
+                <div className="space-y-3">
+                  <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Dominant Emotion</p>
+                    <p className="text-xl font-bold capitalize">{emotionsResult.dominantEmotion}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Emotional Intensity</p>
+                    <p className="text-xl font-bold">{(emotionsResult.emotionalIntensity * 100).toFixed(0)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">All Emotions:</p>
+                    <div className="space-y-2">
+                      {Object.entries(emotionsResult.emotions)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([emotion, score]) => (
+                          <div key={emotion} className="flex items-center justify-between">
+                            <span className="capitalize text-sm">{emotion}</span>
+                            <div className="flex items-center gap-2 flex-1 mx-3">
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div
+                                  className="bg-orange-500 h-2 rounded-full"
+                                  style={{ width: `${score * 100}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium w-12 text-right">{(score * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Adjust Tone */}
+              {toneMode === 'adjust' && (
+                <div className="space-y-3">
+                  <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Sentiment</span>
+                      <select
+                        id="adjust-sentiment"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                        defaultValue=""
+                      >
+                        <option value="">Keep current</option>
+                        <option value="positive">Positive</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="negative">Negative</option>
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Formality (0-1)</span>
+                      <input
+                        type="number"
+                        id="adjust-formality"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                        placeholder="0.0 - 1.0"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Emotion</span>
+                      <input
+                        type="text"
+                        id="adjust-emotion"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                        placeholder="e.g., joyful, serious, friendly"
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        const sentiment = (document.getElementById('adjust-sentiment') as HTMLSelectElement).value;
+                        const formality = (document.getElementById('adjust-formality') as HTMLInputElement).value;
+                        const emotion = (document.getElementById('adjust-emotion') as HTMLInputElement).value;
+                        handleAdjustTone({
+                          sentiment: sentiment ? sentiment as 'positive' | 'neutral' | 'negative' : undefined,
+                          formality: formality ? parseFloat(formality) : undefined,
+                          emotion: emotion || undefined,
+                        });
+                      }}
+                      disabled={isToneAnalyzing}
+                      className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Adjust tone of text"
+                    >
+                      {isToneAnalyzing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Adjusting...
+                        </>
+                      ) : (
+                        'Adjust Tone'
+                      )}
+                    </button>
+                  </div>
+                  {adjustedText && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Adjusted Text:</p>
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <p className="text-sm whitespace-pre-wrap">{adjustedText}</p>
+                      </div>
+                      {toneAdjustmentChanges.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Changes Made:</p>
+                          <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            {toneAdjustmentChanges.map((change, i) => (
+                              <li key={i}>{change}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setHumanizedText(adjustedText);
+                          setAdjustedText(null);
+                        }}
+                        className="btn btn-sm btn-outline w-full"
+                      >
+                        Use Adjusted Text
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Target Tone */}
+              {toneMode === 'target' && (
+                <div className="space-y-3">
+                  <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Target Sentiment *</span>
+                      <select
+                        id="target-sentiment"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                        defaultValue="neutral"
+                      >
+                        <option value="positive">Positive</option>
+                        <option value="neutral">Neutral</option>
+                        <option value="negative">Negative</option>
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Target Formality (0-1) *</span>
+                      <input
+                        type="number"
+                        id="target-formality"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        defaultValue="0.5"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-medium mb-1 block">Target Emotion *</span>
+                      <input
+                        type="text"
+                        id="target-emotion"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800"
+                        placeholder="e.g., joyful, serious, friendly"
+                        defaultValue="neutral"
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        const sentiment = (document.getElementById('target-sentiment') as HTMLSelectElement).value;
+                        const formality = (document.getElementById('target-formality') as HTMLInputElement).value;
+                        const emotion = (document.getElementById('target-emotion') as HTMLInputElement).value;
+                        handleTargetTone({
+                          sentiment: sentiment as 'positive' | 'neutral' | 'negative',
+                          formality: parseFloat(formality),
+                          emotion: emotion,
+                        });
+                      }}
+                      disabled={isToneAnalyzing}
+                      className="btn btn-primary w-full"
+                    >
+                      Target Tone
+                    </button>
+                  </div>
+                  {targetedText && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Targeted Text:</p>
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <p className="text-sm whitespace-pre-wrap">{targetedText}</p>
+                      </div>
+                      {targetAdjustments.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Adjustments Made:</p>
+                          <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                            {targetAdjustments.map((adjustment, i) => (
+                              <li key={i}>{adjustment}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => {
+                          setHumanizedText(targetedText);
+                          setTargetedText(null);
+                        }}
+                        className="btn btn-sm btn-outline w-full"
+                      >
+                        Use Targeted Text
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Consistency Check */}
+              {toneMode === 'consistency' && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Enter multiple texts (one per line) to check tone consistency:
+                  </p>
+                  <textarea
+                    id="consistency-texts"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 min-h-[100px]"
+                    placeholder="Text 1&#10;Text 2&#10;Text 3..."
+                  />
+                  <button
+                    onClick={() => {
+                      const textarea = document.getElementById('consistency-texts') as HTMLTextAreaElement;
+                      const texts = textarea.value.split('\n').filter(t => t.trim());
+                      handleCheckToneConsistency(texts);
+                    }}
+                    disabled={isToneAnalyzing}
+                    className="btn btn-primary w-full"
+                  >
+                    Check Consistency
+                  </button>
+                  {consistencyResult && (
+                    <div className="space-y-2">
+                      <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Consistency Score</p>
+                        <p className={`text-2xl font-bold ${
+                          consistencyResult.consistencyScore >= 0.7 ? 'text-green-600' :
+                          consistencyResult.consistencyScore >= 0.5 ? 'text-amber-600' :
+                          'text-red-600'
+                        }`}>
+                          {(consistencyResult.consistencyScore * 100).toFixed(0)}%
+                        </p>
+                      </div>
+                      {consistencyResult.inconsistencies.length > 0 && (
+                        <div>
+                          <p className="text-sm font-medium mb-1">Inconsistencies Found:</p>
+                          <div className="space-y-2">
+                            {consistencyResult.inconsistencies.map((inc, i) => (
+                              <div key={i} className="p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm">
+                                <p className="font-medium">Text #{inc.textIndex + 1}</p>
+                                <p className="text-gray-600 dark:text-gray-400">{inc.issue}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -1065,6 +1728,95 @@ export function Editor(): JSX.Element {
                 }}
                 onClose={() => setShowBranchManager(false)}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Collaborator Manager Modal */}
+      {showCollaboratorManager && id && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Collaborator Management</h2>
+              <button
+                onClick={() => setShowCollaboratorManager(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <CollaboratorManager
+                projectId={id}
+                projectName={projectName}
+                onClose={() => setShowCollaboratorManager(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Activity Log Modal */}
+      {showActivityLog && id && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Activity Log</h2>
+              <button
+                onClick={() => setShowActivityLog(false)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {isLoadingActivity ? (
+                <div className="flex items-center justify-center gap-2 py-8">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading activity log...</span>
+                </div>
+              ) : activityLog.length > 0 ? (
+                <div className="space-y-3">
+                  {activityLog.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {activity.userName || activity.userEmail}
+                            </span>
+                            <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-400 rounded text-xs font-medium capitalize">
+                              {activity.action.replace(/_/g, ' ').toLowerCase()}
+                            </span>
+                          </div>
+                          {activity.details && Object.keys(activity.details).length > 0 && (
+                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                              {Object.entries(activity.details).map(([key, value]) => (
+                                <div key={key} className="flex gap-2">
+                                  <span className="font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}:</span>
+                                  <span>{String(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 ml-4">
+                          {new Date(activity.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>No activity recorded yet</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -8,3 +8,4 @@ export { Search } from './Search';
 export { Login } from './Login';
 export { Advanced } from './Advanced';
 export { Templates } from './Templates';
+export { ABTesting } from './ABTesting';

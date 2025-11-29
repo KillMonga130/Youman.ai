@@ -58,8 +58,26 @@ export function useHumanize() {
       options,
     }: {
       text: string;
-      options?: { level?: number; strategy?: string; protectedSegments?: string[] };
+      options?: { level?: number; strategy?: string; protectedSegments?: string[]; mlModelId?: string };
     }) => apiClient.humanize(text, options || {}),
+  });
+}
+
+// ML Models
+export function useAvailableModels() {
+  return useQuery({
+    queryKey: ['availableModels'],
+    queryFn: () => apiClient.getAvailableModels(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useModelMetrics(modelId: string | null) {
+  return useQuery({
+    queryKey: ['modelMetrics', modelId],
+    queryFn: () => apiClient.getModelMetrics(modelId!),
+    enabled: !!modelId,
+    staleTime: 1 * 60 * 1000, // 1 minute
   });
 }
 

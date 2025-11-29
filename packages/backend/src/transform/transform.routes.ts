@@ -8,6 +8,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, AuthenticatedRequest } from '../auth/auth.middleware';
 import { createTransformationPipeline } from './transformation-pipeline';
 import { TransformRequest, HumanizationLevel, TransformStrategy } from './types';
+import { getTrainingDataCollectionService } from '../ml-model/training-data-collection.service';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -24,7 +25,7 @@ router.post(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authReq = req as AuthenticatedRequest;
-      const { text, level, strategy, protectedSegments } = req.body;
+      const { text, level, strategy, protectedSegments, mlModelId } = req.body;
 
       // Input validation
       if (!text || typeof text !== 'string' || text.trim().length === 0) {
@@ -87,10 +88,16 @@ router.post(
         textLength: text.length,
         level: transformRequest.level,
         strategy: transformRequest.strategy,
+        mlModelId,
       });
 
+      // Create pipeline with requested model (or use default)
+      const pipelineInstance = mlModelId 
+        ? createTransformationPipeline({ mlModelId })
+        : pipeline;
+
       // Transform text
-      const result = await pipeline.transform(transformRequest);
+      const result = await pipelineInstance.transform(transformRequest);
 
       logger.info('Transformation completed', {
         jobId: result.id,
@@ -98,6 +105,39 @@ router.post(
         processingTime: result.processingTime,
         chunksProcessed: result.chunksProcessed,
       });
+
+      // Collect training data for ML model training (async, don't block response)
+      if (result.detectionScores && result.detectionScores.average) {
+        const trainingDataService = getTrainingDataCollectionService();
+        trainingDataService
+          .collectTrainingData({
+            transformationId: result.id,
+            originalText: text,
+            humanizedText: result.humanizedText,
+            userId: authReq.user.id,
+            projectId: transformRequest.projectId,
+            strategy: transformRequest.strategy || 'auto',
+            level: transformRequest.level || 3,
+            inputDetectionScore: result.detectionScores?.average,
+            outputDetectionScore: result.detectionScores?.average, // Same for now, will be updated when detection is run
+            metadata: {
+              language: result.language,
+              wordCount: text.split(/\s+/).length,
+              processingTimeMs: result.processingTime,
+              qualityMetrics: {
+                perplexityBefore: result.metrics.before.perplexity,
+                perplexityAfter: result.metrics.after.perplexity,
+                burstinessBefore: result.metrics.before.burstiness,
+                burstinessAfter: result.metrics.after.burstiness,
+                modificationPercentage: result.metrics.modificationPercentage,
+              },
+            },
+          })
+          .catch((error) => {
+            // Don't fail the request if training data collection fails
+            logger.warn('Failed to collect training data', { error, transformationId: result.id });
+          });
+      }
 
       // Return result
       res.status(200).json({

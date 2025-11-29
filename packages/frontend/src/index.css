@@ -23,10 +23,10 @@
   --color-primary-900: #0c4a6e;
   --color-primary-950: #082f49;
 
-  /* Accent Colors */
-  --color-accent-500: #8b5cf6;
-  --color-accent-600: #7c3aed;
-  --color-accent-700: #6d28d9;
+  /* Accent Colors - Teal for enterprise palette */
+  --color-accent-500: #14b8a6;
+  --color-accent-600: #0d9488;
+  --color-accent-700: #0f766e;
 
   /* Success */
   --color-success-50: #f0fdf4;
@@ -57,12 +57,13 @@
   --color-gray-900: #171717;
   --color-gray-950: #0a0a0a;
 
-  /* Gradients */
-  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --gradient-accent: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  --gradient-success: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  --gradient-warm: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  --gradient-cool: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+  /* Gradients - Enterprise Professional Palette */
+  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --gradient-accent: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  --gradient-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-cool: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  --gradient-teal: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
   --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
 
   /* Shadows - Modern & Layered */
@@ -119,10 +120,11 @@
   }
 
   html {
-    font-size: 16px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* Font size scaling for accessibility - base 16px */
+    font-size: calc(16px * var(--accessibility-font-scale, 1));
   }
 
   body {
@@ -154,7 +156,8 @@
   .glass-card {
     @apply backdrop-blur-xl bg-white/70 dark:bg-gray-900/70;
     @apply border border-white/20 dark:border-gray-700/50;
-    @apply shadow-xl;
+    @apply shadow-xl hover:shadow-2xl;
+    @apply transition-shadow duration-300;
     background: var(--glass-bg);
     backdrop-filter: blur(20px) saturate(180%);
     -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -164,8 +167,8 @@
   .card {
     @apply bg-white dark:bg-gray-800/90;
     @apply rounded-2xl;
-    @apply border border-gray-200/50 dark:border-gray-700/50;
-    @apply shadow-lg hover:shadow-xl;
+    @apply border border-gray-200/60 dark:border-gray-700/60;
+    @apply shadow-lg hover:shadow-2xl;
     @apply transition-all duration-300;
     @apply backdrop-blur-sm;
   }
@@ -174,6 +177,7 @@
     @apply card;
     @apply hover:scale-[1.02] hover:-translate-y-1;
     @apply cursor-pointer;
+    @apply hover:border-primary-200 dark:hover:border-primary-800;
   }
 
   .card-header {
@@ -207,6 +211,7 @@
     @apply hover:shadow-xl hover:shadow-primary-500/60;
     @apply hover:from-primary-700 hover:to-primary-800;
     @apply focus:ring-primary-500;
+    @apply border border-primary-700/20;
   }
 
   .btn-secondary {
@@ -289,16 +294,18 @@
   .input {
     @apply w-full px-4 py-3;
     @apply text-base text-gray-900 dark:text-gray-100;
-    @apply bg-white/80 dark:bg-gray-800/80;
+    @apply bg-white/90 dark:bg-gray-800/90;
     @apply border border-gray-300 dark:border-gray-600;
     @apply rounded-xl;
     @apply placeholder:text-gray-400 dark:placeholder:text-gray-500;
     @apply transition-all duration-200;
     @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
     @apply focus:bg-white dark:focus:bg-gray-800;
+    @apply focus:shadow-lg focus:shadow-primary-500/20;
     @apply disabled:opacity-50 disabled:cursor-not-allowed;
     @apply backdrop-blur-sm;
     @apply hover:border-gray-400 dark:hover:border-gray-500;
+    @apply shadow-sm;
   }
 
   .input-error {
@@ -328,6 +335,54 @@
     @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
   }
 
+  /* Modern Textarea */
+  .textarea {
+    @apply w-full px-4 py-3;
+    @apply text-base text-gray-900 dark:text-gray-100;
+    @apply bg-white/90 dark:bg-gray-800/90;
+    @apply border border-gray-300 dark:border-gray-600;
+    @apply rounded-xl;
+    @apply placeholder:text-gray-400 dark:placeholder:text-gray-500;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply focus:bg-white dark:focus:bg-gray-800;
+    @apply focus:shadow-lg focus:shadow-primary-500/20;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply backdrop-blur-sm;
+    @apply hover:border-gray-400 dark:hover:border-gray-500;
+    @apply resize-y min-h-[120px];
+    @apply font-sans;
+    @apply shadow-sm;
+  }
+
+  /* Modern Select */
+  .select {
+    @apply w-full px-4 py-3;
+    @apply text-base text-gray-900 dark:text-gray-100;
+    @apply bg-white/90 dark:bg-gray-800/90;
+    @apply border border-gray-300 dark:border-gray-600;
+    @apply rounded-xl;
+    @apply transition-all duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
+    @apply focus:bg-white dark:focus:bg-gray-800;
+    @apply focus:shadow-lg focus:shadow-primary-500/20;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply backdrop-blur-sm;
+    @apply hover:border-gray-400 dark:hover:border-gray-500;
+    @apply appearance-none;
+    @apply cursor-pointer;
+    @apply pr-10;
+    @apply shadow-sm;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+  }
+
+  .dark .select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
   /* Modern Sidebar */
   .sidebar-nav-item {
     @apply flex items-center gap-3 px-4 py-3;
@@ -336,17 +391,19 @@
     @apply transition-all duration-200;
     @apply hover:bg-gray-100 dark:hover:bg-gray-800;
     @apply hover:translate-x-1;
+    @apply font-medium;
   }
 
   .sidebar-nav-item-active {
     @apply bg-gradient-to-r from-primary-500 to-primary-600;
     @apply text-white shadow-lg shadow-primary-500/50;
     @apply hover:from-primary-600 hover:to-primary-700;
+    @apply font-semibold;
   }
 
-  /* Gradient Text */
+  /* Gradient Text - Professional Blue */
   .text-gradient {
-    @apply bg-gradient-to-r from-primary-600 via-accent-600 to-primary-600;
+    @apply bg-gradient-to-r from-primary-600 via-primary-700 to-primary-600;
     @apply bg-clip-text text-transparent;
     @apply bg-[length:200%_auto];
     animation: gradient-shift 3s ease infinite;
@@ -546,7 +603,7 @@
   /* Scrollbar Styling */
   .scrollbar-modern {
     scrollbar-width: thin;
-    scrollbar-color: rgba(99, 102, 241, 0.5) transparent;
+    scrollbar-color: rgba(37, 99, 235, 0.5) transparent;
   }
 
   .scrollbar-modern::-webkit-scrollbar {
@@ -598,4 +655,152 @@
   @apply fixed top-4 left-4 z-50;
   @apply px-4 py-2 bg-primary-600 text-white rounded-lg font-semibold;
   @apply shadow-lg;
+}
+
+/* ============================================
+   Accessibility Features
+   ============================================ */
+
+/* High Contrast Mode - WCAG AAA compliance */
+.high-contrast {
+  --color-primary-600: #0056b3;
+  --color-primary-700: #004085;
+  --color-gray-900: #000000;
+  --color-gray-100: #ffffff;
+  --color-gray-200: #f0f0f0;
+  --color-gray-700: #333333;
+  --color-gray-800: #1a1a1a;
+}
+
+.high-contrast body {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast .card,
+.high-contrast .glass-card {
+  border: 2px solid #000000 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast .btn-primary {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: 2px solid #000000 !important;
+}
+
+.high-contrast .btn-outline {
+  border: 2px solid #000000 !important;
+  color: #000000 !important;
+  background: transparent !important;
+}
+
+.high-contrast .input,
+.high-contrast .select,
+.high-contrast .textarea {
+  border: 2px solid #000000 !important;
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.high-contrast .text-gray-500,
+.high-contrast .text-gray-400,
+.high-contrast .text-gray-600 {
+  color: #000000 !important;
+}
+
+.high-contrast.dark body {
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast.dark .card,
+.high-contrast.dark .glass-card {
+  border: 2px solid #ffffff !important;
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast.dark .btn-primary {
+  background: #ffffff !important;
+  color: #000000 !important;
+  border: 2px solid #ffffff !important;
+}
+
+.high-contrast.dark .btn-outline {
+  border: 2px solid #ffffff !important;
+  color: #ffffff !important;
+  background: transparent !important;
+}
+
+.high-contrast.dark .input,
+.high-contrast.dark .select,
+.high-contrast.dark .textarea {
+  border: 2px solid #ffffff !important;
+  background: #000000 !important;
+  color: #ffffff !important;
+}
+
+.high-contrast.dark .text-gray-500,
+.high-contrast.dark .text-gray-400,
+.high-contrast.dark .text-gray-600 {
+  color: #ffffff !important;
+}
+
+/* Font Size Scaling - Applied globally via html element */
+/* The font-size is set in the base html rule above */
+
+/* Color Blindness Filters */
+html[data-color-blindness="deuteranopia"] body,
+html[data-color-blindness="deuteranopia"] body * {
+  filter: url(#deuteranopia-filter);
+}
+
+html[data-color-blindness="protanopia"] body,
+html[data-color-blindness="protanopia"] body * {
+  filter: url(#protanopia-filter);
+}
+
+html[data-color-blindness="tritanopia"] body,
+html[data-color-blindness="tritanopia"] body * {
+  filter: url(#tritanopia-filter);
+}
+
+/* Don't apply filters to SVG elements themselves or images */
+html[data-color-blindness] svg,
+html[data-color-blindness] img,
+html[data-color-blindness] svg *,
+html[data-color-blindness] img * {
+  filter: none !important;
+}
+
+/* Reduced Motion */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Screen Reader Optimized */
+.sr-optimized [aria-label],
+.sr-optimized [aria-labelledby],
+.sr-optimized [role] {
+  /* Enhanced focus indicators */
+  outline: 3px solid currentColor !important;
+  outline-offset: 2px !important;
+}
+
+.sr-optimized .sr-only {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
 }

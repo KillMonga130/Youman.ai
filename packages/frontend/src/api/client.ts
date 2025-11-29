@@ -459,7 +459,7 @@ class ApiClient {
   // Transformation
   async humanize(
     text: string,
-    options: { level?: number; strategy?: string; protectedSegments?: string[] }
+    options: { level?: number; strategy?: string; protectedSegments?: string[]; mlModelId?: string }
   ): Promise<{ 
     id: string;
     humanizedText: string; 
@@ -477,7 +477,7 @@ class ApiClient {
   }> {
     return this.request('/transformations/humanize', {
       method: 'POST',
-      body: JSON.stringify({ text, level: options.level, strategy: options.strategy, protectedSegments: options.protectedSegments }),
+      body: JSON.stringify({ text, level: options.level, strategy: options.strategy, protectedSegments: options.protectedSegments, mlModelId: options.mlModelId }),
     });
   }
 
@@ -649,23 +649,63 @@ class ApiClient {
     createdAt: string;
   } | null> {
     try {
-      // Get all versions and return the latest one (first in the list)
-      const versionsResponse = await this.getProjectVersions(projectId);
-      if (versionsResponse.versions && versionsResponse.versions.length > 0) {
-        // Versions are typically sorted by version number desc, so first is latest
-        const latest = versionsResponse.versions[0];
+      // Use the dedicated endpoint for getting the latest version
+      const response = await this.request(`/versions/latest/${projectId}`);
+      if (response && response.id) {
         return {
-          id: latest.id,
-          versionNumber: latest.versionNumber,
-          content: latest.content || '',
-          humanizedContent: latest.humanizedContent || null,
-          createdAt: latest.createdAt,
+          id: response.id,
+          versionNumber: response.versionNumber,
+          content: response.content || '',
+          humanizedContent: response.humanizedContent || null,
+          createdAt: response.createdAt,
         };
       }
       return null;
-    } catch (error) {
-      // If no versions found, return null
+    } catch (error: unknown) {
+      // Check if this is a "no versions" error (valid case for new projects)
+      let errorMessage = '';
+      let errorCode = '';
+      if (error instanceof Error) {
+        try {
+          const parsedError = JSON.parse(error.message);
+          errorCode = parsedError.code || '';
+          errorMessage = parsedError.message || '';
+        } catch {
+          // Not JSON, check message directly
+          errorMessage = error.message;
+        }
+      }
+
+      // If it's a "NO_VERSIONS" error, this is expected for new projects - just return null
+      if (errorCode === 'NO_VERSIONS' || errorMessage.includes('No versions found')) {
+        return null;
+      }
+
+      // For other errors, log and try fallback
       console.error('Failed to get latest version:', error);
+      
+      // Fallback: try getting all versions and return the first one
+      try {
+        const versionsResponse = await this.getProjectVersions(projectId);
+        if (versionsResponse.versions && versionsResponse.versions.length > 0) {
+          const latest = versionsResponse.versions[0];
+          return {
+            id: latest.id,
+            versionNumber: latest.versionNumber,
+            content: latest.content || '',
+            humanizedContent: latest.humanizedContent || null,
+            createdAt: latest.createdAt,
+          };
+        }
+      } catch (fallbackError) {
+        // Only log if it's not a "no versions" type error
+        const isNoVersionsError = fallbackError instanceof Error && 
+          (fallbackError.message.includes('NOT_FOUND') || 
+           fallbackError.message.includes('No versions'));
+        if (!isNoVersionsError) {
+          console.error('Fallback also failed:', fallbackError);
+        }
+      }
       return null;
     }
   }
@@ -1137,9 +1177,44 @@ class ApiClient {
 
   async compareVariations(variations: Array<{ id: string; text: string; strategy: string; level: number; detectionScore: number; differences: string[]; wordCount: number; createdAt: string; isOriginal: boolean }>): Promise<{
     success: boolean;
-    data: { bestVariation: string; rankings: Array<{ id: string; rank: number; score: number }> };
+    data: {
+      id: string;
+      testId: string;
+      variations: Array<{ id: string; text: string; strategy: string; level: number; detectionScore: number; differences: string[]; wordCount: number; createdAt: string; isOriginal: boolean }>;
+      sideBySide: Array<{
+        segmentIndex: number;
+        original: string;
+        variations: Array<{
+          variationId: string;
+          text: string;
+          changeType: 'unchanged' | 'modified' | 'added' | 'removed';
+        }>;
+      }>;
+      statistics: {
+        bestVariationId: string;
+        confidenceLevel: number;
+        isStatisticallySignificant: boolean;
+        pValue: number;
+        sampleSize: number;
+        minimumDetectableEffect: number;
+        rankings: Array<{
+          variationId: string;
+          rank: number;
+          score: number;
+          metricScores: {
+            detectionScore: number;
+            engagementScore: number;
+            qualityScore: number;
+          };
+        }>;
+      };
+      recommendations: string[];
+      generatedAt: string;
+      processingTimeMs: number;
+    };
   }> {
-    return this.request('/ab-testing/compare', { method: 'POST', body: JSON.stringify({ variations }) });
+    const response = await this.request<{ success: boolean; data: any }>('/ab-testing/compare', { method: 'POST', body: JSON.stringify({ variations }) });
+    return response;
   }
 
   async createABTest(data: { name: string; originalText: string; variationCount: number; userId: string }): Promise<{
@@ -1259,11 +1334,36 @@ class ApiClient {
     return this.request(`/collaboration/projects/${projectId}/collaborators/${userId}`, { method: 'DELETE' });
   }
 
-  async getProjectActivity(projectId: string): Promise<{
-    activities: Array<{ id: string; action: string; userId: string; userName: string; details: string; createdAt: string }>;
-    total: number;
+  async getProjectActivity(projectId: string, options?: { page?: number; limit?: number; action?: string; userId?: string; startDate?: string; endDate?: string }): Promise<{
+    success: boolean;
+    activities: Array<{
+      id: string;
+      projectId: string;
+      userId: string;
+      userEmail: string;
+      userName: string | null;
+      action: string;
+      details: Record<string, unknown> | null;
+      ipAddress: string | null;
+      createdAt: string;
+    }>;
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasMore: boolean;
+    };
   }> {
-    return this.request(`/collaboration/projects/${projectId}/activity`);
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+    if (options?.action) params.append('action', options.action);
+    if (options?.userId) params.append('userId', options.userId);
+    if (options?.startDate) params.append('startDate', options.startDate);
+    if (options?.endDate) params.append('endDate', options.endDate);
+    const query = params.toString();
+    return this.request(`/collaboration/projects/${projectId}/activity${query ? `?${query}` : ''}`);
   }
 
   // ============================================
@@ -1543,10 +1643,20 @@ class ApiClient {
 
   async getBranchTree(projectId: string): Promise<{
     tree: Array<{
-      id: string;
-      name: string;
-      isDefault: boolean;
-      parentId?: string;
+      branch: {
+        id: string;
+        projectId: string;
+        name: string;
+        parentBranchId: string | null;
+        baseVersionId: string | null;
+        isDefault: boolean;
+        createdAt: string;
+        createdBy: string | null;
+        mergedAt: string | null;
+        mergedInto: string | null;
+      };
+      children: Array<any>;
+      depth: number;
     }>;
   }> {
     return this.request(`/branches/tree/${projectId}`);
@@ -1732,17 +1842,24 @@ class ApiClient {
   }
 
   async getSubscriptionTiers(): Promise<{
-    tiers: Array<{
-      id: string;
-      name: string;
-      monthlyWordLimit: number;
-      monthlyApiCallLimit: number;
-      storageLimit: number;
-      price: number;
-      features: string[];
+    success: boolean;
+    data: Array<{
+      tier: string;
+      limits: {
+        monthlyWordLimit: number;
+        monthlyApiCallLimit: number;
+        storageLimit: string;
+        maxConcurrentProjects: number | string;
+        priorityProcessing: boolean;
+        customAiModels: boolean;
+        advancedAnalytics: boolean;
+        teamCollaboration: boolean;
+        apiAccess: boolean;
+      };
     }>;
   }> {
-    return this.request('/subscription/tiers');
+    const result = await this.request<{ success: boolean; data: any[] }>('/subscription/tiers');
+    return result;
   }
 
   async getUpgradePreview(tier: string): Promise<{
@@ -1757,36 +1874,99 @@ class ApiClient {
       };
     };
   }> {
-    return this.request(`/subscription/upgrade-preview?tier=${encodeURIComponent(tier)}`);
+    const response = await this.request<{ success: boolean; data: {
+      currentTier: string;
+      newTier: string;
+      priceDifference: number;
+      newLimits: {
+        monthlyWordLimit: number;
+        monthlyApiCallLimit: number;
+        storageLimit: number;
+      };
+    } }>(`/subscription/upgrade-preview?tier=${encodeURIComponent(tier)}`);
+    return { preview: response.data };
   }
 
-  async checkQuota(resourceType: 'words' | 'apiCalls' | 'storage', amount: number): Promise<{
+  async checkQuota(resourceType: 'words' | 'api_calls' | 'storage', amount: number): Promise<{
     allowed: boolean;
     remaining: number;
-    limit: number;
+    upgradeRequired: boolean;
+    message?: string;
   }> {
-    return this.request(`/subscription/quota/check?resourceType=${resourceType}&amount=${amount}`);
+    try {
+      const response = await this.request<{ success: boolean; data: { allowed: boolean; remaining: number; upgradeRequired: boolean; message?: string } }>(
+        `/subscription/quota/check?resourceType=${resourceType}&amount=${amount}`
+      );
+      return response.data;
+    } catch (err: unknown) {
+      // Handle 402 Payment Required (quota exceeded)
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      try {
+        const errorData = JSON.parse(errorMessage);
+        if (errorData.status === 402 || errorData.code === 'QUOTA_EXCEEDED') {
+          return {
+            allowed: false,
+            remaining: errorData.remaining || 0,
+            upgradeRequired: errorData.upgradeRequired !== false,
+            message: errorData.message || errorData.error || 'Quota exceeded',
+          };
+        }
+      } catch {
+        // If parsing fails, rethrow original error
+      }
+      throw err;
+    }
   }
 
   async getBillingDashboard(): Promise<{
-    dashboard: {
-      currentPeriod: {
-        start: string;
-        end: string;
-        usage: {
-          words: number;
-          apiCalls: number;
-          storage: number;
+    success: boolean;
+    data: {
+      subscription: any;
+      usage: {
+        words: {
+          used: number;
+          limit: number;
+          remaining: number;
+          percentUsed: number;
+          periodStart: string;
+          periodEnd: string;
+        };
+        apiCalls: {
+          used: number;
+          limit: number;
+          remaining: number;
+          percentUsed: number;
+          periodStart: string;
+          periodEnd: string;
+        };
+        storage: {
+          used: number;
+          limit: number;
+          remaining: number;
+          percentUsed: number;
+          periodStart: string;
+          periodEnd: string;
         };
       };
-      upcomingInvoice: {
+      invoices: Array<{
+        id: string;
         amount: number;
-        date: string;
-      } | null;
-      paymentMethod: {
+        currency: string;
+        status: string;
+        periodStart: string | Date;
+        periodEnd: string | Date;
+        paidAt: string | Date | null;
+        invoiceUrl: string | null;
+      }>;
+      paymentMethods: Array<{
+        id: string;
         type: string;
-        last4: string;
-      } | null;
+        brand: string | null;
+        last4: string | null;
+        expiryMonth: number | null;
+        expiryYear: number | null;
+        isDefault: boolean;
+      }>;
     };
   }> {
     return this.request('/subscription/billing');
@@ -1976,6 +2156,113 @@ class ApiClient {
     return this.request('/tone/target', {
       method: 'POST',
       body: JSON.stringify({ text, targetTone }),
+    });
+  }
+
+  // ML Model Management
+  async createModelVersion(data: {
+    modelId: string;
+    version: string;
+    description?: string;
+    artifactPath: string;
+    config: Record<string, unknown>;
+    trainingMetrics?: Record<string, unknown>;
+    tags?: string[];
+  }): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request('/ml-models/versions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getModelVersions(modelId: string): Promise<Array<{
+    id: string;
+    version: string;
+    status: string;
+    createdAt: string;
+  }>> {
+    return this.request(`/ml-models/${modelId}/versions`);
+  }
+
+  async deployModel(data: {
+    modelId: string;
+    version: string;
+    deploymentType?: 'blue-green' | 'canary' | 'rolling';
+    environment?: string;
+    replicas?: number;
+    canaryPercentage?: number;
+    autoRollback?: boolean;
+  }): Promise<{
+    id: string;
+    modelId: string;
+    version: string;
+    status: string;
+    deployedAt: string;
+  }> {
+    return this.request('/ml-models/deployments', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getModelMetrics(modelId: string): Promise<{
+    modelId: string;
+    version: string;
+    accuracy: number;
+    latency: number;
+    throughput: number;
+    detectionEvasionRate: number;
+    errorRate: number;
+    totalRequests: number;
+  }> {
+    return this.request(`/ml-models/${modelId}/metrics`);
+  }
+
+  async detectModelDrift(modelId: string): Promise<{
+    modelId: string;
+    driftDetected: boolean;
+    severity: string;
+    driftScore: number;
+    recommendations: string[];
+  }> {
+    return this.request(`/ml-models/${modelId}/drift`);
+  }
+
+  async getAvailableModels(): Promise<{
+    models: Array<{
+      id: string;
+      name: string;
+      type: 'llm' | 'custom';
+      provider?: string;
+      available: boolean;
+    }>;
+  }> {
+    return this.request('/ml-models/available');
+  }
+
+  async compareModels(modelIds: string[]): Promise<{
+    models: Array<{
+      modelId: string;
+      version: string;
+      metrics: {
+        accuracy: number;
+        latency: number;
+        detectionEvasionRate: number;
+      };
+    }>;
+    winner?: string;
+    isStatisticallySignificant: boolean;
+    recommendations: string[];
+  }> {
+    return this.request('/ml-models/compare', {
+      method: 'POST',
+      body: JSON.stringify({ modelIds }),
     });
   }
 }

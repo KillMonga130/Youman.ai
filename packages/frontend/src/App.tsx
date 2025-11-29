@@ -27,6 +27,7 @@ const Analytics = lazy(() => import('./pages').then(m => ({ default: m.Analytics
 const Search = lazy(() => import('./pages').then(m => ({ default: m.Search })));
 const Advanced = lazy(() => import('./pages').then(m => ({ default: m.Advanced })));
 const Templates = lazy(() => import('./pages').then(m => ({ default: m.Templates })));
+const ABTesting = lazy(() => import('./pages').then(m => ({ default: m.ABTesting })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,6 +104,7 @@ function AppContent(): JSX.Element {
                     <Route path="/editor" element={<Editor />} />
                     <Route path="/editor/:id" element={<Editor />} />
                     <Route path="/templates" element={<Templates />} />
+                    <Route path="/ab-testing" element={<ABTesting />} />
                     <Route path="/comparison" element={<Comparison />} />
                     <Route path="/history" element={<History />} />
                     <Route path="/analytics" element={<Analytics />} />
@@ -129,7 +131,12 @@ function App(): JSX.Element {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system">
         <AccessibilityProvider>
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <AppContent />
           </BrowserRouter>
         </AccessibilityProvider>

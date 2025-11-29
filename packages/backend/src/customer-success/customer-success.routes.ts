@@ -5,6 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
+import { authenticate } from '../auth/auth.middleware';
 import { customerSuccessService, CustomerSuccessError } from './customer-success.service';
 import {
   updateOnboardingStepSchema,
@@ -15,6 +16,9 @@ import {
 import { z } from 'zod';
 
 const router = Router();
+
+// All customer success routes require authentication
+router.use(authenticate);
 
 /**
  * Error handler for customer success routes
@@ -46,12 +50,7 @@ function handleError(error: unknown, res: Response): void {
  */
 router.post('/onboarding/initialize', async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-
+    const userId = req.user!.id;
     const progress = await customerSuccessService.initializeOnboarding(userId);
     res.json({ progress });
   } catch (error) {

@@ -228,6 +228,8 @@ export interface TransformPipelineOptions {
   enableAutoSave?: boolean;
   /** Auto-save interval in chunks */
   autoSaveInterval?: number;
+  /** ML Model ID to use for transformation (optional, falls back to rule-based) */
+  mlModelId?: string;
 }
 
 /** Resumable job state */

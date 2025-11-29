@@ -320,7 +320,7 @@ export function Comparison(): JSX.Element {
               {versionComparison.similarityPercentage}% similar
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded bg-purple-500" />
+              <span className="w-3 h-3 rounded bg-teal-500" />
               {versionComparison.wordCountDiff > 0 ? '+' : ''}{versionComparison.wordCountDiff} words
             </span>
           </>

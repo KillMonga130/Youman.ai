@@ -74,7 +74,7 @@ function getPreviousPeriod(): { start: Date; end: Date } {
 /**
  * Get user's subscription tier limits
  */
-async function getUserLimits(userId: string): Promise<{
+export async function getUserLimits(userId: string): Promise<{
   tier: SubscriptionTier;
   monthlyWordLimit: number;
   monthlyApiCallLimit: number;

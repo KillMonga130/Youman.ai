@@ -68,6 +68,29 @@ import { autoScalingRoutes } from '../auto-scaling';
 import { disasterRecoveryRoutes } from '../disaster-recovery';
 import { cdnRoutes } from '../cdn';
 import { performanceRoutes } from '../performance';
+import { customerSuccessRoutes } from '../customer-success';
+import { mlModelRoutes } from '../ml-model';
+import { whiteLabelRoutes } from '../white-label';
+import { partnerRoutes } from '../partner';
+import { contentModerationRoutes } from '../content-moderation';
+import { legalRoutes } from '../legal';
+import { costManagementRoutes } from '../cost-management';
+import { dataPipelineRoutes } from '../data-pipeline';
+import { featureFlagRoutes } from '../feature-flags';
+import { expansionRoutes } from '../expansion';
+import { summarizationRoutes } from '../summarization';
+import { translationRoutes } from '../translation';
+import { factCheckingRoutes } from '../fact-checking';
+import { formalizationRoutes } from '../formalization';
+import { simplificationRoutes } from '../simplification';
+import { enrichmentRoutes } from '../enrichment';
+import { anonymizationRoutes } from '../anonymization';
+import { grammarRoutes } from '../grammar';
+import { retentionRoutes } from '../retention';
+import { watermarkRoutes } from '../watermark';
+import { expirationRoutes } from '../expiration';
+import { contentAnalysisRoutes } from '../content-analysis';
+import { learningProfileRoutes } from '../learning-profile';
 import { setupSwagger } from '../docs';
 
 /**
@@ -267,6 +290,90 @@ function mountApiRoutes(app: Express): void {
   // Requirements: 70 - Performance optimization
   apiRouter.use('/performance', strictRateLimiter, performanceRoutes);
   
+  // Customer Success routes (standard rate limiting)
+  // Requirements: 96 - Customer success tools (onboarding, engagement, NPS, milestones)
+  apiRouter.use('/customer-success', standardRateLimiter, customerSuccessRoutes);
+  
+  // ML Model Management routes (standard rate limiting)
+  // Requirements: 88 - Model versioning, blue-green deployment, performance tracking, drift detection
+  apiRouter.use('/ml-models', standardRateLimiter, mlModelRoutes);
+
+  // White-Label routes (standard rate limiting)
+  // Requirements: 60 - Branding customization, custom domains, branded reports
+  apiRouter.use('/white-label', standardRateLimiter, whiteLabelRoutes);
+
+  // Partner Integration routes (standard rate limiting)
+  // Requirements: 98 - Partner OAuth, API keys, webhooks, marketplace
+  apiRouter.use('/partners', standardRateLimiter, partnerRoutes);
+
+  // Content Moderation routes (standard rate limiting)
+  // Requirements: 97 - Content scanning, flagging, review workflow, policy enforcement
+  apiRouter.use('/content-moderation', standardRateLimiter, contentModerationRoutes);
+
+  // Legal and Compliance routes (standard rate limiting)
+  // Requirements: 95 - Legal compliance, terms of service, consent, DMCA, licensing
+  apiRouter.use('/legal', standardRateLimiter, legalRoutes);
+
+  // Cost Management routes (standard rate limiting)
+  // Requirements: 99 - Cost tracking and optimization
+  apiRouter.use('/cost-management', standardRateLimiter, costManagementRoutes);
+
+  // Data Pipeline routes (standard rate limiting)
+  // Requirements: 89 - ETL pipeline, data quality validation, batch processing
+  apiRouter.use('/data-pipeline', standardRateLimiter, dataPipelineRoutes);
+
+  // Feature Flags routes (standard rate limiting)
+  // Requirements: 87 - Experiment management, user bucketing, feature rollouts
+  apiRouter.use('/feature-flags', standardRateLimiter, featureFlagRoutes);
+
+  // Content Transformation routes (standard rate limiting)
+  // Expansion routes - Requirements: 79
+  apiRouter.use('/expansion', standardRateLimiter, expansionRoutes);
+
+  // Summarization routes - Requirements: 78
+  apiRouter.use('/summarization', standardRateLimiter, summarizationRoutes);
+
+  // Translation routes - Requirements: 77
+  apiRouter.use('/translation', standardRateLimiter, translationRoutes);
+
+  // Fact-Checking routes - Requirements: 110
+  apiRouter.use('/fact-checking', standardRateLimiter, factCheckingRoutes);
+
+  // Formalization routes - Requirements: 107
+  apiRouter.use('/formalization', standardRateLimiter, formalizationRoutes);
+
+  // Simplification routes - Requirements: 106
+  apiRouter.use('/simplification', standardRateLimiter, simplificationRoutes);
+
+  // Enrichment routes - Requirements: 105
+  apiRouter.use('/enrichment', standardRateLimiter, enrichmentRoutes);
+
+  // Anonymization routes - Requirements: 104
+  apiRouter.use('/anonymization', standardRateLimiter, anonymizationRoutes);
+
+  // Grammar routes - Requirements: 103
+  apiRouter.use('/grammar', standardRateLimiter, grammarRoutes);
+
+  // Data Retention routes (standard rate limiting)
+  // Requirements: 63 - Data lifecycle and retention policies
+  apiRouter.use('/retention', standardRateLimiter, retentionRoutes);
+
+  // Watermarking routes (standard rate limiting)
+  // Requirements: 76 - Invisible watermarking system
+  apiRouter.use('/watermark', standardRateLimiter, watermarkRoutes);
+
+  // Content Expiration routes (standard rate limiting)
+  // Requirements: 75 - Content expiration with automatic deletion
+  apiRouter.use('/expiration', standardRateLimiter, expirationRoutes);
+
+  // Content Analysis routes (standard rate limiting)
+  // Requirements: 54, 62, 122-130 - Content analysis features
+  apiRouter.use('/content-analysis', standardRateLimiter, contentAnalysisRoutes);
+
+  // Learning Profile routes (standard rate limiting)
+  // Requirements: 28 - User-specific learning and adaptation
+  apiRouter.use('/learning-profile', standardRateLimiter, learningProfileRoutes);
+
   // Transformations routes (standard rate limiting)
   // Requirements: 2.1, 2.2, 2.3, 2.4 - Text humanization API
   apiRouter.use('/transformations', standardRateLimiter, transformRouter);
@@ -363,6 +470,29 @@ function createVersionHandler(): express.RequestHandler {
         disasterRecovery: `${API_PREFIX}/disaster-recovery`,
         cdn: `${API_PREFIX}/cdn`,
         performance: `${API_PREFIX}/performance`,
+        customerSuccess: `${API_PREFIX}/customer-success`,
+        mlModels: `${API_PREFIX}/ml-models`,
+        whiteLabel: `${API_PREFIX}/white-label`,
+        partners: `${API_PREFIX}/partners`,
+        contentModeration: `${API_PREFIX}/content-moderation`,
+        legal: `${API_PREFIX}/legal`,
+        costManagement: `${API_PREFIX}/cost-management`,
+        dataPipeline: `${API_PREFIX}/data-pipeline`,
+        featureFlags: `${API_PREFIX}/feature-flags`,
+        expansion: `${API_PREFIX}/expansion`,
+        summarization: `${API_PREFIX}/summarization`,
+        translation: `${API_PREFIX}/translation`,
+        factChecking: `${API_PREFIX}/fact-checking`,
+        formalization: `${API_PREFIX}/formalization`,
+        simplification: `${API_PREFIX}/simplification`,
+        enrichment: `${API_PREFIX}/enrichment`,
+        anonymization: `${API_PREFIX}/anonymization`,
+        grammar: `${API_PREFIX}/grammar`,
+        retention: `${API_PREFIX}/retention`,
+        watermark: `${API_PREFIX}/watermark`,
+        expiration: `${API_PREFIX}/expiration`,
+        contentAnalysis: `${API_PREFIX}/content-analysis`,
+        learningProfile: `${API_PREFIX}/learning-profile`,
         monitoring: '/monitoring',
         transformations: `${API_PREFIX}/transformations`,
         analytics: `${API_PREFIX}/analytics`,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, User, Lock, CreditCard, CheckCircle, Cloud, Shield, FileText, Loader2 } from 'lucide-react';
+import { Save, RotateCcw, User, Lock, CreditCard, CheckCircle, Cloud, Shield, FileText, Loader2, X, ArrowRight } from 'lucide-react';
 import { useAppStore, UserSettings } from '../store';
 import { KeyboardShortcutsSettings } from '../components/KeyboardShortcutsSettings';
 import { AccessibilitySettings } from '../components/AccessibilitySettings';
@@ -22,13 +22,7 @@ const defaultSettings: UserSettings = {
   },
 };
 
-const languages = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'pt', name: 'Portuguese' },
-];
+// Languages will be loaded from API
 
 const strategies = [
   { value: 'auto', label: 'Auto-detect', description: 'Automatically detect the best strategy based on content' },
@@ -61,6 +55,55 @@ export function Settings(): JSX.Element {
     confirmPassword: '',
   });
   
+  // Locales state
+  const [locales, setLocales] = useState<Array<{ code: string; name: string; nativeName: string }>>([]);
+  const [isLoadingLocales, setIsLoadingLocales] = useState(false);
+  
+  // Billing dashboard state
+  const [billingDashboard, setBillingDashboard] = useState<{
+    subscription: any;
+    usage: any;
+    invoices: Array<{
+      id: string;
+      amount: number;
+      currency: string;
+      status: string;
+      periodStart: string | Date;
+      periodEnd: string | Date;
+      paidAt: string | Date | null;
+      invoiceUrl: string | null;
+    }>;
+    paymentMethods: Array<{
+      id: string;
+      type: string;
+      brand: string | null;
+      last4: string | null;
+      expiryMonth: number | null;
+      expiryYear: number | null;
+      isDefault: boolean;
+    }>;
+  } | null>(null);
+  const [subscriptionTiers, setSubscriptionTiers] = useState<Array<{
+    tier: string;
+    limits: any;
+  }>>([]);
+  const [isLoadingBilling, setIsLoadingBilling] = useState(false);
+  const [showBillingDashboard, setShowBillingDashboard] = useState(false);
+  const [upgradePreview, setUpgradePreview] = useState<{
+    tier: string;
+    preview: {
+      currentTier: string;
+      newTier: string;
+      priceDifference: number;
+      newLimits: {
+        monthlyWordLimit: number;
+        monthlyApiCallLimit: number;
+        storageLimit: number;
+      };
+    };
+  } | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  
   // API hooks
   const { data: currentUserData, isLoading: isLoadingUser } = useCurrentUser();
   const { data: subscriptionData, isLoading: isLoadingSubscription } = useSubscription();
@@ -82,11 +125,67 @@ export function Settings(): JSX.Element {
     }
   }, [currentUserData, user, setUser]);
 
+  // Load locales
+  useEffect(() => {
+    const loadLocales = async () => {
+      try {
+        setIsLoadingLocales(true);
+        const result = await apiClient.getSupportedLocales();
+        if (result?.locales && result.locales.length > 0) {
+          setLocales(result.locales);
+        } else {
+          console.error('No locales returned from API');
+          setLocales([]);
+        }
+      } catch (error) {
+        console.error('Failed to load locales:', error);
+        // Show error but don't fallback to hardcoded list
+        setLocales([]);
+      } finally {
+        setIsLoadingLocales(false);
+      }
+    };
+    loadLocales();
+  }, []);
+
+  // Load billing dashboard and tiers
+  useEffect(() => {
+    const loadBillingData = async () => {
+      try {
+        setIsLoadingBilling(true);
+        const [dashboardResult, tiersResult] = await Promise.all([
+          apiClient.getBillingDashboard().catch(() => null),
+          apiClient.getSubscriptionTiers().catch(() => null),
+        ]);
+        if (dashboardResult?.data) {
+          setBillingDashboard(dashboardResult.data);
+        }
+        if (tiersResult?.data) {
+          setSubscriptionTiers(tiersResult.data);
+        }
+      } catch (error) {
+        console.error('Failed to load billing data:', error);
+      } finally {
+        setIsLoadingBilling(false);
+      }
+    };
+    loadBillingData();
+  }, []);
+
   const handleSaveSettings = (): void => {
-    updateSettings(localSettings);
+    // Get current settings from store to preserve accessibility settings that were updated directly
+    const currentSettings = useAppStore.getState().settings;
+    
+    // Merge localSettings with current accessibility settings from store
+    const settingsToSave = {
+      ...localSettings,
+      accessibility: currentSettings.accessibility, // Preserve accessibility settings
+    };
+    
+    updateSettings(settingsToSave);
     
     // Apply dark mode
-    document.documentElement.classList.toggle('dark', localSettings.darkMode);
+    document.documentElement.classList.toggle('dark', settingsToSave.darkMode);
     
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -453,9 +552,9 @@ export function Settings(): JSX.Element {
       {/* Subscription */}
       {!isLoadingSubscription && subscriptionData && (
         <div className="card animate-slide-up">
-          <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-purple-50/30 to-transparent dark:from-purple-900/10">
+          <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-teal-50/30 to-transparent dark:from-teal-900/10">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-lg">
                 <CreditCard className="w-5 h-5 text-white" />
               </div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Subscription</h2>
@@ -560,6 +659,256 @@ export function Settings(): JSX.Element {
         </div>
       )}
 
+      {/* Billing Dashboard */}
+      {!isLoadingSubscription && subscriptionData && (
+        <div className="card animate-slide-up">
+          <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-50/30 to-transparent dark:from-blue-900/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
+                  <CreditCard className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Billing Dashboard</h2>
+              </div>
+              <button
+                onClick={() => setShowBillingDashboard(!showBillingDashboard)}
+                className="btn btn-sm btn-outline"
+              >
+                {showBillingDashboard ? 'Hide' : 'Show'} Details
+              </button>
+            </div>
+          </div>
+          {showBillingDashboard && (
+            <div className="p-6 space-y-6">
+              {isLoadingBilling ? (
+                <div className="flex items-center justify-center gap-2 py-8">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading billing information...</span>
+                </div>
+              ) : (
+                <>
+                  {/* Usage Summary */}
+                  {billingDashboard?.usage && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Current Period Usage</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Words Used</p>
+                          <p className="text-lg font-bold">
+                            {billingDashboard.usage.words?.used?.toLocaleString() || 0}
+                            {billingDashboard.usage.words?.limit && (
+                              <span className="text-sm font-normal text-gray-500">
+                                {' / ' + billingDashboard.usage.words.limit.toLocaleString()}
+                              </span>
+                            )}
+                          </p>
+                          {billingDashboard.usage.words?.percentUsed !== undefined && (
+                            <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  billingDashboard.usage.words.percentUsed > 90 ? 'bg-red-500' :
+                                  billingDashboard.usage.words.percentUsed > 70 ? 'bg-yellow-500' :
+                                  'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min(billingDashboard.usage.words.percentUsed, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">API Calls</p>
+                          <p className="text-lg font-bold">
+                            {billingDashboard.usage.apiCalls?.used?.toLocaleString() || 0}
+                            {billingDashboard.usage.apiCalls?.limit && (
+                              <span className="text-sm font-normal text-gray-500">
+                                {' / ' + billingDashboard.usage.apiCalls.limit.toLocaleString()}
+                              </span>
+                            )}
+                          </p>
+                          {billingDashboard.usage.apiCalls?.percentUsed !== undefined && (
+                            <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  billingDashboard.usage.apiCalls.percentUsed > 90 ? 'bg-red-500' :
+                                  billingDashboard.usage.apiCalls.percentUsed > 70 ? 'bg-yellow-500' :
+                                  'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min(billingDashboard.usage.apiCalls.percentUsed, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Storage</p>
+                          <p className="text-lg font-bold">
+                            {billingDashboard.usage.storage?.used ? (billingDashboard.usage.storage.used / 1024 / 1024).toFixed(2) + ' MB' : '0 MB'}
+                            {billingDashboard.usage.storage?.limit && (
+                              <span className="text-sm font-normal text-gray-500">
+                                {' / ' + (billingDashboard.usage.storage.limit / 1024 / 1024).toFixed(0) + ' MB'}
+                              </span>
+                            )}
+                          </p>
+                          {billingDashboard.usage.storage?.percentUsed !== undefined && (
+                            <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                              <div
+                                className={`h-2 rounded-full ${
+                                  billingDashboard.usage.storage.percentUsed > 90 ? 'bg-red-500' :
+                                  billingDashboard.usage.storage.percentUsed > 70 ? 'bg-yellow-500' :
+                                  'bg-green-500'
+                                }`}
+                                style={{ width: `${Math.min(billingDashboard.usage.storage.percentUsed, 100)}%` }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment Methods */}
+                  {billingDashboard?.paymentMethods && billingDashboard.paymentMethods.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Payment Methods</h3>
+                      <div className="space-y-2">
+                        {billingDashboard.paymentMethods.map((method) => (
+                          <div key={method.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <CreditCard className="w-5 h-5 text-gray-400" />
+                              <div>
+                                <p className="font-medium">
+                                  {method.brand ? method.brand.charAt(0).toUpperCase() + method.brand.slice(1) : method.type} 
+                                  {method.last4 && ` •••• ${method.last4}`}
+                                </p>
+                                {method.expiryMonth && method.expiryYear && (
+                                  <p className="text-sm text-gray-500">
+                                    Expires {method.expiryMonth}/{method.expiryYear}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {method.isDefault && (
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400 rounded text-xs font-medium">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Invoices */}
+                  {billingDashboard?.invoices && billingDashboard.invoices.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Recent Invoices</h3>
+                      <div className="space-y-2">
+                        {billingDashboard.invoices.slice(0, 5).map((invoice) => (
+                          <div key={invoice.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <div>
+                              <p className="font-medium">Invoice #{invoice.id.slice(-8)}</p>
+                              <p className="text-sm text-gray-500">
+                                {new Date(invoice.periodStart).toLocaleDateString()} - {new Date(invoice.periodEnd).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <p className="font-medium">
+                                  {invoice.currency === 'usd' ? '$' : invoice.currency.toUpperCase() + ' '}
+                                  {invoice.amount.toFixed(2)}
+                                </p>
+                                <span className={`text-xs px-2 py-0.5 rounded ${
+                                  invoice.status === 'paid' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+                                  invoice.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400' :
+                                  'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+                                }`}>
+                                  {invoice.status}
+                                </span>
+                              </div>
+                              {invoice.invoiceUrl && (
+                                <a
+                                  href={invoice.invoiceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="btn btn-sm btn-outline"
+                                  title="View invoice"
+                                >
+                                  <FileText className="w-4 h-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tier Comparison */}
+                  {subscriptionTiers.length > 0 && (
+                    <div className="space-y-3">
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Available Plans</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {subscriptionTiers.map((tier) => {
+                          const isCurrentTier = subscriptionData?.subscription.tier === tier.tier;
+                          return (
+                            <div
+                              key={tier.tier}
+                              className={`p-4 border-2 rounded-lg ${
+                                isCurrentTier
+                                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                  : 'border-gray-200 dark:border-gray-700'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-bold">{tierLabels[tier.tier] || tier.tier}</h4>
+                                {isCurrentTier && (
+                                  <span className="px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-2 text-sm">
+                                <p className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium">Words:</span> {tier.limits?.monthlyWordLimit?.toLocaleString() || 'N/A'}
+                                </p>
+                                <p className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium">API Calls:</span> {tier.limits?.monthlyApiCallLimit?.toLocaleString() || 'N/A'}
+                                </p>
+                                <p className="text-gray-600 dark:text-gray-400">
+                                  <span className="font-medium">Storage:</span> {tier.limits?.storageLimit || 'N/A'}
+                                </p>
+                              </div>
+                              {!isCurrentTier && (
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      const previewResult = await apiClient.getUpgradePreview(tier.tier);
+                                      setUpgradePreview({
+                                        tier: tier.tier,
+                                        preview: previewResult.preview,
+                                      });
+                                    } catch (error) {
+                                      console.error('Failed to get upgrade preview:', error);
+                                      alert('Failed to load upgrade preview. Please try again.');
+                                    }
+                                  }}
+                                  className="btn btn-sm btn-outline w-full mt-3"
+                                >
+                                  Upgrade
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Transformation defaults */}
       <div className="card">
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
@@ -635,12 +984,19 @@ export function Settings(): JSX.Element {
                 setLocalSettings({ ...localSettings, defaultLanguage: e.target.value })
               }
               className="input"
+              disabled={isLoadingLocales}
             >
-              {languages.map((lang) => (
-                <option key={lang.code} value={lang.code}>
-                  {lang.name}
-                </option>
-              ))}
+              {isLoadingLocales ? (
+                <option>Loading languages...</option>
+              ) : locales.length > 0 ? (
+                locales.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.nativeName || lang.name} ({lang.code})
+                  </option>
+                ))
+              ) : (
+                <option disabled>Failed to load languages. Please refresh the page.</option>
+              )}
             </select>
           </div>
         </div>
@@ -905,7 +1261,9 @@ export function Settings(): JSX.Element {
       <KeyboardShortcutsSettings />
 
       {/* Accessibility */}
-      <AccessibilitySettings />
+      <div className="card animate-slide-up">
+        <AccessibilitySettings />
+      </div>
 
       {/* Actions */}
       <div className="flex items-center justify-between">
@@ -1002,6 +1360,105 @@ export function Settings(): JSX.Element {
                   className="btn btn-primary"
                 >
                   {isSettingUpMFA ? 'Verifying...' : 'Verify & Enable'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Preview Modal */}
+      {upgradePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold">Upgrade Preview</h2>
+              <button
+                onClick={() => setUpgradePreview(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                disabled={isUpgrading}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Current vs New Tier */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Current Plan</p>
+                  <p className="text-xl font-bold">{tierLabels[upgradePreview.preview.currentTier] || upgradePreview.preview.currentTier}</p>
+                </div>
+                <div className="p-4 border-2 border-blue-500 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">New Plan</p>
+                  <p className="text-xl font-bold">{tierLabels[upgradePreview.preview.newTier] || upgradePreview.preview.newTier}</p>
+                </div>
+              </div>
+
+              {/* Price Difference */}
+              <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Monthly Price Difference</span>
+                  <span className={`text-xl font-bold ${upgradePreview.preview.priceDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {upgradePreview.preview.priceDifference >= 0 ? '+' : ''}${upgradePreview.preview.priceDifference.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* New Limits */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-gray-900 dark:text-white">New Limits</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Words/Month</p>
+                    <p className="text-lg font-bold">{upgradePreview.preview.newLimits.monthlyWordLimit.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">API Calls/Month</p>
+                    <p className="text-lg font-bold">{upgradePreview.preview.newLimits.monthlyApiCallLimit.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Storage</p>
+                    <p className="text-lg font-bold">{(upgradePreview.preview.newLimits.storageLimit / 1024 / 1024).toFixed(0)} MB</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={() => setUpgradePreview(null)}
+                  className="btn btn-outline"
+                  disabled={isUpgrading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsUpgrading(true);
+                    try {
+                      await apiClient.updateSubscription(upgradePreview.tier);
+                      setUpgradePreview(null);
+                      window.location.reload();
+                    } catch (error) {
+                      console.error('Failed to upgrade subscription:', error);
+                      alert('Failed to upgrade subscription. Please try again.');
+                      setIsUpgrading(false);
+                    }
+                  }}
+                  disabled={isUpgrading}
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  {isUpgrading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Upgrading...
+                    </>
+                  ) : (
+                    <>
+                      Confirm Upgrade
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </div>

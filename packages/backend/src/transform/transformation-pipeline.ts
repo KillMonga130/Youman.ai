@@ -35,6 +35,12 @@ import {
   DEFAULT_HUMANIZATION_LEVEL,
 } from './humanization-level';
 import { getDetectionService } from '../detection';
+import { mlModelService } from '../ml-model';
+import { getLLMInferenceService } from '../ml-model/llm-inference.service';
+import { getModelServingService } from '../ml-model/model-serving.service';
+import { logger } from '../utils/logger';
+import { SubscriptionTier } from '../subscription/types';
+import { getUserLimits } from '../usage/usage.service';
 
 /** Memory check interval in chunks */
 const MEMORY_CHECK_INTERVAL = 5;
@@ -308,12 +314,19 @@ export class TransformationPipeline implements ITransformationPipeline {
       // Prepare context from previous chunk
       const preparedChunk = contextPreserver.prepareChunkContext(chunk, previousChunk);
 
-      // Apply transformation (placeholder - actual transformation logic would go here)
-      const transformedContent = this.applyTransformation(
+      // Apply transformation (supports LLM, ML model, and rule-based)
+      // Get userId from active job if available
+      const job = Array.from(this.activeJobs.values()).find(j => 
+        j.chunks.some(c => c.index === chunk.index)
+      );
+      const userId = job?.request.userId;
+      
+      const transformedContent = await this.applyTransformation(
         preparedChunk.content,
         strategy,
         level,
-        preparedChunk.context
+        preparedChunk.context,
+        userId
       );
 
       preparedChunk.transformedContent = transformedContent;
@@ -333,8 +346,211 @@ export class TransformationPipeline implements ITransformationPipeline {
   /**
    * Applies transformation to text using the selected strategy
    * Requirements: 6
+   * Hybrid routing: LLM -> Custom ML Model -> Rule-based
+   * Phase 1: LLM API integration (quick win)
+   * Phase 3: Hybrid approach based on user tier and text complexity
    */
-  private applyTransformation(
+  private async applyTransformation(
+    text: string,
+    strategyName: TransformStrategy,
+    level: HumanizationLevel,
+    context: ChunkContext,
+    userId?: string
+  ): Promise<string> {
+    let userTier: SubscriptionTier = SubscriptionTier.FREE;
+    
+    // Get user tier for routing decisions
+    if (userId) {
+      try {
+        const userLimits = await getUserLimits(userId);
+        userTier = userLimits.tier;
+      } catch (error) {
+        logger.warn('Failed to get user tier, defaulting to FREE', { error, userId });
+      }
+    }
+
+    // Hybrid routing logic based on user tier and text complexity
+    const textLength = text.length;
+    const mlModelId = this.options.mlModelId;
+
+    // Route 1: Try LLM inference (for BASIC+ tiers or if explicitly requested)
+    if (userTier !== SubscriptionTier.FREE || mlModelId?.startsWith('llm-')) {
+      try {
+        const llmService = getLLMInferenceService();
+        if (llmService.getAvailableProviders().length > 0) {
+          // Use LLM for premium users or long/complex text
+          if (userTier !== SubscriptionTier.FREE || textLength > 500) {
+            logger.debug('Attempting LLM transformation', { userId, userTier, textLength });
+            return await this.applyLLMTransformation(text, strategyName, level, context, userTier);
+          }
+        }
+      } catch (error) {
+        logger.warn('LLM transformation failed, falling back', { error });
+        // Continue to next routing option
+      }
+    }
+
+    // Route 2: Try custom ML model if available (for PROFESSIONAL+ tiers)
+    if (mlModelId && userTier !== SubscriptionTier.FREE && userTier !== SubscriptionTier.BASIC) {
+      try {
+        const activeDeployment = await mlModelService.getActiveDeployment(mlModelId);
+        if (activeDeployment && activeDeployment.status === 'active') {
+          logger.debug('Attempting custom ML model transformation', { modelId: mlModelId });
+          return await this.applyMLTransformation(text, mlModelId, strategyName, level, context);
+        }
+      } catch (error) {
+        logger.warn('Custom ML model transformation failed, falling back', { error });
+        // Continue to next routing option
+      }
+    }
+
+    // Route 3: Fall back to rule-based transformation (always available)
+    logger.debug('Using rule-based transformation', { userId, userTier });
+    return this.applyRuleBasedTransformation(text, strategyName, level, context);
+  }
+
+  /**
+   * Applies LLM-based transformation using OpenAI or Anthropic
+   * Phase 1: Quick win LLM API integration
+   */
+  private async applyLLMTransformation(
+    text: string,
+    strategy: TransformStrategy,
+    level: HumanizationLevel,
+    context: ChunkContext,
+    userTier: SubscriptionTier
+  ): Promise<string> {
+    // Extract protected segments
+    const protectedSegments = context.protectedSegments || [];
+    const placeholders: Map<string, string> = new Map();
+    let processedText = text;
+    
+    protectedSegments.forEach((segment, index) => {
+      const placeholder = `__PROTECTED_${index}__`;
+      placeholders.set(placeholder, segment.original);
+      processedText = processedText.replace(segment.original, placeholder);
+    });
+
+    try {
+      const llmService = getLLMInferenceService();
+      const result = await llmService.humanize(processedText, {
+        level,
+        strategy,
+        userTier,
+      });
+
+      // Restore protected segments
+      let finalText = result.humanizedText;
+      placeholders.forEach((original, placeholder) => {
+        finalText = finalText.replace(placeholder, original);
+      });
+
+      logger.info('LLM transformation completed', {
+        provider: result.provider,
+        model: result.model,
+        latencyMs: result.latencyMs,
+        tokensUsed: result.tokensUsed,
+      });
+
+      return finalText;
+    } catch (error) {
+      logger.error('LLM transformation failed', { error });
+      throw error;
+    }
+  }
+
+  /**
+   * Applies ML model-based transformation (custom trained models)
+   */
+  private async applyMLTransformation(
+    text: string,
+    modelId: string,
+    strategy: TransformStrategy,
+    level: HumanizationLevel,
+    context: ChunkContext
+  ): Promise<string> {
+    // Extract protected segments
+    const protectedSegments = context.protectedSegments || [];
+    const placeholders: Map<string, string> = new Map();
+    let processedText = text;
+    
+    protectedSegments.forEach((segment, index) => {
+      const placeholder = `__PROTECTED_${index}__`;
+      placeholders.set(placeholder, segment.original);
+      processedText = processedText.replace(segment.original, placeholder);
+    });
+
+    // Record prediction for metrics
+    const startTime = Date.now();
+    try {
+      // Try to use model serving service first
+      const modelServingService = getModelServingService();
+      const activeDeployment = await mlModelService.getActiveDeployment(modelId);
+      
+      let result: string;
+      
+      if (activeDeployment && modelServingService.getConfig(modelId)) {
+        // Use actual model serving endpoint
+        const servingResult = await modelServingService.infer(
+          modelId,
+          activeDeployment,
+          {
+            text: processedText,
+            level,
+            strategy: strategy || 'auto',
+            features: {
+              textLength: text.length,
+              detectionScore: context.detectionScore,
+            },
+          }
+        );
+        result = servingResult.humanizedText;
+      } else {
+        // Fallback to rule-based if model serving not configured
+        logger.warn('Model serving not configured, falling back to rule-based', { modelId });
+        result = await this.applyRuleBasedTransformation(
+          processedText,
+          'auto',
+          level,
+          context
+        );
+      }
+
+      // Record prediction metrics
+      await mlModelService.recordPrediction(modelId, {
+        prediction: result,
+        latencyMs: Date.now() - startTime,
+        success: true,
+        detectionScore: context.detectionScore,
+        features: {
+          textLength: text.length,
+          level,
+          strategy: strategy || 'auto',
+        },
+      });
+
+      // Restore protected segments
+      let finalText = result;
+      placeholders.forEach((original, placeholder) => {
+        finalText = finalText.replace(placeholder, original);
+      });
+
+      return finalText;
+    } catch (error) {
+      await mlModelService.recordPrediction(modelId, {
+        prediction: text,
+        latencyMs: Date.now() - startTime,
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Applies rule-based transformation (original implementation)
+   */
+  private applyRuleBasedTransformation(
     text: string,
     strategyName: TransformStrategy,
     level: HumanizationLevel,

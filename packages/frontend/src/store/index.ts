@@ -103,7 +103,16 @@ export const useAppStore = create<AppState>()(
         },
       },
       updateSettings: (newSettings) =>
-        set((state) => ({ settings: { ...state.settings, ...newSettings } })),
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ...newSettings,
+            accessibility: {
+              ...state.settings.accessibility,
+              ...(newSettings.accessibility || {}),
+            },
+          },
+        })),
       
       // UI state
       sidebarOpen: true,

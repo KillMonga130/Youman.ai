@@ -63,13 +63,15 @@ export function AccessibilityProvider({
     const root = document.documentElement;
 
     // High contrast mode
-    root.classList.toggle('high-contrast', accessibilitySettings.highContrast);
+    if (accessibilitySettings.highContrast) {
+      root.classList.add('high-contrast');
+    } else {
+      root.classList.remove('high-contrast');
+    }
 
     // Font size (CSS custom property)
-    root.style.setProperty(
-      '--accessibility-font-scale',
-      `${accessibilitySettings.fontSize / 100}`
-    );
+    const fontScale = accessibilitySettings.fontSize / 100;
+    root.style.setProperty('--accessibility-font-scale', String(fontScale));
 
     // Color blindness mode
     if (accessibilitySettings.colorBlindnessMode !== 'none') {
@@ -79,10 +81,18 @@ export function AccessibilityProvider({
     }
 
     // Reduced motion
-    root.classList.toggle('reduce-motion', accessibilitySettings.reduceMotion);
+    if (accessibilitySettings.reduceMotion) {
+      root.classList.add('reduce-motion');
+    } else {
+      root.classList.remove('reduce-motion');
+    }
 
     // Screen reader optimized
-    root.classList.toggle('sr-optimized', accessibilitySettings.screenReaderOptimized);
+    if (accessibilitySettings.screenReaderOptimized) {
+      root.classList.add('sr-optimized');
+    } else {
+      root.classList.remove('sr-optimized');
+    }
   }, [accessibilitySettings]);
 
   // Respect system preference for reduced motion
@@ -111,10 +121,10 @@ export function AccessibilityProvider({
   const setHighContrast = useCallback(
     (enabled: boolean) => {
       updateSettings({
-        accessibility: { ...accessibilitySettings, highContrast: enabled },
+        accessibility: { highContrast: enabled },
       });
     },
-    [accessibilitySettings, updateSettings]
+    [updateSettings]
   );
 
   const setFontSize = useCallback(
@@ -122,37 +132,37 @@ export function AccessibilityProvider({
       // Clamp between 100% and 200%
       const clampedSize = Math.min(200, Math.max(100, size));
       updateSettings({
-        accessibility: { ...accessibilitySettings, fontSize: clampedSize },
+        accessibility: { fontSize: clampedSize },
       });
     },
-    [accessibilitySettings, updateSettings]
+    [updateSettings]
   );
 
   const setColorBlindnessMode = useCallback(
     (mode: ColorBlindnessMode) => {
       updateSettings({
-        accessibility: { ...accessibilitySettings, colorBlindnessMode: mode },
+        accessibility: { colorBlindnessMode: mode },
       });
     },
-    [accessibilitySettings, updateSettings]
+    [updateSettings]
   );
 
   const setReduceMotion = useCallback(
     (enabled: boolean) => {
       updateSettings({
-        accessibility: { ...accessibilitySettings, reduceMotion: enabled },
+        accessibility: { reduceMotion: enabled },
       });
     },
-    [accessibilitySettings, updateSettings]
+    [updateSettings]
   );
 
   const setScreenReaderOptimized = useCallback(
     (enabled: boolean) => {
       updateSettings({
-        accessibility: { ...accessibilitySettings, screenReaderOptimized: enabled },
+        accessibility: { screenReaderOptimized: enabled },
       });
     },
-    [accessibilitySettings, updateSettings]
+    [updateSettings]
   );
 
   const resetAccessibility = useCallback(() => {

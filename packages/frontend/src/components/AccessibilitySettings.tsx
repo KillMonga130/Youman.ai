@@ -74,22 +74,24 @@ export function AccessibilitySettings(): JSX.Element {
   };
 
   return (
-    <div className="card" role="region" aria-labelledby="accessibility-heading">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h2 id="accessibility-heading" className="font-semibold flex items-center gap-2">
-          <Eye className="w-5 h-5" aria-hidden="true" />
+    <div role="region" aria-labelledby="accessibility-heading">
+      <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <h2 id="accessibility-heading" className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg">
+            <Eye className="w-5 h-5 text-white" aria-hidden="true" />
+          </div>
           Accessibility
         </h2>
         <button
           onClick={handleReset}
-          className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1"
+          className="btn btn-outline btn-sm flex items-center gap-2"
           aria-label="Reset accessibility settings to defaults"
         >
           <RotateCcw className="w-4 h-4" aria-hidden="true" />
           Reset
         </button>
       </div>
-      <div className="p-4 space-y-6">
+      <div className="p-6 space-y-6">
         {/* High Contrast Mode */}
         <div className="flex items-center justify-between">
           <div className="flex items-start gap-3">
@@ -146,10 +148,10 @@ export function AccessibilitySettings(): JSX.Element {
                 role="radio"
                 aria-checked={settings.fontSize === option.value}
                 onClick={() => handleFontSizeChange(option.value)}
-                className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
                   settings.fontSize === option.value
-                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-300'
-                    : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    ? 'bg-primary-600 text-white shadow-md'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 {option.label}
@@ -175,7 +177,7 @@ export function AccessibilitySettings(): JSX.Element {
             id="color-blindness-select"
             value={settings.colorBlindnessMode}
             onChange={(e) => handleColorBlindnessChange(e.target.value as ColorBlindnessMode)}
-            className="input ml-8 max-w-xs"
+            className="select ml-8 max-w-xs"
             aria-describedby="color-blindness-description"
           >
             {colorBlindnessModes.map((mode) => (

@@ -13,6 +13,8 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle,
+  List,
+  Network,
 } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { useAppStore } from '../store';
@@ -35,10 +37,24 @@ interface BranchManagerProps {
   onClose?: () => void;
 }
 
+interface BranchTreeNode {
+  branch: {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    parentBranchId: string | null;
+  };
+  children: BranchTreeNode[];
+  depth: number;
+}
+
 export function BranchManager({ projectId, currentBranchId, onBranchSwitch, onClose }: BranchManagerProps): JSX.Element {
   const { user } = useAppStore();
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchTree, setBranchTree] = useState<BranchTreeNode[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'tree'>('list');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingTree, setIsLoadingTree] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
@@ -77,6 +93,49 @@ export function BranchManager({ projectId, currentBranchId, onBranchSwitch, onCl
       setIsLoading(false);
     }
   };
+
+  const loadBranchTree = async () => {
+    setIsLoadingTree(true);
+    setError(null);
+    try {
+      const result = await apiClient.getBranchTree(projectId);
+      if (result.tree && result.tree.length > 0) {
+        // Backend returns tree structure directly with nested children
+        // Transform dates and ensure proper structure
+        const transformNode = (node: any): BranchTreeNode => ({
+          branch: {
+            id: node.branch.id,
+            name: node.branch.name,
+            isDefault: node.branch.isDefault,
+            parentBranchId: node.branch.parentBranchId,
+          },
+          children: (node.children || []).map((child: any) => transformNode(child)),
+          depth: node.depth || 0,
+        });
+        
+        const transformedTree = result.tree.map((node: any) => transformNode(node));
+        setBranchTree(transformedTree);
+      } else {
+        setBranchTree([]);
+      }
+    } catch (err) {
+      console.error('Failed to load branch tree:', err);
+      setError('Failed to load branch tree');
+      setBranchTree([]);
+    } finally {
+      setIsLoadingTree(false);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) {
+      if (viewMode === 'tree') {
+        loadBranchTree();
+      } else {
+        loadBranches();
+      }
+    }
+  }, [projectId, viewMode]);
 
   const handleCreateBranch = async () => {
     if (!newBranchName.trim()) {
@@ -225,6 +284,22 @@ export function BranchManager({ projectId, currentBranchId, onBranchSwitch, onCl
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded ${viewMode === 'list' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}
+              title="List view"
+            >
+              <List className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`p-1.5 rounded ${viewMode === 'tree' ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}
+              title="Tree view"
+            >
+              <Network className="w-4 h-4" />
+            </button>
+          </div>
           <button
             onClick={() => setShowCompareModal(true)}
             className="btn btn-outline btn-sm flex items-center gap-2"
@@ -254,10 +329,38 @@ export function BranchManager({ projectId, currentBranchId, onBranchSwitch, onCl
       {error && <Alert variant="error">{error}</Alert>}
       {success && <Alert variant="success"><CheckCircle className="w-4 h-4 mr-2" />{success}</Alert>}
 
-      {isLoading ? (
+      {isLoading || isLoadingTree ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin" />
         </div>
+      ) : viewMode === 'tree' ? (
+        branchTree.length > 0 ? (
+          <div className="space-y-4">
+            {branchTree.map((node) => (
+              <BranchTreeNodeComponent
+                key={node.branch.id}
+                node={node}
+                currentBranchId={currentBranchId}
+                onSwitch={handleSwitchBranch}
+                onSetDefault={handleSetDefault}
+                onRename={openRenameModal}
+                onDelete={handleDeleteBranch}
+                branches={branches}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <Network className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No branches found</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn btn-primary btn-sm mt-4"
+            >
+              Create First Branch
+            </button>
+          </div>
+        )
       ) : branches.length > 0 ? (
         <div className="space-y-2">
           {branches.map((branch) => (
@@ -594,6 +697,125 @@ export function BranchManager({ projectId, currentBranchId, onBranchSwitch, onCl
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Branch Tree Node Component
+function BranchTreeNodeComponent({
+  node,
+  currentBranchId,
+  onSwitch,
+  onSetDefault,
+  onRename,
+  onDelete,
+  branches,
+}: {
+  node: BranchTreeNode;
+  currentBranchId?: string;
+  onSwitch: (id: string) => void;
+  onSetDefault: (id: string) => void;
+  onRename: (branch: Branch) => void;
+  onDelete: (id: string, name: string) => void;
+  branches: Branch[];
+}): JSX.Element {
+  const branch = branches.find(b => b.id === node.branch.id) || {
+    id: node.branch.id,
+    name: node.branch.name,
+    isDefault: node.branch.isDefault,
+    createdAt: '',
+    lastCommitAt: '',
+  };
+
+  return (
+    <div className="relative">
+      <div
+        className={`card p-4 flex items-center justify-between ${
+          node.branch.id === currentBranchId ? 'ring-2 ring-primary-500' : ''
+        }`}
+        style={{ marginLeft: `${node.depth * 2}rem` }}
+      >
+        <div className="flex items-center gap-3 flex-1">
+          {node.depth > 0 && (
+            <div className="absolute left-0 top-1/2 w-8 h-px bg-gray-300 dark:bg-gray-600" style={{ left: `${(node.depth - 1) * 2}rem` }} />
+          )}
+          <GitBranch className="w-5 h-5 text-gray-400" />
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold">{node.branch.name}</span>
+              {node.branch.isDefault && (
+                <span className="px-2 py-0.5 bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 rounded text-xs flex items-center gap-1">
+                  <Star className="w-3 h-3" />
+                  Default
+                </span>
+              )}
+              {node.branch.id === currentBranchId && (
+                <span className="px-2 py-0.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs">
+                  Current
+                </span>
+              )}
+            </div>
+            {branch.versionCount !== undefined && (
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {branch.versionCount} version{branch.versionCount !== 1 ? 's' : ''}
+                {branch.latestVersionNumber && ` • Latest: v${branch.latestVersionNumber}`}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {!node.branch.isDefault && (
+            <button
+              onClick={() => onSetDefault(node.branch.id)}
+              className="btn btn-outline btn-sm"
+              title="Set as default"
+            >
+              <Star className="w-4 h-4" />
+            </button>
+          )}
+          {node.branch.id !== currentBranchId && (
+            <button
+              onClick={() => onSwitch(node.branch.id)}
+              className="btn btn-outline btn-sm"
+              title="Switch to this branch"
+            >
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={() => onRename(branch)}
+            className="btn btn-outline btn-sm"
+            title="Rename branch"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          {!node.branch.isDefault && (
+            <button
+              onClick={() => onDelete(node.branch.id, node.branch.name)}
+              className="btn btn-outline btn-sm text-red-600"
+              title="Delete branch"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      {node.children.length > 0 && (
+        <div className="mt-2 space-y-2">
+          {node.children.map((child) => (
+            <BranchTreeNodeComponent
+              key={child.branch.id}
+              node={child}
+              currentBranchId={currentBranchId}
+              onSwitch={onSwitch}
+              onSetDefault={onSetDefault}
+              onRename={onRename}
+              onDelete={onDelete}
+              branches={branches}
+            />
+          ))}
         </div>
       )}
     </div>

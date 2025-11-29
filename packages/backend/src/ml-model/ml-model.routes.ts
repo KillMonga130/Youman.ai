@@ -6,6 +6,7 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { mlModelService } from './ml-model.service';
+import { getLLMInferenceService } from './llm-inference.service';
 import { logger } from '../utils/logger';
 
 const router = Router();
@@ -18,6 +19,54 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 };
+
+// ============ Model Listing Routes ============
+
+/**
+ * GET /api/ml-models/available
+ * Lists all available models including LLM providers
+ */
+router.get(
+  '/available',
+  asyncHandler(async (req: Request, res: Response) => {
+    const llmService = getLLMInferenceService();
+    const llmProviders = llmService.getAvailableProviders();
+    
+    const availableModels = [];
+    
+    // Add LLM models
+    for (const provider of llmProviders) {
+      let modelName: string;
+      switch (provider) {
+        case 'openai':
+          modelName = 'OpenAI GPT-4o';
+          break;
+        case 'anthropic':
+          modelName = 'Anthropic Claude 3.5 Sonnet';
+          break;
+        case 'gemini':
+          modelName = 'Google Gemini 2.0 Flash';
+          break;
+        default:
+          modelName = provider.toUpperCase();
+      }
+      
+      availableModels.push({
+        id: `llm-${provider}`,
+        name: modelName,
+        type: 'llm',
+        provider,
+        available: true,
+      });
+    }
+    
+    // Add custom ML models from service (if any)
+    // This would typically come from the database or service registry
+    // For now, return LLM models only
+    
+    res.json({ models: availableModels });
+  })
+);
 
 // ============ Model Version Routes ============
 

@@ -25,6 +25,11 @@ const envSchema = z.object({
   TURNITIN_API_KEY: z.string().optional(),
   COPYSCAPE_API_KEY: z.string().optional(),
   GRAMMARLY_API_KEY: z.string().optional(),
+  
+  // LLM API Keys for ML inference
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
 
   // Storage
   S3_BUCKET: z.string().optional(),
@@ -82,6 +87,9 @@ export const config = {
     copyscape: env.COPYSCAPE_API_KEY,
     grammarly: env.GRAMMARLY_API_KEY,
     googleFactCheck: process.env.GOOGLE_FACT_CHECK_API_KEY,
+    openai: env.OPENAI_API_KEY,
+    anthropic: env.ANTHROPIC_API_KEY,
+    google: env.GOOGLE_API_KEY,
   },
 
   jwtSecret: env.JWT_SECRET,
