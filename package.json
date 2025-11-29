@@ -17,6 +17,7 @@
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
+    "build:shared": "cd packages/shared && npm run build",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",

@@ -7,7 +7,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "prisma generate && tsc",
-    "start": "node dist/index.js",
+    "build:skip-prisma": "echo 'Skipping Prisma generate - will generate at runtime' && tsc",
+    "postinstall": "prisma generate || echo 'Prisma generate skipped - will generate at runtime'",
+    "start": "node -e \"require('child_process').execSync('npx prisma generate', {stdio: 'inherit'})\" 2>/dev/null || node dist/index.js",
+    "start:direct": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
