@@ -17,7 +17,7 @@ async function testBedrock() {
     console.log('✓ AWS credentials valid');
     console.log(`  Account: ${identity.Account}`);
     console.log(`  User/Role: ${identity.Arn}\n`);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('✗ AWS credentials error:', error);
     console.error('\nPlease configure AWS credentials:');
     console.error('  - Run: aws configure');
@@ -33,15 +33,16 @@ async function testBedrock() {
     const models = await bedrockClient.send(new ListFoundationModelsCommand({}));
     console.log('✓ Bedrock API accessible');
     console.log(`  Found ${models.modelSummaries?.length || 0} foundation models\n`);
-  } catch (error: any) {
-    if (error.name === 'AccessDeniedException' || error.message?.includes('not enabled')) {
+  } catch (error: unknown) {
+    const err = error as { name?: string; message?: string };
+    if (err.name === 'AccessDeniedException' || err.message?.includes('not enabled')) {
       console.error('✗ Bedrock is not enabled in your AWS account');
       console.error('\nTo enable Bedrock:');
       console.error('  1. Go to AWS Console > Bedrock');
       console.error('  2. Enable the models you want to use');
       console.error('  3. Or use: aws bedrock put-model-invocation-logging-configuration\n');
     } else {
-      console.error('✗ Bedrock API error:', error.message);
+      console.error('✗ Bedrock API error:', err.message);
     }
     process.exit(1);
   }
@@ -70,15 +71,16 @@ async function testBedrock() {
     const responseBody = JSON.parse(new TextDecoder().decode(response.body));
     console.log('✓ Model invocation successful');
     console.log(`  Response: ${responseBody.content[0].text}\n`);
-  } catch (error: any) {
-    if (error.name === 'AccessDeniedException') {
+  } catch (error: unknown) {
+    const err = error as { name?: string; message?: string };
+    if (err.name === 'AccessDeniedException') {
       console.error('✗ Model access denied');
       console.error('  You may need to enable this model in AWS Bedrock console\n');
-    } else if (error.name === 'ValidationException') {
-      console.error('✗ Model validation error:', error.message);
+    } else if (err.name === 'ValidationException') {
+      console.error('✗ Model validation error:', err.message);
       console.error('  The model ID might be incorrect\n');
     } else {
-      console.error('✗ Model invocation error:', error.message);
+      console.error('✗ Model invocation error:', err.message);
     }
     process.exit(1);
   }

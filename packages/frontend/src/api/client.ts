@@ -1525,19 +1525,43 @@ class ApiClient {
   // Repurposing
   // ============================================
 
-  async repurposeContent(data: { text: string; targetPlatform: 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'blog'; options?: { tone?: string; maxLength?: number } }): Promise<{
+  async repurposeContent(data: { text: string; targetPlatform: 'twitter' | 'linkedin' | 'instagram' | 'facebook' | 'medium' | 'threads'; options?: { tone?: string; maxLength?: number } }): Promise<{
     success: boolean;
     data: { repurposedContent: string; platform: string; characterCount: number; suggestions: string[] };
   }> {
     try {
-      const response = await this.request<{ success: boolean; data: any }>('/repurposing/repurpose', { method: 'POST', body: JSON.stringify(data) });
+      // Transform frontend format to backend format
+      const requestBody = {
+        content: data.text,
+        targetPlatform: data.targetPlatform,
+        allowSplitting: true,
+        ...(data.options?.tone && { targetTone: data.options.tone }),
+        ...(data.options?.maxLength && { customLengthLimit: data.options.maxLength }),
+      };
+      
+      const response = await this.request<{
+        id: string;
+        originalContent: string;
+        targetPlatform: string;
+        posts: Array<{ content: string; characterCount: number }>;
+        totalCharacters: number;
+      }>('/repurposing/repurpose', { method: 'POST', body: JSON.stringify(requestBody) });
+      
+      // Transform backend response to frontend format
+      // Get the first post's content (or combine all posts if multiple)
+      const repurposedContent = response.posts && response.posts.length > 0
+        ? response.posts.map(post => post.content).join('\n\n')
+        : data.text;
+      
+      const characterCount = response.totalCharacters ?? repurposedContent.length;
+      
       return {
-        success: response.success ?? true,
+        success: true,
         data: {
-          repurposedContent: response.data?.repurposedContent ?? data.text,
-          platform: response.data?.platform ?? data.targetPlatform,
-          characterCount: response.data?.characterCount ?? data.text.length,
-          suggestions: response.data?.suggestions ?? [],
+          repurposedContent,
+          platform: response.targetPlatform ?? data.targetPlatform,
+          characterCount,
+          suggestions: [],
         },
       };
     } catch (error) {
@@ -2662,6 +2686,736 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify({ status }),
     });
+  }
+
+  // ============================================
+  // DevOps Features - Auto-Scaling
+  // ============================================
+
+  async getAutoScalingStatus(serviceId: string): Promise<{
+    serviceId: string;
+    currentInstances: number;
+    minInstances: number;
+    maxInstances: number;
+    targetInstances: number;
+    status: string;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/status`);
+  }
+
+  async getAutoScalingMetrics(serviceId: string): Promise<{
+    serviceId: string;
+    cpuUsage: number;
+    memoryUsage: number;
+    queueDepth: number;
+    requestRate: number;
+    timestamp: string;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/metrics`);
+  }
+
+  async getScalingPolicy(serviceId: string): Promise<{
+    serviceId: string;
+    minInstances: number;
+    maxInstances: number;
+    targetCpuUtilization: number;
+    scaleUpThreshold: number;
+    scaleDownThreshold: number;
+    cooldownPeriod: number;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/policy`);
+  }
+
+  async configureScalingPolicy(serviceId: string, policy: {
+    minInstances: number;
+    maxInstances: number;
+    targetCpuUtilization?: number;
+    scaleUpThreshold?: number;
+    scaleDownThreshold?: number;
+    cooldownPeriod?: number;
+  }): Promise<{ success: boolean; policy: unknown }> {
+    return this.request(`/auto-scaling/${serviceId}/policy`, {
+      method: 'POST',
+      body: JSON.stringify({ policy }),
+    });
+  }
+
+  async scaleUp(serviceId: string, reason?: string): Promise<{
+    serviceId: string;
+    eventId: string;
+    previousInstances: number;
+    newInstances: number;
+    reason: string;
+    timestamp: string;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/scale-up`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason || 'Manual scale up' }),
+    });
+  }
+
+  async scaleDown(serviceId: string): Promise<{
+    serviceId: string;
+    eventId: string;
+    previousInstances: number;
+    newInstances: number;
+    reason: string;
+    timestamp: string;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/scale-down`, {
+      method: 'POST',
+    });
+  }
+
+  async getLoadPrediction(serviceId: string, hoursAhead = 24): Promise<{
+    serviceId: string;
+    predictedLoad: number;
+    confidence: number;
+    hoursAhead: number;
+    timestamp: string;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/prediction?hoursAhead=${hoursAhead}`);
+  }
+
+  async getCostOptimization(serviceId: string): Promise<{
+    serviceId: string;
+    recommendations: Array<{
+      type: string;
+      description: string;
+      estimatedSavings: number;
+      priority: string;
+    }>;
+    currentCost: number;
+    projectedCost: number;
+  }> {
+    return this.request(`/auto-scaling/${serviceId}/cost-optimization`);
+  }
+
+  async getScalingEvents(serviceId: string, limit = 100): Promise<Array<{
+    id: string;
+    serviceId: string;
+    type: 'scale_up' | 'scale_down';
+    previousInstances: number;
+    newInstances: number;
+    reason: string;
+    timestamp: string;
+  }>> {
+    return this.request(`/auto-scaling/${serviceId}/events?limit=${limit}`);
+  }
+
+  async registerService(serviceId: string, config: {
+    minInstances: number;
+    maxInstances: number;
+    initialInstances?: number;
+  }): Promise<{ success: boolean; serviceId: string }> {
+    return this.request(`/auto-scaling/${serviceId}/register`, {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  // ============================================
+  // DevOps Features - Disaster Recovery
+  // ============================================
+
+  async getDisasterRecoveryStatus(): Promise<{
+    status: string;
+    lastBackup: string;
+    replicationStatus: string;
+    failoverReady: boolean;
+  }> {
+    return this.request('/disaster-recovery/status');
+  }
+
+  async createBackup(type: 'full' | 'incremental' | 'differential', description?: string): Promise<{
+    id: string;
+    type: string;
+    status: string;
+    createdAt: string;
+    description?: string;
+  }> {
+    return this.request('/disaster-recovery/backups', {
+      method: 'POST',
+      body: JSON.stringify({ type, description }),
+    });
+  }
+
+  async listBackups(limit = 100): Promise<Array<{
+    id: string;
+    type: string;
+    status: string;
+    size: number;
+    createdAt: string;
+    description?: string;
+  }>> {
+    return this.request(`/disaster-recovery/backups?limit=${limit}`);
+  }
+
+  async getBackup(backupId: string): Promise<{
+    id: string;
+    type: string;
+    status: string;
+    size: number;
+    createdAt: string;
+    description?: string;
+  }> {
+    return this.request(`/disaster-recovery/backups/${backupId}`);
+  }
+
+  async verifyBackup(backupId: string): Promise<{
+    backupId: string;
+    verified: boolean;
+    integrity: string;
+    timestamp: string;
+  }> {
+    return this.request(`/disaster-recovery/backups/${backupId}/verify`, {
+      method: 'POST',
+    });
+  }
+
+  async deleteBackup(backupId: string): Promise<{ success: boolean }> {
+    return this.request(`/disaster-recovery/backups/${backupId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getRecoveryPoints(startTime?: string, endTime?: string): Promise<Array<{
+    id: string;
+    timestamp: string;
+    type: string;
+    status: string;
+  }>> {
+    const query = new URLSearchParams();
+    if (startTime) query.append('startTime', startTime);
+    if (endTime) query.append('endTime', endTime);
+    return this.request(`/disaster-recovery/recovery-points?${query.toString()}`);
+  }
+
+  async restoreFromBackup(backupId: string, validateOnly = false): Promise<{
+    id: string;
+    backupId: string;
+    status: string;
+    validateOnly: boolean;
+    createdAt: string;
+  }> {
+    return this.request('/disaster-recovery/restore', {
+      method: 'POST',
+      body: JSON.stringify({ backupId, validateOnly }),
+    });
+  }
+
+  async restoreToPointInTime(pointInTime: string, validateOnly = false): Promise<{
+    id: string;
+    pointInTime: string;
+    status: string;
+    validateOnly: boolean;
+    createdAt: string;
+  }> {
+    return this.request('/disaster-recovery/restore', {
+      method: 'POST',
+      body: JSON.stringify({ pointInTime, validateOnly }),
+    });
+  }
+
+  async getReplicationStatus(configId?: string): Promise<Array<{
+    configId: string;
+    sourceRegion: string;
+    targetRegion: string;
+    status: string;
+    lagMs: number;
+    lastSyncTime: string;
+  }>> {
+    const query = configId ? `?configId=${configId}` : '';
+    return this.request(`/disaster-recovery/replication/status${query}`);
+  }
+
+  async configureReplication(config: {
+    sourceRegion: string;
+    targetRegions: string[];
+    mode: string;
+    enabled?: boolean;
+  }): Promise<{
+    configId: string;
+    sourceRegion: string;
+    targetRegions: string[];
+    mode: string;
+    enabled: boolean;
+  }> {
+    return this.request('/disaster-recovery/replication', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async initiateFailover(configId: string, targetRegion: string, reason: string, force = false): Promise<{
+    eventId: string;
+    configId: string;
+    targetRegion: string;
+    status: string;
+    reason: string;
+    timestamp: string;
+  }> {
+    return this.request(`/disaster-recovery/failover/${configId}/initiate`, {
+      method: 'POST',
+      body: JSON.stringify({ targetRegion, reason, force }),
+    });
+  }
+
+  async getFailoverEvents(configId: string, limit = 100): Promise<Array<{
+    id: string;
+    configId: string;
+    targetRegion: string;
+    status: string;
+    reason: string;
+    timestamp: string;
+  }>> {
+    return this.request(`/disaster-recovery/failover/${configId}/events?limit=${limit}`);
+  }
+
+  async scheduleRecoveryTest(type: 'backup_restore' | 'failover' | 'replication', scheduledTime?: string): Promise<{
+    id: string;
+    type: string;
+    status: string;
+    scheduledTime: string;
+  }> {
+    return this.request('/disaster-recovery/tests', {
+      method: 'POST',
+      body: JSON.stringify({ type, scheduledTime }),
+    });
+  }
+
+  async runRecoveryTest(testId: string): Promise<{
+    id: string;
+    type: string;
+    status: string;
+    result: string;
+    completedAt: string;
+  }> {
+    return this.request(`/disaster-recovery/tests/${testId}/run`, {
+      method: 'POST',
+    });
+  }
+
+  async listRecoveryTests(limit = 100): Promise<Array<{
+    id: string;
+    type: string;
+    status: string;
+    scheduledTime: string;
+    completedAt?: string;
+  }>> {
+    return this.request(`/disaster-recovery/tests?limit=${limit}`);
+  }
+
+  // ============================================
+  // DevOps Features - CDN & Caching
+  // ============================================
+
+  async createCDNDistribution(config: {
+    name: string;
+    origin: string;
+    enabled?: boolean;
+  }): Promise<{
+    id: string;
+    name: string;
+    origin: string;
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request('/cdn/distributions', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async listCDNDistributions(): Promise<Array<{
+    id: string;
+    name: string;
+    origin: string;
+    status: string;
+    createdAt: string;
+  }>> {
+    return this.request('/cdn/distributions');
+  }
+
+  async getCDNDistribution(id: string): Promise<{
+    id: string;
+    name: string;
+    origin: string;
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request(`/cdn/distributions/${id}`);
+  }
+
+  async updateCDNDistribution(id: string, config: {
+    name?: string;
+    origin?: string;
+    enabled?: boolean;
+  }): Promise<{
+    id: string;
+    name: string;
+    origin: string;
+    status: string;
+  }> {
+    return this.request(`/cdn/distributions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+  }
+
+  async deleteCDNDistribution(id: string): Promise<{ success: boolean }> {
+    return this.request(`/cdn/distributions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getCacheStats(): Promise<{
+    hitRate: number;
+    missRate: number;
+    totalRequests: number;
+    cacheSize: number;
+    entriesCount: number;
+  }> {
+    return this.request('/cdn/cache/stats');
+  }
+
+  async invalidateCache(patterns: string[]): Promise<{
+    id: string;
+    patterns: string[];
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request('/cdn/cache/invalidate', {
+      method: 'POST',
+      body: JSON.stringify({ patterns }),
+    });
+  }
+
+  async purgeAllCache(): Promise<{
+    id: string;
+    status: string;
+    createdAt: string;
+  }> {
+    return this.request('/cdn/cache/invalidate', {
+      method: 'POST',
+      body: JSON.stringify({ purgeAll: true }),
+    });
+  }
+
+  // ============================================
+  // DevOps Features - Performance Optimization
+  // ============================================
+
+  async getPerformanceMetrics(): Promise<{
+    averageResponseTime: number;
+    p95ResponseTime: number;
+    p99ResponseTime: number;
+    requestsPerSecond: number;
+    errorRate: number;
+    cacheHitRate: number;
+  }> {
+    return this.request('/performance/metrics');
+  }
+
+  async generatePerformanceReport(startDate: string, endDate: string): Promise<{
+    startDate: string;
+    endDate: string;
+    metrics: {
+      averageResponseTime: number;
+      totalRequests: number;
+      errorRate: number;
+      cacheHitRate: number;
+    };
+    recommendations: Array<{
+      type: string;
+      description: string;
+      impact: string;
+    }>;
+  }> {
+    return this.request('/performance/report', {
+      method: 'POST',
+      body: JSON.stringify({ startDate, endDate }),
+    });
+  }
+
+  async getSlowQueries(limit = 100): Promise<Array<{
+    query: string;
+    duration: number;
+    timestamp: string;
+  }>> {
+    return this.request(`/performance/query/slow?limit=${limit}`);
+  }
+
+  async getConnectionPoolStats(): Promise<{
+    totalConnections: number;
+    activeConnections: number;
+    idleConnections: number;
+    waitingRequests: number;
+  }> {
+    return this.request('/performance/connection-pool/stats');
+  }
+
+  async getPerformanceAlerts(): Promise<Array<{
+    id: string;
+    type: string;
+    message: string;
+    severity: string;
+    timestamp: string;
+  }>> {
+    return this.request('/performance/alerts');
+  }
+
+  // ============================================
+  // DevOps Features - Cost Management
+  // ============================================
+
+  async getCostSummary(): Promise<{
+    totalCost: number;
+    costByService: Record<string, number>;
+    costByFeature: Record<string, number>;
+    period: string;
+  }> {
+    return this.request('/cost-management/summary');
+  }
+
+  async getCostReport(params: {
+    startDate?: string;
+    endDate?: string;
+    groupBy?: 'service' | 'feature' | 'customer';
+  }): Promise<{
+    startDate: string;
+    endDate: string;
+    totalCost: number;
+    breakdown: Array<{
+      category: string;
+      cost: number;
+      percentage: number;
+    }>;
+  }> {
+    const query = new URLSearchParams();
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.groupBy) query.append('groupBy', params.groupBy);
+    return this.request(`/cost-management/report?${query.toString()}`);
+  }
+
+  async forecastCosts(params: {
+    period: 'week' | 'month' | 'quarter' | 'year';
+    includeOptimizations?: boolean;
+  }): Promise<{
+    period: string;
+    forecastedCost: number;
+    confidence: number;
+    breakdown: Array<{
+      category: string;
+      cost: number;
+    }>;
+  }> {
+    return this.request('/cost-management/forecast', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getCostOptimizations(): Promise<Array<{
+    type: string;
+    description: string;
+    estimatedSavings: number;
+    priority: 'high' | 'medium' | 'low';
+  }>> {
+    return this.request('/cost-management/optimizations');
+  }
+
+  async getUnderutilizedResources(): Promise<Array<{
+    resourceId: string;
+    resourceType: string;
+    utilization: number;
+    estimatedSavings: number;
+  }>> {
+    return this.request('/cost-management/underutilized');
+  }
+
+  async createBudget(budget: {
+    name: string;
+    amount: number;
+    period: 'week' | 'month' | 'quarter' | 'year';
+    alertThresholds: number[];
+  }): Promise<{
+    id: string;
+    name: string;
+    amount: number;
+    period: string;
+    alertThresholds: number[];
+  }> {
+    return this.request('/cost-management/budgets', {
+      method: 'POST',
+      body: JSON.stringify(budget),
+    });
+  }
+
+  async listBudgets(): Promise<Array<{
+    id: string;
+    name: string;
+    amount: number;
+    period: string;
+    currentSpend: number;
+    alertThresholds: number[];
+  }>> {
+    return this.request('/cost-management/budgets');
+  }
+
+  async getBudgetAlerts(acknowledged?: boolean): Promise<Array<{
+    id: string;
+    budgetId: string;
+    message: string;
+    threshold: number;
+    currentSpend: number;
+    acknowledged: boolean;
+    createdAt: string;
+  }>> {
+    const query = acknowledged !== undefined ? `?acknowledged=${acknowledged}` : '';
+    return this.request(`/cost-management/alerts${query}`);
+  }
+
+  // ============================================
+  // DevOps Features - Support & Diagnostics
+  // ============================================
+
+  async startImpersonation(targetUserId: string, reason: string): Promise<{
+    sessionId: string;
+    adminUserId: string;
+    targetUserId: string;
+    token: string;
+    createdAt: string;
+  }> {
+    return this.request('/support/impersonation/start', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId, reason }),
+    });
+  }
+
+  async endImpersonation(sessionId: string): Promise<{
+    sessionId: string;
+    endedAt: string;
+  }> {
+    return this.request('/support/impersonation/end', {
+      method: 'POST',
+      body: JSON.stringify({ sessionId }),
+    });
+  }
+
+  async getActiveImpersonationSessions(): Promise<Array<{
+    sessionId: string;
+    adminUserId: string;
+    targetUserId: string;
+    reason: string;
+    createdAt: string;
+  }>> {
+    return this.request('/support/impersonation/sessions');
+  }
+
+  async getErrorContexts(limit = 50, filters?: {
+    userId?: string;
+    errorCode?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<Array<{
+    id: string;
+    error: {
+      name: string;
+      message: string;
+      stack?: string;
+    };
+    request?: unknown;
+    response?: unknown;
+    timestamp: string;
+  }>> {
+    const query = new URLSearchParams();
+    query.append('limit', limit.toString());
+    if (filters?.userId) query.append('userId', filters.userId);
+    if (filters?.errorCode) query.append('errorCode', filters.errorCode);
+    if (filters?.startDate) query.append('startDate', filters.startDate);
+    if (filters?.endDate) query.append('endDate', filters.endDate);
+    return this.request(`/support/errors?${query.toString()}`);
+  }
+
+  async getRequestInspections(limit = 50, filters?: {
+    userId?: string;
+    method?: string;
+    statusCode?: number;
+  }): Promise<Array<{
+    id: string;
+    requestId: string;
+    method: string;
+    url: string;
+    statusCode: number;
+    duration: number;
+    timestamp: string;
+  }>> {
+    const query = new URLSearchParams();
+    query.append('limit', limit.toString());
+    if (filters?.userId) query.append('userId', filters.userId);
+    if (filters?.method) query.append('method', filters.method);
+    if (filters?.statusCode) query.append('statusCode', filters.statusCode.toString());
+    return this.request(`/support/requests?${query.toString()}`);
+  }
+
+  async retryOperation(operationId: string, input?: unknown): Promise<{
+    operationId: string;
+    status: string;
+    result: unknown;
+  }> {
+    return this.request(`/support/operations/${operationId}/retry`, {
+      method: 'POST',
+      body: JSON.stringify({ input }),
+    });
+  }
+
+  async generateDiagnosticReport(params: {
+    includeSystemInfo?: boolean;
+    includeErrorLogs?: boolean;
+    includePerformanceMetrics?: boolean;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{
+    id: string;
+    generatedAt: string;
+    report: unknown;
+  }> {
+    return this.request('/support/diagnostics/report', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getAuditLogs(params: {
+    limit?: number;
+    offset?: number;
+    eventType?: string;
+    adminUserId?: string;
+    targetUserId?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<{
+    logs: Array<{
+      id: string;
+      eventType: string;
+      adminUserId: string;
+      targetUserId?: string;
+      details: unknown;
+      timestamp: string;
+    }>;
+    total: number;
+  }> {
+    const query = new URLSearchParams();
+    if (params.limit) query.append('limit', params.limit.toString());
+    if (params.offset) query.append('offset', params.offset.toString());
+    if (params.eventType) query.append('eventType', params.eventType);
+    if (params.adminUserId) query.append('adminUserId', params.adminUserId);
+    if (params.targetUserId) query.append('targetUserId', params.targetUserId);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    return this.request(`/support/audit-logs?${query.toString()}`);
   }
 
   async getDeploymentHistory(modelId: string): Promise<Array<{

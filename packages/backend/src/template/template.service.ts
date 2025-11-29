@@ -5,6 +5,7 @@
  */
 
 import crypto from 'crypto';
+import { prisma } from '../database/prisma';
 import { logger } from '../utils/logger';
 import {
   Template,
@@ -20,6 +21,7 @@ import {
   TemplateShare,
   SystemTemplateDefinition,
   TemplateServiceConfig,
+  TemplateMetadata,
 } from './types';
 
 /** Default configuration */
@@ -221,19 +223,19 @@ const SYSTEM_TEMPLATES: SystemTemplateDefinition[] = [
  */
 export class TemplateService {
   private config: TemplateServiceConfig;
-  private templates: Map<string, Template>;
   private shares: Map<string, TemplateShare>;
   private systemTemplatesInitialized: boolean;
 
   constructor(serviceConfig?: Partial<TemplateServiceConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...serviceConfig };
-    this.templates = new Map();
     this.shares = new Map();
     this.systemTemplatesInitialized = false;
 
-    // Initialize system templates
+    // Initialize system templates asynchronously
     if (this.config.enableSystemTemplates) {
-      this.initializeSystemTemplates();
+      this.initializeSystemTemplates().catch(err => {
+        logger.error('Failed to initialize system templates:', err);
+      });
     }
   }
 
@@ -241,38 +243,138 @@ export class TemplateService {
    * Initializes pre-configured system templates
    * Requirement 25.1: Pre-configured templates for common use cases
    */
-  private initializeSystemTemplates(): void {
+  private async initializeSystemTemplates(): Promise<void> {
     if (this.systemTemplatesInitialized) return;
 
-    for (const def of SYSTEM_TEMPLATES) {
-      const id = this.generateId('sys_tpl');
-      const now = new Date();
+    try {
+      for (const def of SYSTEM_TEMPLATES) {
+        // Check if template already exists
+        const existing = await prisma.template.findFirst({
+          where: {
+            name: def.name,
+            createdBy: 'system',
+          },
+        });
 
-      const template: Template = {
-        id,
-        name: def.name,
-        description: def.description,
-        category: def.category,
-        visibility: 'public',
-        userId: 'system',
-        settings: def.settings,
-        metadata: {
+        if (existing) {
+          continue; // Skip if already exists
+        }
+
+        // Create system template
+        const metadata: TemplateMetadata = {
           author: 'AI Humanizer',
           version: '1.0.0',
           tags: def.tags,
           usageCount: 0,
           ratingCount: 0,
-        },
-        isSystem: true,
-        createdAt: now,
-        updatedAt: now,
-      };
+        };
 
-      this.templates.set(id, template);
+        const settingsWithMetadata = {
+          ...def.settings,
+          _metadata: metadata,
+        };
+
+        await prisma.template.create({
+          data: {
+            name: def.name,
+            description: def.description,
+            category: def.category,
+            isPublic: true,
+            createdBy: 'system',
+            settings: settingsWithMetadata as any,
+            usageCount: 0,
+          },
+        });
+      }
+
+      this.systemTemplatesInitialized = true;
+      logger.info(`Initialized ${SYSTEM_TEMPLATES.length} system templates`);
+    } catch (error) {
+      logger.error('Error initializing system templates:', error);
+      throw error;
     }
+  }
 
-    this.systemTemplatesInitialized = true;
-    logger.info(`Initialized ${SYSTEM_TEMPLATES.length} system templates`);
+  /**
+   * Converts database model to Template interface
+   */
+  private dbToTemplate(dbTemplate: {
+    id: string;
+    name: string;
+    description: string | null;
+    category: string;
+    isPublic: boolean;
+    createdBy: string | null;
+    settings: any;
+    usageCount: number;
+    createdAt: Date;
+    updatedAt: Date;
+  }): Template {
+    const settings = dbTemplate.settings as any;
+    const metadata: TemplateMetadata = settings._metadata || {
+      version: '1.0.0',
+      tags: [],
+      usageCount: dbTemplate.usageCount,
+      ratingCount: 0,
+    };
+
+    // Extract settings without metadata
+    const { _metadata, ...templateSettings } = settings;
+    const cleanSettings: TemplateSettings = templateSettings;
+
+    return {
+      id: dbTemplate.id,
+      name: dbTemplate.name,
+      description: dbTemplate.description || '',
+      category: dbTemplate.category as TemplateCategory,
+      visibility: dbTemplate.isPublic ? 'public' : (dbTemplate.createdBy === 'system' ? 'public' : 'private'),
+      userId: dbTemplate.createdBy || '',
+      settings: cleanSettings,
+      metadata: {
+        ...metadata,
+        usageCount: dbTemplate.usageCount, // Use actual usageCount from DB
+      },
+      isSystem: dbTemplate.createdBy === 'system',
+      createdAt: dbTemplate.createdAt,
+      updatedAt: dbTemplate.updatedAt,
+    };
+  }
+
+  /**
+   * Converts Template interface to database model data
+   */
+  private templateToDbData(template: {
+    name: string;
+    description: string;
+    category: TemplateCategory;
+    visibility: TemplateVisibility;
+    userId: string;
+    settings: TemplateSettings;
+    metadata: TemplateMetadata;
+    isSystem?: boolean;
+  }): {
+    name: string;
+    description: string;
+    category: string;
+    isPublic: boolean;
+    createdBy: string;
+    settings: any;
+    usageCount: number;
+  } {
+    const settingsWithMetadata = {
+      ...template.settings,
+      _metadata: template.metadata,
+    };
+
+    return {
+      name: template.name,
+      description: template.description,
+      category: template.category,
+      isPublic: template.visibility === 'public',
+      createdBy: template.isSystem ? 'system' : template.userId,
+      settings: settingsWithMetadata as any,
+      usageCount: template.metadata.usageCount,
+    };
   }
 
   /**
@@ -282,83 +384,116 @@ export class TemplateService {
    * @returns Array of templates
    */
   async getTemplates(options?: TemplateFilterOptions): Promise<Template[]> {
-    let templates = Array.from(this.templates.values());
+    const where: any = {};
 
     // Apply filters
     if (options) {
-      // Filter by category
       if (options.category) {
-        templates = templates.filter(t => t.category === options.category);
+        where.category = options.category;
       }
 
-      // Filter by visibility
       if (options.visibility) {
-        templates = templates.filter(t => t.visibility === options.visibility);
+        where.isPublic = options.visibility === 'public';
       }
 
-      // Filter by user ID
-      if (options.userId) {
-        const userId = options.userId;
-        templates = templates.filter(t => 
-          t.userId === userId || 
-          t.visibility === 'public' ||
-          this.hasSharedAccess(t.id, userId)
-        );
-      }
-
-      // Include/exclude system templates
       if (options.includeSystem === false) {
-        templates = templates.filter(t => !t.isSystem);
+        where.createdBy = { not: 'system' };
       }
 
-      // Search query
+      // Handle userId filter
+      if (options.userId) {
+        // Include user's templates, public templates, and system templates
+        where.OR = [
+          { createdBy: options.userId },
+          { isPublic: true },
+          { createdBy: 'system' },
+        ];
+      }
+
+      // Handle search query (combines with userId filter if both exist)
       if (options.searchQuery) {
-        const query = options.searchQuery.toLowerCase();
-        templates = templates.filter(t =>
-          t.name.toLowerCase().includes(query) ||
-          t.description.toLowerCase().includes(query)
-        );
-      }
+        const searchConditions = [
+          { name: { contains: options.searchQuery, mode: 'insensitive' } },
+          { description: { contains: options.searchQuery, mode: 'insensitive' } },
+        ];
 
-      // Filter by tags
+        if (where.OR) {
+          // If userId filter exists, combine with AND
+          where.AND = [
+            { OR: where.OR },
+            { OR: searchConditions },
+          ];
+          delete where.OR;
+        } else {
+          where.OR = searchConditions;
+        }
+      }
+    }
+
+    let dbTemplates = await prisma.template.findMany({
+      where,
+      orderBy: this.getOrderBy(options),
+      skip: options?.offset,
+      take: options?.limit,
+    });
+
+    // Convert to Template interface
+    let templates = dbTemplates.map(t => this.dbToTemplate(t));
+
+    // Apply additional filters that require Template interface
+    if (options) {
+      // Filter by tags (stored in metadata)
       if (options.tags && options.tags.length > 0) {
         templates = templates.filter(t =>
           options.tags!.some(tag => t.metadata.tags.includes(tag))
         );
       }
 
-      // Sort
-      if (options.sortBy) {
-        templates.sort((a, b) => {
-          let comparison = 0;
-          switch (options.sortBy) {
-            case 'name':
-              comparison = a.name.localeCompare(b.name);
-              break;
-            case 'createdAt':
-              comparison = a.createdAt.getTime() - b.createdAt.getTime();
-              break;
-            case 'usageCount':
-              comparison = a.metadata.usageCount - b.metadata.usageCount;
-              break;
-            case 'rating':
-              comparison = (a.metadata.rating || 0) - (b.metadata.rating || 0);
-              break;
-          }
-          return options.sortDirection === 'desc' ? -comparison : comparison;
-        });
+      // Filter by shared access
+      if (options.userId) {
+        templates = templates.filter(t =>
+          t.userId === options.userId ||
+          t.visibility === 'public' ||
+          t.isSystem ||
+          this.hasSharedAccess(t.id, options.userId!)
+        );
       }
 
-      // Pagination
-      if (options.offset !== undefined) {
-        templates = templates.slice(options.offset);
-      }
-      if (options.limit !== undefined) {
-        templates = templates.slice(0, options.limit);
+      // Sort by rating in memory (since it's stored in metadata)
+      if (options.sortBy === 'rating') {
+        templates.sort((a, b) => {
+          const ratingA = a.metadata.rating || 0;
+          const ratingB = b.metadata.rating || 0;
+          const comparison = ratingA - ratingB;
+          return options.sortDirection === 'desc' ? -comparison : comparison;
+        });
       }
     }
 
     return templates;
+  }
+
+  /**
+   * Gets orderBy clause for Prisma
+   */
+  private getOrderBy(options?: TemplateFilterOptions): any {
+    if (!options?.sortBy) {
+      return { createdAt: 'desc' };
+    }
+
+    switch (options.sortBy) {
+      case 'name':
+        return { name: options.sortDirection || 'asc' };
+      case 'createdAt':
+        return { createdAt: options.sortDirection || 'desc' };
+      case 'usageCount':
+        return { usageCount: options.sortDirection || 'desc' };
+      case 'rating':
+        // Rating is in metadata, so we'll sort in memory
+        return { createdAt: 'desc' };
+      default:
+        return { createdAt: 'desc' };
+    }
   }
 
   /**
@@ -367,7 +502,15 @@ export class TemplateService {
    * @returns Template or null
    */
   async getTemplate(templateId: string): Promise<Template | null> {
-    return this.templates.get(templateId) || null;
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
+      return null;
+    }
+
+    return this.dbToTemplate(dbTemplate);
   }
 
   /**
@@ -378,13 +521,13 @@ export class TemplateService {
    */
   async createTemplate(options: CreateTemplateOptions): Promise<Template> {
     // Validate user template limit
-    const userTemplates = await this.getTemplates({ 
-      userId: options.userId, 
-      includeSystem: false 
+    const userTemplatesCount = await prisma.template.count({
+      where: {
+        createdBy: options.userId,
+      },
     });
-    const ownedTemplates = userTemplates.filter(t => t.userId === options.userId);
     
-    if (ownedTemplates.length >= this.config.maxTemplatesPerUser) {
+    if (userTemplatesCount >= this.config.maxTemplatesPerUser) {
       throw new Error(`Maximum templates per user (${this.config.maxTemplatesPerUser}) exceeded`);
     }
 
@@ -397,31 +540,31 @@ export class TemplateService {
     // Validate settings
     this.validateSettings(options.settings);
 
-    const id = this.generateId('tpl');
-    const now = new Date();
+    const metadata: TemplateMetadata = {
+      version: '1.0.0',
+      tags,
+      usageCount: 0,
+      ratingCount: 0,
+    };
 
-    const template: Template = {
-      id,
+    const dbData = this.templateToDbData({
       name: options.name,
       description: options.description,
       category: options.category,
       visibility: options.visibility || 'private',
       userId: options.userId,
       settings: options.settings,
-      metadata: {
-        version: '1.0.0',
-        tags,
-        usageCount: 0,
-        ratingCount: 0,
-      },
+      metadata,
       isSystem: false,
-      createdAt: now,
-      updatedAt: now,
-    };
+    });
 
-    this.templates.set(id, template);
+    const dbTemplate = await prisma.template.create({
+      data: dbData,
+    });
 
-    logger.info(`Created template: ${id}`, {
+    const template = this.dbToTemplate(dbTemplate);
+
+    logger.info(`Created template: ${template.id}`, {
       name: template.name,
       userId: template.userId,
       category: template.category,
@@ -442,10 +585,15 @@ export class TemplateService {
     userId: string,
     options: UpdateTemplateOptions
   ): Promise<Template> {
-    const template = this.templates.get(templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     // Check authorization
     if (template.isSystem) {
@@ -455,33 +603,51 @@ export class TemplateService {
       throw new Error('Not authorized to modify this template');
     }
 
-    // Update fields
-    if (options.name !== undefined) template.name = options.name;
-    if (options.description !== undefined) template.description = options.description;
-    if (options.category !== undefined) template.category = options.category;
-    if (options.visibility !== undefined) template.visibility = options.visibility;
+    // Prepare update data
+    const updateData: any = {};
+    const newMetadata = { ...template.metadata };
+
+    if (options.name !== undefined) updateData.name = options.name;
+    if (options.description !== undefined) updateData.description = options.description;
+    if (options.category !== undefined) updateData.category = options.category;
+    if (options.visibility !== undefined) {
+      updateData.isPublic = options.visibility === 'public';
+    }
+
     if (options.tags !== undefined) {
       if (options.tags.length > this.config.maxTagsPerTemplate) {
         throw new Error(`Maximum tags per template (${this.config.maxTagsPerTemplate}) exceeded`);
       }
-      template.metadata.tags = options.tags;
+      newMetadata.tags = options.tags;
     }
 
     // Update settings
+    let newSettings = { ...template.settings };
     if (options.settings) {
-      template.settings = { ...template.settings, ...options.settings };
-      this.validateSettings(template.settings);
+      newSettings = { ...newSettings, ...options.settings };
+      this.validateSettings(newSettings);
     }
 
     // Increment version
-    const versionParts = template.metadata.version.split('.').map(Number);
+    const versionParts = newMetadata.version.split('.').map(Number);
     versionParts[2]!++;
-    template.metadata.version = versionParts.join('.');
+    newMetadata.version = versionParts.join('.');
 
-    template.updatedAt = new Date();
+    // Combine settings with metadata
+    const settingsWithMetadata = {
+      ...newSettings,
+      _metadata: newMetadata,
+    };
+
+    updateData.settings = settingsWithMetadata as any;
+
+    const updatedDbTemplate = await prisma.template.update({
+      where: { id: templateId },
+      data: updateData,
+    });
 
     logger.info(`Updated template: ${templateId}`);
-    return template;
+    return this.dbToTemplate(updatedDbTemplate);
   }
 
   /**
@@ -490,10 +656,15 @@ export class TemplateService {
    * @param userId - User ID (for authorization)
    */
   async deleteTemplate(templateId: string, userId: string): Promise<void> {
-    const template = this.templates.get(templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     if (template.isSystem) {
       throw new Error('Cannot delete system templates');
@@ -509,7 +680,10 @@ export class TemplateService {
       }
     }
 
-    this.templates.delete(templateId);
+    await prisma.template.delete({
+      where: { id: templateId },
+    });
+
     logger.info(`Deleted template: ${templateId}`);
   }
 
@@ -521,10 +695,15 @@ export class TemplateService {
    * @returns Application result
    */
   async applyTemplate(options: ApplyTemplateOptions): Promise<ApplyTemplateResult> {
-    const template = this.templates.get(options.templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: options.templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${options.templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     // Merge template settings with overrides
     const appliedSettings: TemplateSettings = { ...template.settings };
@@ -556,9 +735,24 @@ export class TemplateService {
       }
     }
 
-    // Increment usage count
-    template.metadata.usageCount++;
-    template.updatedAt = new Date();
+    // Increment usage count in database
+    const newMetadata = {
+      ...template.metadata,
+      usageCount: template.metadata.usageCount + 1,
+    };
+
+    const settingsWithMetadata = {
+      ...template.settings,
+      _metadata: newMetadata,
+    };
+
+    await prisma.template.update({
+      where: { id: options.templateId },
+      data: {
+        usageCount: newMetadata.usageCount,
+        settings: settingsWithMetadata as any,
+      },
+    });
 
     const result: ApplyTemplateResult = {
       templateId: options.templateId,
@@ -582,10 +776,15 @@ export class TemplateService {
    * @returns Template export data
    */
   async exportTemplate(templateId: string): Promise<TemplateExport> {
-    const template = this.templates.get(templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     const exportData: TemplateExport = {
       formatVersion: this.config.exportFormatVersion,
@@ -658,10 +857,15 @@ export class TemplateService {
    * @returns Share record
    */
   async shareTemplate(options: ShareTemplateOptions): Promise<TemplateShare> {
-    const template = this.templates.get(options.templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: options.templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${options.templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     if (template.isSystem) {
       throw new Error('System templates are already public');
@@ -718,10 +922,15 @@ export class TemplateService {
    * @param rating - Rating (1-5)
    */
   async rateTemplate(templateId: string, userId: string, rating: number): Promise<void> {
-    const template = this.templates.get(templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     if (rating < 1 || rating > 5) {
       throw new Error('Rating must be between 1 and 5');
@@ -729,9 +938,26 @@ export class TemplateService {
 
     // Simple average calculation (in production, would track individual ratings)
     const currentTotal = (template.metadata.rating || 0) * template.metadata.ratingCount;
-    template.metadata.ratingCount++;
-    template.metadata.rating = (currentTotal + rating) / template.metadata.ratingCount;
-    template.updatedAt = new Date();
+    const newRatingCount = template.metadata.ratingCount + 1;
+    const newRating = (currentTotal + rating) / newRatingCount;
+
+    const newMetadata = {
+      ...template.metadata,
+      rating: newRating,
+      ratingCount: newRatingCount,
+    };
+
+    const settingsWithMetadata = {
+      ...template.settings,
+      _metadata: newMetadata,
+    };
+
+    await prisma.template.update({
+      where: { id: templateId },
+      data: {
+        settings: settingsWithMetadata as any,
+      },
+    });
 
     logger.info(`Rated template ${templateId}: ${rating}`);
   }
@@ -744,10 +970,15 @@ export class TemplateService {
    * @returns Duplicated template
    */
   async duplicateTemplate(templateId: string, userId: string, newName?: string): Promise<Template> {
-    const template = this.templates.get(templateId);
-    if (!template) {
+    const dbTemplate = await prisma.template.findUnique({
+      where: { id: templateId },
+    });
+
+    if (!dbTemplate) {
       throw new Error(`Template not found: ${templateId}`);
     }
+
+    const template = this.dbToTemplate(dbTemplate);
 
     return this.createTemplate({
       name: newName || `${template.name} (Copy)`,

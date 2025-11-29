@@ -29,6 +29,8 @@ export function Login(): JSX.Element {
       } else {
         const result = await registerMutation.mutateAsync({ email, password, name });
         setUser(result.user);
+        // Mark that user just registered so welcome notification can be shown
+        sessionStorage.setItem('just-registered', 'true');
         navigate('/');
       }
     } catch (err: unknown) {

@@ -4,19 +4,43 @@ import { useAppStore } from '../../store';
 import { Tooltip } from '../ui';
 import { NotificationPanel, type Notification } from '../NotificationPanel';
 
+const WELCOME_NOTIFICATION_ID = 'welcome-notification';
+const DISMISSED_NOTIFICATIONS_KEY = 'dismissed-notifications';
+
 export function Header(): JSX.Element {
-  const { settings, updateSettings } = useAppStore();
+  const { settings, updateSettings, user } = useAppStore();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      type: 'info',
-      title: 'Welcome!',
-      message: 'Your account has been successfully created.',
-      timestamp: new Date(),
-      read: false,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Load dismissed notifications from localStorage
+  useEffect(() => {
+    const dismissed = localStorage.getItem(DISMISSED_NOTIFICATIONS_KEY);
+    const dismissedIds = dismissed ? JSON.parse(dismissed) : [];
+    
+    // Only show welcome notification if:
+    // 1. User is logged in
+    // 2. Welcome notification hasn't been dismissed
+    // 3. User was just registered (check if this is first load after registration)
+    const shouldShowWelcome = user && !dismissedIds.includes(WELCOME_NOTIFICATION_ID);
+    
+    // Check if user was just registered (stored in sessionStorage during registration)
+    const justRegistered = sessionStorage.getItem('just-registered') === 'true';
+    
+    if (shouldShowWelcome && justRegistered) {
+      setNotifications([
+        {
+          id: WELCOME_NOTIFICATION_ID,
+          type: 'info',
+          title: 'Welcome!',
+          message: 'Your account has been successfully created.',
+          timestamp: new Date(),
+          read: false,
+        },
+      ]);
+      // Clear the flag so it doesn't show again
+      sessionStorage.removeItem('just-registered');
+    }
+  }, [user]);
 
   const toggleDarkMode = (): void => {
     const newDarkMode = !settings.darkMode;
@@ -37,6 +61,14 @@ export function Header(): JSX.Element {
   };
 
   const handleDelete = (id: string): void => {
+    // Save dismissed notification ID to localStorage
+    const dismissed = localStorage.getItem(DISMISSED_NOTIFICATIONS_KEY);
+    const dismissedIds = dismissed ? JSON.parse(dismissed) : [];
+    if (!dismissedIds.includes(id)) {
+      dismissedIds.push(id);
+      localStorage.setItem(DISMISSED_NOTIFICATIONS_KEY, JSON.stringify(dismissedIds));
+    }
+    
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 

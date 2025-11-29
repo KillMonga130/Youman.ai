@@ -85,6 +85,13 @@ export function useModelMetrics(modelId: string | null) {
     queryFn: () => apiClient.getModelMetrics(modelId!),
     enabled: !!modelId && hasAuthToken(),
     staleTime: 1 * 60 * 1000, // 1 minute
+    retry: (failureCount, error: any) => {
+      // Don't retry on 500s too aggressively
+      if (error?.message?.includes('500') || error?.message?.includes('Internal Server Error')) {
+        return failureCount < 1;
+      }
+      return failureCount < 2;
+    },
   });
 }
 
@@ -471,6 +478,14 @@ export function useLatestModelVersion(modelId: string | null) {
     queryKey: ['ml-models', 'versions', 'latest', modelId],
     queryFn: () => apiClient.getLatestModelVersion(modelId!),
     enabled: !!modelId && hasAuthToken(),
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s (expected when no versions exist)
+      if (error?.message?.includes('404') || error?.message?.includes('Not Found')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryOnMount: false,
   });
 }
 
@@ -524,6 +539,14 @@ export function useActiveDeployment(modelId: string | null) {
     queryKey: ['ml-models', 'deployment', 'active', modelId],
     queryFn: () => apiClient.getActiveDeployment(modelId!),
     enabled: !!modelId && hasAuthToken(),
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404s (expected when no deployment exists)
+      if (error?.message?.includes('404') || error?.message?.includes('Not Found')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryOnMount: false,
   });
 }
 
@@ -571,6 +594,13 @@ export function useModelDrift(modelId: string | null) {
     queryFn: () => apiClient.detectModelDrift(modelId!),
     enabled: !!modelId && hasAuthToken(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error: any) => {
+      // Don't retry on 500s too aggressively (drift detection may fail if no data)
+      if (error?.message?.includes('500') || error?.message?.includes('Internal Server Error')) {
+        return failureCount < 1;
+      }
+      return failureCount < 2;
+    },
   });
 }
 
@@ -624,5 +654,429 @@ export function useStopABTest() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ml-models', 'ab-tests'] });
     },
+  });
+}
+
+// ============================================
+// DevOps Hooks - Auto-Scaling
+// ============================================
+
+export function useAutoScalingStatus(serviceId: string) {
+  return useQuery({
+    queryKey: ['auto-scaling', serviceId, 'status'],
+    queryFn: async () => {
+      try {
+        return await apiClient.getAutoScalingStatus(serviceId);
+      } catch (error) {
+        // Silently handle 404 - service not registered
+        if (getErrorStatus(error) === 404) {
+          throw error; // Re-throw to let React Query handle it
+        }
+        throw error;
+      }
+    },
+    enabled: hasAuthToken() && !!serviceId,
+    refetchInterval: (query) => {
+      // Don't refetch if we got a 404
+      if (query.state.error && getErrorStatus(query.state.error) === 404) {
+        return false;
+      }
+      return 30 * 1000; // Refetch every 30 seconds
+    },
+    retry: (failureCount, error) => {
+      // Don't retry on 404 errors (service not registered)
+      if (getErrorStatus(error) === 404) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useAutoScalingMetrics(serviceId: string) {
+  return useQuery({
+    queryKey: ['auto-scaling', serviceId, 'metrics'],
+    queryFn: async () => {
+      try {
+        return await apiClient.getAutoScalingMetrics(serviceId);
+      } catch (error) {
+        // Silently handle 404 - service not registered
+        if (getErrorStatus(error) === 404) {
+          throw error; // Re-throw to let React Query handle it
+        }
+        throw error;
+      }
+    },
+    enabled: hasAuthToken() && !!serviceId,
+    refetchInterval: (query) => {
+      // Don't refetch if we got a 404
+      if (query.state.error && getErrorStatus(query.state.error) === 404) {
+        return false;
+      }
+      return 10 * 1000; // Refetch every 10 seconds
+    },
+    retry: (failureCount, error) => {
+      // Don't retry on 404 errors (service not registered)
+      if (getErrorStatus(error) === 404) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+// Helper to extract status from error
+function getErrorStatus(error: unknown): number | undefined {
+  if (!error) return undefined;
+  try {
+    if (error instanceof Error) {
+      const parsed = JSON.parse(error.message);
+      return parsed.status;
+    }
+    if (typeof error === 'object' && 'status' in error) {
+      return (error as any).status;
+    }
+  } catch {
+    // Error message is not JSON
+  }
+  return undefined;
+}
+
+export function useScalingPolicy(serviceId: string) {
+  return useQuery({
+    queryKey: ['auto-scaling', serviceId, 'policy'],
+    queryFn: async () => {
+      try {
+        return await apiClient.getScalingPolicy(serviceId);
+      } catch (error) {
+        // Silently handle 404 - service not registered
+        if (getErrorStatus(error) === 404) {
+          throw error; // Re-throw to let React Query handle it, but don't log
+        }
+        throw error;
+      }
+    },
+    enabled: hasAuthToken() && !!serviceId,
+    retry: (failureCount, error) => {
+      // Don't retry on 404 errors (service not registered)
+      if (getErrorStatus(error) === 404) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useConfigureScalingPolicy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, policy }: { serviceId: string; policy: unknown }) =>
+      apiClient.configureScalingPolicy(serviceId, policy as any),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['auto-scaling', variables.serviceId] });
+    },
+  });
+}
+
+export function useScaleUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, reason }: { serviceId: string; reason?: string }) =>
+      apiClient.scaleUp(serviceId, reason),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['auto-scaling', variables.serviceId] });
+    },
+  });
+}
+
+export function useScaleDown() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (serviceId: string) => apiClient.scaleDown(serviceId),
+    onSuccess: (_, serviceId) => {
+      queryClient.invalidateQueries({ queryKey: ['auto-scaling', serviceId] });
+    },
+  });
+}
+
+export function useScalingEvents(serviceId: string, limit = 100) {
+  return useQuery({
+    queryKey: ['auto-scaling', serviceId, 'events', limit],
+    queryFn: () => apiClient.getScalingEvents(serviceId, limit),
+    enabled: hasAuthToken() && !!serviceId,
+  });
+}
+
+export function useRegisterService() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serviceId, config }: { serviceId: string; config: { minInstances: number; maxInstances: number; initialInstances?: number } }) =>
+      apiClient.registerService(serviceId, config),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['auto-scaling', variables.serviceId] });
+    },
+  });
+}
+
+// ============================================
+// DevOps Hooks - Disaster Recovery
+// ============================================
+
+export function useDisasterRecoveryStatus() {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'status'],
+    queryFn: () => apiClient.getDisasterRecoveryStatus(),
+    enabled: hasAuthToken(),
+    refetchInterval: 60 * 1000, // Refetch every minute
+  });
+}
+
+export function useBackups(limit = 100) {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'backups', limit],
+    queryFn: () => apiClient.listBackups(limit),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useCreateBackup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ type, description }: { type: 'full' | 'incremental' | 'differential'; description?: string }) =>
+      apiClient.createBackup(type, description),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['disaster-recovery', 'backups'] });
+    },
+  });
+}
+
+export function useRecoveryPoints(startTime?: string, endTime?: string) {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'recovery-points', startTime, endTime],
+    queryFn: () => apiClient.getRecoveryPoints(startTime, endTime),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useReplicationStatus(configId?: string) {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'replication', configId],
+    queryFn: () => apiClient.getReplicationStatus(configId),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useFailoverEvents(configId: string, limit = 100) {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'failover', configId, 'events', limit],
+    queryFn: () => apiClient.getFailoverEvents(configId, limit),
+    enabled: hasAuthToken() && !!configId,
+  });
+}
+
+export function useRecoveryTests(limit = 100) {
+  return useQuery({
+    queryKey: ['disaster-recovery', 'tests', limit],
+    queryFn: () => apiClient.listRecoveryTests(limit),
+    enabled: hasAuthToken(),
+  });
+}
+
+// ============================================
+// DevOps Hooks - CDN & Caching
+// ============================================
+
+export function useCDNDistributions() {
+  return useQuery({
+    queryKey: ['cdn', 'distributions'],
+    queryFn: () => apiClient.listCDNDistributions(),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useCacheStats() {
+  return useQuery({
+    queryKey: ['cdn', 'cache', 'stats'],
+    queryFn: () => apiClient.getCacheStats(),
+    enabled: hasAuthToken(),
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+  });
+}
+
+export function useCreateCDNDistribution() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (config: { name: string; origin: string; enabled?: boolean }) =>
+      apiClient.createCDNDistribution(config),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cdn', 'distributions'] });
+    },
+  });
+}
+
+export function useInvalidateCache() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (patterns: string[]) => apiClient.invalidateCache(patterns),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cdn', 'cache'] });
+    },
+  });
+}
+
+// ============================================
+// DevOps Hooks - Performance
+// ============================================
+
+export function usePerformanceMetrics() {
+  return useQuery({
+    queryKey: ['performance', 'metrics'],
+    queryFn: () => apiClient.getPerformanceMetrics(),
+    enabled: hasAuthToken(),
+    refetchInterval: 15 * 1000, // Refetch every 15 seconds
+  });
+}
+
+export function useSlowQueries(limit = 100) {
+  return useQuery({
+    queryKey: ['performance', 'slow-queries', limit],
+    queryFn: () => apiClient.getSlowQueries(limit),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useConnectionPoolStats() {
+  return useQuery({
+    queryKey: ['performance', 'connection-pool', 'stats'],
+    queryFn: () => apiClient.getConnectionPoolStats(),
+    enabled: hasAuthToken(),
+    refetchInterval: 30 * 1000, // Refetch every 30 seconds
+  });
+}
+
+export function usePerformanceAlerts() {
+  return useQuery({
+    queryKey: ['performance', 'alerts'],
+    queryFn: () => apiClient.getPerformanceAlerts(),
+    enabled: hasAuthToken(),
+  });
+}
+
+// ============================================
+// DevOps Hooks - Cost Management
+// ============================================
+
+export function useCostSummary() {
+  return useQuery({
+    queryKey: ['cost-management', 'summary'],
+    queryFn: () => apiClient.getCostSummary(),
+    enabled: hasAuthToken(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+export function useCostReport(params?: {
+  startDate?: string;
+  endDate?: string;
+  groupBy?: 'service' | 'feature' | 'customer';
+}) {
+  return useQuery({
+    queryKey: ['cost-management', 'report', params],
+    queryFn: () => apiClient.getCostReport(params || {}),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useCostForecast() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (params: { period: 'week' | 'month' | 'quarter' | 'year'; includeOptimizations?: boolean }) =>
+      apiClient.forecastCosts(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cost-management'] });
+    },
+  });
+}
+
+export function useCostOptimizations() {
+  return useQuery({
+    queryKey: ['cost-management', 'optimizations'],
+    queryFn: () => apiClient.getCostOptimizations(),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useBudgets() {
+  return useQuery({
+    queryKey: ['cost-management', 'budgets'],
+    queryFn: () => apiClient.listBudgets(),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useBudgetAlerts(acknowledged?: boolean) {
+  return useQuery({
+    queryKey: ['cost-management', 'budget-alerts', acknowledged],
+    queryFn: () => apiClient.getBudgetAlerts(acknowledged),
+    enabled: hasAuthToken(),
+  });
+}
+
+// ============================================
+// DevOps Hooks - Support & Diagnostics
+// ============================================
+
+export function useActiveImpersonationSessions() {
+  return useQuery({
+    queryKey: ['support', 'impersonation', 'sessions'],
+    queryFn: () => apiClient.getActiveImpersonationSessions(),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useErrorContexts(limit = 50, filters?: {
+  userId?: string;
+  errorCode?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  return useQuery({
+    queryKey: ['support', 'error-contexts', limit, filters],
+    queryFn: () => apiClient.getErrorContexts(limit, filters),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useRequestInspections(limit = 50, filters?: {
+  userId?: string;
+  method?: string;
+  statusCode?: number;
+}) {
+  return useQuery({
+    queryKey: ['support', 'request-inspections', limit, filters],
+    queryFn: () => apiClient.getRequestInspections(limit, filters),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useAuditLogs(params?: {
+  limit?: number;
+  offset?: number;
+  eventType?: string;
+  adminUserId?: string;
+  targetUserId?: string;
+  startDate?: string;
+  endDate?: string;
+}) {
+  return useQuery({
+    queryKey: ['support', 'audit-logs', params],
+    queryFn: () => apiClient.getAuditLogs(params || {}),
+    enabled: hasAuthToken(),
+  });
+}
+
+export function useGenerateDiagnosticReport() {
+  return useMutation({
+    mutationFn: (params: {
+      includeSystemInfo?: boolean;
+      includeErrorLogs?: boolean;
+      includePerformanceMetrics?: boolean;
+      startDate?: string;
+      endDate?: string;
+    }) => apiClient.generateDiagnosticReport(params),
   });
 }

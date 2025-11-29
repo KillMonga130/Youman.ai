@@ -314,8 +314,16 @@ router.get(
   '/:modelId/metrics',
   asyncHandler(async (req: Request, res: Response) => {
     const modelId = req.params.modelId as string;
-    const metrics = await mlModelService.trackModelPerformance(modelId);
-    res.json(metrics);
+    try {
+      const metrics = await mlModelService.trackModelPerformance(modelId);
+      res.json(metrics);
+    } catch (error: any) {
+      if (error.message?.includes('No active deployment')) {
+        res.status(404).json({ error: 'No active deployment found. Please deploy a model version first.' });
+        return;
+      }
+      throw error;
+    }
   })
 );
 
@@ -372,8 +380,16 @@ router.get(
   '/:modelId/drift',
   asyncHandler(async (req: Request, res: Response) => {
     const modelId = req.params.modelId as string;
-    const report = await mlModelService.detectModelDrift(modelId);
-    res.json(report);
+    try {
+      const report = await mlModelService.detectModelDrift(modelId);
+      res.json(report);
+    } catch (error: any) {
+      if (error.message?.includes('No active deployment')) {
+        res.status(404).json({ error: 'No active deployment found. Please deploy a model version first.' });
+        return;
+      }
+      throw error;
+    }
   })
 );
 

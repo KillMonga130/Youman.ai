@@ -159,8 +159,21 @@ router.post('/multi-platform', async (req: Request, res: Response) => {
  */
 router.get('/platforms', (_req: Request, res: Response) => {
   try {
-    const platforms = repurposingService.getAllPlatformLimits();
-    return res.json(platforms);
+    const platformLimits = repurposingService.getAllPlatformLimits();
+    // Transform to match frontend expected format
+    const platforms = platformLimits.map(limit => ({
+      id: limit.platform,
+      name: limit.platform.charAt(0).toUpperCase() + limit.platform.slice(1),
+      maxLength: limit.maxCharacters,
+      features: [
+        ...(limit.supportsMarkdown ? ['markdown'] : []),
+        ...(limit.supportsLineBreaks ? ['line-breaks'] : []),
+        ...(limit.supportsEmojis ? ['emojis'] : []),
+        `max-hashtags-${limit.maxHashtags}`,
+        `max-links-${limit.maxLinks}`,
+      ],
+    }));
+    return res.json({ platforms });
   } catch (error) {
     console.error('Error getting platforms:', error);
     return res.status(500).json({
