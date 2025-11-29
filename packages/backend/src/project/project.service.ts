@@ -190,6 +190,19 @@ export async function listProjects(
       orderBy,
       skip,
       take: limit,
+      include: {
+        transformations: {
+          where: {
+            status: 'COMPLETED',
+            outputDetectionScore: { not: null },
+          },
+          orderBy: { completedAt: 'desc' },
+          take: 1,
+          select: {
+            outputDetectionScore: true,
+          },
+        },
+      },
     }),
     prisma.project.count({ where: whereClause }),
   ]);
@@ -197,7 +210,18 @@ export async function listProjects(
   const totalPages = Math.ceil(total / limit);
 
   return {
-    projects: projects.map(toProjectResponse),
+    projects: projects.map(project => {
+      const response = toProjectResponse(project);
+      // Add detection score from latest transformation
+      const latestTransformation = project.transformations[0];
+      const detectionScore = latestTransformation?.outputDetectionScore 
+        ? Math.round(latestTransformation.outputDetectionScore) 
+        : undefined;
+      return {
+        ...response,
+        ...(detectionScore !== undefined && { detectionScore }),
+      };
+    }),
     pagination: {
       page,
       limit,

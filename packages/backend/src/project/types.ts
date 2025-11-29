@@ -109,6 +109,7 @@ export interface ProjectResponse {
   ownerId: string;
   createdAt: Date;
   updatedAt: Date;
+  detectionScore?: number; // Detection score from latest transformation (0-100)
 }
 
 /**

@@ -24,7 +24,7 @@ const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => P
 
 /**
  * GET /api/ml-models/available
- * Lists all available models including LLM providers
+ * Lists all available models including LLM providers and Bedrock models
  */
 router.get(
   '/available',
@@ -60,9 +60,26 @@ router.get(
       });
     }
     
+    // Add AWS Bedrock models
+    const { listBedrockModels } = await import('./bedrock.service');
+    const bedrockModels = listBedrockModels();
+    for (const model of bedrockModels) {
+      availableModels.push({
+        id: model.id,
+        name: model.name,
+        type: 'bedrock',
+        provider: model.provider,
+        tier: model.tier,
+        available: true,
+        costInfo: {
+          inputCostPer1KTokens: model.inputCostPer1KTokens,
+          outputCostPer1KTokens: model.outputCostPer1KTokens,
+        },
+      });
+    }
+    
     // Add custom ML models from service (if any)
     // This would typically come from the database or service registry
-    // For now, return LLM models only
     
     res.json({ models: availableModels });
   })

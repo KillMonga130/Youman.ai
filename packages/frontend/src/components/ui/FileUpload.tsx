@@ -20,6 +20,7 @@ export interface UploadedFile {
   content?: string;
   error?: string;
   startTime?: number;
+  fileObject?: File; // Store the actual File object for upload
 }
 
 export interface FileUploadProps {
@@ -130,51 +131,78 @@ export function FileUpload({
     {} as Record<string, string[]>
   );
 
-  // Simulate file upload with progress
-  const simulateUpload = useCallback(
-    (file: UploadedFile) => {
+  // Real file upload with extraction
+  const uploadFile = useCallback(
+    async (file: UploadedFile, fileObject: File) => {
       const startTime = Date.now();
-      let progress = 0;
+      
+      // Update status to uploading
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === file.id
+            ? { ...f, progress: 0, status: 'uploading', startTime }
+            : f
+        )
+      );
 
-      const interval = setInterval(() => {
-        progress += Math.random() * 15 + 5;
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval(interval);
-          delete uploadIntervalRef.current[file.id];
-
+      try {
+        // Import API client
+        const { apiClient } = await import('../../api/client');
+        
+        // Simulate upload progress (since we can't track actual upload progress easily)
+        const progressInterval = setInterval(() => {
           setFiles((prev) =>
-            prev.map((f) =>
-              f.id === file.id
-                ? { ...f, progress: 100, status: 'processing' }
-                : f
-            )
+            prev.map((f) => {
+              if (f.id === file.id && f.progress < 90) {
+                return { ...f, progress: Math.min(f.progress + 10, 90) };
+              }
+              return f;
+            })
           );
+        }, 200);
 
-          // Simulate processing
-          setTimeout(() => {
-            const mockContent = `Content extracted from ${file.name}`;
-            setFiles((prev) =>
-              prev.map((f) =>
-                f.id === file.id
-                  ? { ...f, status: 'complete', content: mockContent }
-                  : f
-              )
-            );
-            onContentExtracted?.(mockContent, { ...file, status: 'complete', content: mockContent });
-          }, 500);
-        } else {
-          setFiles((prev) =>
-            prev.map((f) =>
-              f.id === file.id
-                ? { ...f, progress, startTime }
-                : f
-            )
-          );
-        }
-      }, 200);
+        // Extract file content
+        const result = await apiClient.extractFile(fileObject);
+        
+        clearInterval(progressInterval);
 
-      uploadIntervalRef.current[file.id] = interval;
+        // Update to processing
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === file.id
+              ? { ...f, progress: 95, status: 'processing' }
+              : f
+          )
+        );
+
+        // Small delay to show processing state
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Update to complete
+        const extractedContent = result.data.content;
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === file.id
+              ? { ...f, progress: 100, status: 'complete', content: extractedContent }
+              : f
+          )
+        );
+
+        onContentExtracted?.(extractedContent, { 
+          ...file, 
+          status: 'complete', 
+          content: extractedContent 
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to extract file content';
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === file.id
+              ? { ...f, status: 'error', error: errorMessage, progress: 0 }
+              : f
+          )
+        );
+      }
     },
     [onContentExtracted]
   );
@@ -187,6 +215,7 @@ export function FileUpload({
         name: file.name,
         size: file.size,
         format: getFormatFromFile(file) || 'txt',
+        fileObject: file, // Store the actual File object
         status: 'uploading' as UploadStatus,
         progress: 0,
         startTime: Date.now(),
@@ -207,10 +236,14 @@ export function FileUpload({
       setFiles((prev) => [...prev, ...allNewFiles]);
       onFilesUploaded?.(allNewFiles);
 
-      // Start upload simulation for accepted files
-      newFiles.forEach(simulateUpload);
+      // Start real upload for accepted files
+      newFiles.forEach((uploadedFile) => {
+        if (uploadedFile.fileObject) {
+          uploadFile(uploadedFile, uploadedFile.fileObject);
+        }
+      });
     },
-    [onFilesUploaded, simulateUpload]
+    [onFilesUploaded, uploadFile]
   );
 
   // Cleanup intervals on unmount

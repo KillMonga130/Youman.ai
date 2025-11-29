@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Wand2, Copy, Download, RotateCcw, ChevronDown, Shield, Upload, Save, AlertCircle, CheckCircle, XCircle, Loader2, FileSearch, Target, BookOpen, GitBranch, Volume2, Sparkles, X, History, Users } from 'lucide-react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -11,9 +11,10 @@ import { apiClient } from '../api/client';
 import { Alert } from '../components/ui';
 import { BranchManager } from '../components/BranchManager';
 import { CollaboratorManager } from '../components/CollaboratorManager';
+import { ProtectedSegments, type ProtectedSegment } from '../components/ui/ProtectedSegments';
 
 type Strategy = 'auto' | 'casual' | 'professional' | 'academic';
-type AnalysisTab = 'detection' | 'plagiarism' | 'seo' | 'citations' | 'variations' | 'tone';
+type AnalysisTab = 'detection' | 'plagiarism' | 'seo' | 'citations' | 'variations' | 'tone' | 'protected';
 
 interface TransformOptions {
   level: number;
@@ -28,6 +29,7 @@ export function Editor(): JSX.Element {
   const { originalText, setOriginalText, humanizedText, setHumanizedText, settings, setCurrentProjectId } = useAppStore();
   const { getShortcutKey, shortcutsEnabled } = useKeyboardShortcuts();
   
+  const originalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [projectName, setProjectName] = useState('Untitled Project');
   const [error, setError] = useState<string | null>(null);
@@ -111,6 +113,12 @@ export function Editor(): JSX.Element {
   const [targetAdjustments, setTargetAdjustments] = useState<string[]>([]);
   const [isToneAnalyzing, setIsToneAnalyzing] = useState(false);
   const [toneMode, setToneMode] = useState<'analyze' | 'adjust' | 'emotions' | 'consistency' | 'target'>('analyze');
+  
+  // Handle text selection for protected segments
+  const handleTextSelection = useCallback((e: React.SyntheticEvent<HTMLTextAreaElement>) => {
+    // Selection handling is done in ProtectedSegments component
+    // This is just a placeholder to ensure the event is available
+  }, []);
   
   // Branch management state
   const [showBranchManager, setShowBranchManager] = useState(false);
@@ -233,6 +241,26 @@ export function Editor(): JSX.Element {
       return;
     }
     
+    // Estimate cost if using Bedrock model
+    if (selectedModelId && availableModels?.models?.find((m: any) => m.id === selectedModelId && m.type === 'bedrock')) {
+      const model = availableModels.models.find((m: any) => m.id === selectedModelId);
+      if (model?.costInfo) {
+        const wordCount = originalText.trim().split(/\s+/).length;
+        // Rough estimate: 1 word ≈ 1.3 tokens, output ≈ 1.5x input
+        const estimatedInputTokens = Math.ceil(wordCount * 1.3);
+        const estimatedOutputTokens = Math.ceil(estimatedInputTokens * 1.5);
+        const estimatedCost = (estimatedInputTokens / 1000) * model.costInfo.inputCostPer1KTokens + 
+                            (estimatedOutputTokens / 1000) * model.costInfo.outputCostPer1KTokens;
+        
+        if (estimatedCost > 0.01) { // Warn if cost > $0.01
+          const confirmMessage = `Estimated cost for this operation: $${estimatedCost.toFixed(4)}. Continue?`;
+          if (!confirm(confirmMessage)) {
+            return;
+          }
+        }
+      }
+    }
+    
     // Check quota before humanization
     const wordCount = originalText.trim().split(/\s+/).length;
     try {
@@ -262,6 +290,14 @@ export function Editor(): JSX.Element {
         }
       }
       console.error('Failed to check quota:', err);
+      
+      // If it's an authentication error, don't show confirm dialog
+      const quotaErrorMsg = err instanceof Error ? err.message : 'Unknown error';
+      if (quotaErrorMsg.includes('NO_TOKEN') || quotaErrorMsg.includes('SESSION_EXPIRED') || quotaErrorMsg.includes('401')) {
+        // Authentication error - will be handled by API client redirect
+        return;
+      }
+      
       // For other errors, show a warning but allow the operation to proceed
       const shouldContinue = confirm('Unable to check quota. Continue anyway?');
       if (!shouldContinue) {
@@ -274,12 +310,14 @@ export function Editor(): JSX.Element {
     setDetectionResults(null);
     
     try {
+      // Extract protected segments from text (they're already in the text with delimiters)
+      // The backend will parse them automatically
       const result = await humanizeMutation.mutateAsync({
         text: originalText,
         options: {
           level: options.level,
           strategy: options.strategy,
-          protectedSegments: options.protectedSegments,
+          protectedSegments: [], // Backend parses from text delimiters
           mlModelId: selectedModelId,
         },
       });
@@ -312,12 +350,22 @@ export function Editor(): JSX.Element {
       // Don't set jobId for synchronous completions to avoid unnecessary polling
       setJobId(null);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to humanize text. Please try again.';
+      let errorMessage = 'Failed to humanize text. Please try again.';
+      if (err instanceof Error) {
+        try {
+          // Try to parse JSON error message from API client
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          // If parsing fails, use the error message directly
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
       setProgress(null);
       console.error('Humanization error:', err);
     }
-  }, [originalText, options, humanizeMutation, setHumanizedText]);
+  }, [originalText, options, selectedModelId, id, humanizeMutation, setHumanizedText]);
 
   const handleTestDetection = useCallback(async () => {
     if (!humanizedText.trim()) {
@@ -334,11 +382,21 @@ export function Editor(): JSX.Element {
       
       setDetectionResults(result);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to test detection. Please try again.';
+      let errorMessage = 'Failed to test detection. Please try again.';
+      if (err instanceof Error) {
+        try {
+          // Try to parse JSON error message from API client
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          // If parsing fails, use the error message directly
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
       console.error('Detection error:', err);
     }
-  }, [humanizedText, detectAIMutation]);
+  }, [humanizedText, detectAIMutation, setError]);
 
   const handleCheckPlagiarism = useCallback(async () => {
     if (!humanizedText.trim()) {
@@ -360,12 +418,20 @@ export function Editor(): JSX.Element {
         totalMatches: matches.length,
       });
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Plagiarism check failed';
+      let errorMessage = 'Plagiarism check failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [humanizedText]);
+  }, [humanizedText, setError]);
 
   const handleAnalyzeSEO = useCallback(async () => {
     const textToAnalyze = humanizedText.trim() || originalText.trim();
@@ -383,12 +449,20 @@ export function Editor(): JSX.Element {
         wordCount: textToAnalyze.split(/\s+/).length,
       });
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'SEO analysis failed';
+      let errorMessage = 'SEO analysis failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   const handleDetectCitations = useCallback(async () => {
     const textToAnalyze = humanizedText.trim() || originalText.trim();
@@ -406,12 +480,20 @@ export function Editor(): JSX.Element {
         confidence: result.data?.formatDetection?.confidence ?? 0,
       });
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Citation detection failed';
+      let errorMessage = 'Citation detection failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   const handleGenerateVariations = useCallback(async () => {
     if (!originalText.trim()) {
@@ -427,12 +509,20 @@ export function Editor(): JSX.Element {
       });
       setVariations(result.data?.variations ?? []);
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate variations';
+      let errorMessage = 'Failed to generate variations. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsGeneratingVariations(false);
     }
-  }, [originalText]);
+  }, [originalText, setError]);
 
   const handleSelectVariation = useCallback((text: string) => {
     setHumanizedText(text);
@@ -452,12 +542,20 @@ export function Editor(): JSX.Element {
       setToneAnalysisResult(result.data);
       setToneMode('analyze');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Tone analysis failed';
+      let errorMessage = 'Tone analysis failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsToneAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   const handleDetectEmotions = useCallback(async () => {
     const textToAnalyze = humanizedText.trim() || originalText.trim();
@@ -472,12 +570,20 @@ export function Editor(): JSX.Element {
       setEmotionsResult(result.data);
       setToneMode('emotions');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Emotion detection failed';
+      let errorMessage = 'Emotion detection failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsToneAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   const handleAdjustTone = useCallback(async (targetTone: { sentiment?: 'positive' | 'neutral' | 'negative'; formality?: number; emotion?: string }) => {
     const textToAdjust = humanizedText.trim() || originalText.trim();
@@ -493,12 +599,20 @@ export function Editor(): JSX.Element {
       setToneAdjustmentChanges(result.data.changes);
       setToneMode('adjust');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Tone adjustment failed';
+      let errorMessage = 'Tone adjustment failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsToneAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   const handleCheckToneConsistency = useCallback(async (texts: string[]) => {
     if (texts.length < 2) {
@@ -512,12 +626,20 @@ export function Editor(): JSX.Element {
       setConsistencyResult(result.data);
       setToneMode('consistency');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Consistency check failed';
+      let errorMessage = 'Consistency check failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsToneAnalyzing(false);
     }
-  }, []);
+  }, [setError]);
 
   const handleTargetTone = useCallback(async (targetTone: { sentiment: 'positive' | 'neutral' | 'negative'; formality: number; emotion: string }) => {
     const textToTarget = humanizedText.trim() || originalText.trim();
@@ -533,12 +655,20 @@ export function Editor(): JSX.Element {
       setTargetAdjustments(result.data.adjustments);
       setToneMode('target');
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Tone targeting failed';
+      let errorMessage = 'Tone targeting failed. Please try again.';
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
     } finally {
       setIsToneAnalyzing(false);
     }
-  }, [humanizedText, originalText]);
+  }, [humanizedText, originalText, setError]);
 
   // Load activity log
   const loadActivityLog = useCallback(async () => {
@@ -621,30 +751,56 @@ export function Editor(): JSX.Element {
 
     setError(null);
     try {
+      let projectId = id;
+      
       if (id) {
         // Update existing project
         await updateProject.mutateAsync({
           id,
           data: {
             name: projectName,
-            description: `Original: ${originalText.substring(0, 100)}...`,
+            description: originalText ? `Original: ${originalText.substring(0, 100)}...` : undefined,
           },
         });
       } else {
         // Create new project
         const result = await createProject.mutateAsync({
           name: projectName,
-          description: `Original: ${originalText.substring(0, 100)}...`,
+          description: originalText ? `Original: ${originalText.substring(0, 100)}...` : undefined,
         });
-        setCurrentProjectId(result.project.id);
-        navigate(`/editor/${result.project.id}`);
+        projectId = result.project.id;
+        setCurrentProjectId(projectId);
+        navigate(`/editor/${projectId}`);
+      }
+      
+      // Create version if there's content to save
+      if (projectId && (originalText.trim() || humanizedText.trim())) {
+        try {
+          await apiClient.createVersion(projectId, {
+            content: originalText || '',
+            humanizedContent: humanizedText || undefined,
+          });
+        } catch (error) {
+          console.error('Failed to create version:', error);
+          // Don't block user if version creation fails
+        }
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save project. Please try again.';
+      let errorMessage = 'Failed to save project. Please try again.';
+      if (err instanceof Error) {
+        try {
+          // Try to parse JSON error message from API client
+          const errorData = JSON.parse(err.message);
+          errorMessage = errorData.message || errorData.error || err.message;
+        } catch {
+          // If parsing fails, use the error message directly
+          errorMessage = err.message;
+        }
+      }
       setError(errorMessage);
       console.error('Save error:', err);
     }
-  }, [id, projectName, originalText, createProject, updateProject, setCurrentProjectId, navigate]);
+  }, [id, projectName, originalText, humanizedText, createProject, updateProject, setCurrentProjectId, navigate, setError]);
 
   const wordCount = originalText.trim() ? originalText.trim().split(/\s+/).length : 0;
 
@@ -791,11 +947,16 @@ export function Editor(): JSX.Element {
               title="Select ML model for humanization"
             >
               <option value="">Auto-select (Recommended)</option>
-              {availableModels?.models?.map((model: any) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} {model.tier ? `(${model.tier})` : ''}
-                </option>
-              ))}
+              {availableModels?.models?.map((model: any) => {
+                const costInfo = model.costInfo ? 
+                  ` - $${(model.costInfo.inputCostPer1KTokens * 1000).toFixed(2)}/$1M input, $${(model.costInfo.outputCostPer1KTokens * 1000).toFixed(2)}/$1M output` : 
+                  '';
+                return (
+                  <option key={model.id} value={model.id}>
+                    {model.name} {model.tier ? `(${model.tier})` : ''}{costInfo}
+                  </option>
+                );
+              })}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
           </div>
@@ -932,6 +1093,7 @@ export function Editor(): JSX.Element {
             <span className="text-sm font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">{wordCount} words</span>
           </div>
           <textarea
+            ref={originalTextareaRef}
             value={originalText}
             onChange={(e) => setOriginalText(e.target.value)}
             placeholder="Paste your AI-generated text here..."
@@ -1038,11 +1200,15 @@ export function Editor(): JSX.Element {
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Burstiness</p>
-              <p className="text-xl font-semibold">{metrics.burstiness.toFixed(2)}</p>
+              <p className="text-xl font-semibold">
+                {typeof metrics.burstiness === 'number' ? metrics.burstiness.toFixed(2) : 'N/A'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Modified</p>
-              <p className="text-xl font-semibold">{metrics.modificationPercentage}%</p>
+              <p className="text-xl font-semibold">
+                {typeof metrics.modificationPercentage === 'number' ? `${metrics.modificationPercentage}%` : 'N/A'}
+              </p>
             </div>
             {metrics.sentencesModified !== undefined && metrics.totalSentences !== undefined && (
               <div>
@@ -1368,6 +1534,19 @@ export function Editor(): JSX.Element {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Protected Segments Tab */}
+          {activeAnalysisTab === 'protected' && (
+            <div>
+              <ProtectedSegments
+                text={originalText}
+                onTextChange={setOriginalText}
+                protectedSegments={[]}
+                onProtectedSegmentsChange={() => {}}
+                textareaRef={originalTextareaRef}
+              />
             </div>
           )}
 

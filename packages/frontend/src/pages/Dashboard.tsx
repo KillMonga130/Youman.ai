@@ -5,8 +5,10 @@ import { ProjectList } from '../components/ProjectList';
 import { useProjects, useUsage, useDeleteProject, useBulkDeleteProjects } from '../api/hooks';
 import { Spinner, Alert } from '../components/ui';
 import { useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export function Dashboard(): JSX.Element {
+  const queryClient = useQueryClient();
   const { deleteProject: deleteProjectFromStore } = useAppStore();
   const { data: projectsData, isLoading: isLoadingProjects, error: projectsError } = useProjects({ page: 1, limit: 20 });
   const { data: usageData, isLoading: isLoadingUsage } = useUsage();
@@ -21,8 +23,10 @@ export function Dashboard(): JSX.Element {
   // Calculate stats from real data
   const stats = useMemo(() => {
     const totalWordCount = projects.reduce((sum, p) => sum + (p.wordCount || 0), 0);
-    const avgDetectionScore = projects.length > 0
-      ? projects.reduce((sum, p) => sum + ((p as { detectionScore?: number }).detectionScore || 0), 0) / projects.length
+    // Calculate average detection score from projects that have detection scores
+    const projectsWithScores = projects.filter(p => p.detectionScore !== undefined && p.detectionScore !== null);
+    const avgDetectionScore = projectsWithScores.length > 0
+      ? projectsWithScores.reduce((sum, p) => sum + (p.detectionScore || 0), 0) / projectsWithScores.length
       : 0;
     
     // Get projects from this month
@@ -110,7 +114,7 @@ export function Dashboard(): JSX.Element {
     updatedAt: p.updatedAt,
     wordCount: p.wordCount || 0,
     status: (p.status.toLowerCase() === 'active' ? 'completed' : p.status.toLowerCase()) as 'draft' | 'processing' | 'completed',
-    detectionScore: (p as { detectionScore?: number }).detectionScore,
+    detectionScore: p.detectionScore,
   }));
 
   if (isLoadingProjects || isLoadingUsage) {
@@ -260,15 +264,17 @@ export function Dashboard(): JSX.Element {
             projects={displayProjects}
             onDeleteProject={handleDeleteProject}
             onBulkOperationComplete={async (result) => {
-              // After bulk operations complete, remove deleted projects from store
+              // After bulk operations complete, invalidate queries to refresh the UI
               if (result.success && result.successCount > 0) {
-                // The BulkOperationsToolbar already handles the API calls
-                // We just need to ensure the store is updated
-                // The query invalidation in the hooks should handle the refresh
-                result.errors.forEach(error => {
-                  // Remove failed deletions from store if they were partially processed
-                  // This is handled by the individual delete handlers
-                });
+                // Remove successfully deleted projects from store
+                const deletedIds = displayProjects
+                  .filter(p => !result.errors.some(e => e.id === p.id))
+                  .map(p => p.id);
+                deletedIds.forEach(id => deleteProjectFromStore(id));
+                
+                // Invalidate queries to refresh the data
+                await queryClient.invalidateQueries({ queryKey: ['projects'] });
+                await queryClient.invalidateQueries({ queryKey: ['usage'] });
               }
               return result;
             }}

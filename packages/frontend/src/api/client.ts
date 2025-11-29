@@ -78,8 +78,10 @@ class ApiClient {
     options: RequestInit = {},
     retryOn401 = true
   ): Promise<T> {
+    // Don't set Content-Type for FormData - browser will set it with boundary
+    const isFormData = options.body instanceof FormData;
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
     };
 
@@ -112,41 +114,56 @@ class ApiClient {
     
     clearTimeout(timeoutId);
 
-    // Handle 401 - try to refresh token once
-    if (response.status === 401 && retryOn401 && token) {
-      const refreshed = await this.attemptTokenRefresh();
-      if (refreshed) {
-        // Retry the request with new token
-        const newToken = this.getToken();
-        if (newToken) {
-          (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
-          const retryController = new AbortController();
-          const retryTimeoutId = setTimeout(() => retryController.abort(), 30000);
-          
-          const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
-            ...options,
-            headers,
-            signal: retryController.signal,
-          });
-          
-          clearTimeout(retryTimeoutId);
-          
-          if (!retryResponse.ok) {
-            // If retry still fails, handle error normally
-            return this.handleErrorResponse<T>(retryResponse);
+    // Handle 401 - try to refresh token once if we have a token
+    if (response.status === 401 && retryOn401) {
+      if (token) {
+        // Try to refresh the token
+        const refreshed = await this.attemptTokenRefresh();
+        if (refreshed) {
+          // Retry the request with new token
+          const newToken = this.getToken();
+          if (newToken) {
+            (headers as Record<string, string>)['Authorization'] = `Bearer ${newToken}`;
+            const retryController = new AbortController();
+            const retryTimeoutId = setTimeout(() => retryController.abort(), 30000);
+            
+            const retryResponse = await fetch(`${this.baseUrl}${endpoint}`, {
+              ...options,
+              headers,
+              signal: retryController.signal,
+            });
+            
+            clearTimeout(retryTimeoutId);
+            
+            if (!retryResponse.ok) {
+              // If retry still fails, handle error normally
+              return this.handleErrorResponse<T>(retryResponse);
+            }
+            
+            return retryResponse.json();
           }
-          
-          return retryResponse.json();
         }
+        
+        // Refresh failed - logout user
+        this.setToken(null);
+        localStorage.removeItem('refresh_token');
+      } else {
+        // No token at all - user needs to login
+        // Don't redirect here, let the ProtectedRoute handle it
+        // Just throw a clear error
       }
       
-      // Refresh failed or no token - logout user
-      this.setToken(null);
-      localStorage.removeItem('refresh_token');
-      window.location.href = '/login';
+      // Only redirect if we're not already on the login page
+      if (!window.location.pathname.includes('/login')) {
+        // Use a small delay to avoid race conditions
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 100);
+      }
+      
       throw new Error(JSON.stringify({
-        message: 'Session expired. Please login again.',
-        code: 'SESSION_EXPIRED',
+        message: token ? 'Session expired. Please login again.' : 'Authentication required. Please login.',
+        code: token ? 'SESSION_EXPIRED' : 'NO_TOKEN',
         status: 401,
       }));
     }
@@ -414,6 +431,7 @@ class ApiClient {
       updatedAt: string; 
       wordCount: number; 
       status: string;
+      detectionScore?: number; // Detection score from latest transformation (0-100)
     }>; 
     pagination: {
       page: number;
@@ -2778,6 +2796,32 @@ class ApiClient {
     status: string;
   }> {
     return this.request(`/ml-models/ab-tests/${testId}/stop`, { method: 'POST' });
+  }
+
+  // File Extraction
+  async extractFile(file: File): Promise<{
+    success: boolean;
+    data: {
+      content: string;
+      wordCount: number;
+      characterCount: number;
+      format: 'docx' | 'pdf' | 'txt' | 'epub';
+      metadata?: {
+        title?: string;
+        author?: string;
+        pages?: number;
+      };
+    };
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return this.request('/storage/files/extract', {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header, let browser set it with boundary
+      headers: {},
+    });
   }
 }
 

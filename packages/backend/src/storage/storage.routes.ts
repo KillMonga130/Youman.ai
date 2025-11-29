@@ -23,6 +23,7 @@ import {
   chunkUploadSchema,
 } from './index';
 import { StorageError } from './storage.service';
+import fileExtractionRouter from './file-extraction.routes';
 
 const router = Router();
 
@@ -325,5 +326,8 @@ function formatBytes(bytes: number): string {
   
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
+
+// Mount file extraction routes
+router.use('/files', fileExtractionRouter);
 
 export { router as storageRouter };

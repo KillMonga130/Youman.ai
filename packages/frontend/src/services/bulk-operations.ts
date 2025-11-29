@@ -21,7 +21,8 @@ export type ProgressCallback = (progress: BulkOperationProgress) => void;
  */
 export async function bulkDelete(
   projectIds: string[],
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  projects?: ProjectForBulk[]
 ): Promise<BulkOperationResult> {
   const progress: BulkOperationProgress = {
     total: projectIds.length,
@@ -31,8 +32,15 @@ export async function bulkDelete(
     errors: [],
   };
 
+  // Create a map for quick lookup of project names
+  const projectMap = new Map<string, string>();
+  if (projects) {
+    projects.forEach(p => projectMap.set(p.id, p.name));
+  }
+
   for (const id of projectIds) {
-    progress.currentItem = id;
+    const projectName = projectMap.get(id) || id;
+    progress.currentItem = projectName;
     onProgress?.(progress);
 
     try {
@@ -42,7 +50,7 @@ export async function bulkDelete(
       progress.failed++;
       progress.errors.push({
         id,
-        name: id,
+        name: projectName,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -326,7 +334,7 @@ export async function executeBulkOperation(
 
   switch (action) {
     case 'delete':
-      return bulkDelete(projectIds, onProgress);
+      return bulkDelete(projectIds, onProgress, projects);
     case 'export':
       return bulkExport(
         projects,

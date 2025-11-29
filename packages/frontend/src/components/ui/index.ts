@@ -34,6 +34,12 @@ export {
   type UploadStatus,
 } from './FileUpload';
 
+// Protected Segments
+export {
+  ProtectedSegments,
+  type ProtectedSegment,
+} from './ProtectedSegments';
+
 // Theme
 export { ThemeProvider, useTheme } from './ThemeProvider';
 export * from './theme';
