@@ -32,7 +32,7 @@ import type {
  * Get S3 client configuration from environment
  */
 function getS3Config(): S3Config | null {
-  const { bucket, region, accessKey, secretKey } = config.storage;
+  const { bucket, region, accessKey, secretKey, endpoint } = config.storage;
   
   if (!bucket || !accessKey || !secretKey) {
     return null;
@@ -43,6 +43,7 @@ function getS3Config(): S3Config | null {
     region,
     accessKeyId: accessKey,
     secretAccessKey: secretKey,
+    ...(endpoint && { endpoint }), // For Cloudflare R2 or other S3-compatible services
   };
 }
 

@@ -238,6 +238,17 @@ npm test -- packages/backend/src/auth/auth.test.ts
 
 ## 🚢 Deployment
 
+### Free Tier Deployment (Recommended)
+
+Deploy for **$0/month** using free services:
+
+- **Frontend**: Vercel (FREE)
+- **Backend**: Railway (FREE $5/month credit)
+- **Databases**: Supabase, MongoDB Atlas, Upstash (all FREE)
+
+📖 **[Free Deployment Quick Start →](FREE_SETUP_QUICKSTART.md)** (30 minutes)  
+📖 **[URL Configuration Guide →](URL_CONFIGURATION_GUIDE.md)** ⚠️ **Critical!**
+
 ### Docker
 
 ```bash

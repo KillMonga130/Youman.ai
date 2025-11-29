@@ -31,11 +31,16 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   GOOGLE_API_KEY: z.string().optional(),
 
-  // Storage
+  // Storage (AWS S3 or Cloudflare R2)
   S3_BUCKET: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
-  S3_ACCESS_KEY: z.string().optional(),
-  S3_SECRET_KEY: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(), // Optional - uses IAM role if not provided
+  S3_SECRET_KEY: z.string().optional(), // Optional - uses IAM role if not provided
+  S3_ENDPOINT: z.string().optional(), // For Cloudflare R2 or other S3-compatible services
+  
+  // AWS Bedrock (uses AWS credentials from environment/IAM role)
+  AWS_REGION: z.string().default('us-east-1'),
+  AWS_BEDROCK_ENABLED: z.string().transform(val => val === 'true').default('true'),
 
   // Stripe
   STRIPE_SECRET_KEY: z.string().optional(),
@@ -78,7 +83,7 @@ export const config = {
     expiresIn: env.JWT_EXPIRES_IN,
   },
 
-  corsOrigins: env.CORS_ORIGINS.split(','),
+  corsOrigins: env.CORS_ORIGINS.split(',').map(origin => origin.trim()).filter(origin => origin.length > 0),
 
   externalApis: {
     gptZero: env.GPTZERO_API_KEY,
@@ -99,6 +104,12 @@ export const config = {
     region: env.S3_REGION,
     accessKey: env.S3_ACCESS_KEY,
     secretKey: env.S3_SECRET_KEY,
+    endpoint: env.S3_ENDPOINT, // For Cloudflare R2
+  },
+
+  aws: {
+    region: env.AWS_REGION,
+    bedrockEnabled: env.AWS_BEDROCK_ENABLED,
   },
 
   stripe: {

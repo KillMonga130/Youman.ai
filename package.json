@@ -26,7 +26,8 @@
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
     "docker:build": "docker-compose build",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "validate:urls": "node scripts/validate-urls.js"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

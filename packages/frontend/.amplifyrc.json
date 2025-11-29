@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "frontend": {
+    "framework": "vite",
+    "config": {
+      "SourceDir": "packages/frontend",
+      "DistributionDir": "dist",
+      "BuildCommand": "npm run build",
+      "StartCommand": "npm run dev"
+    }
+  }
+}
+

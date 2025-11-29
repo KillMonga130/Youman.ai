@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: youman-backend
+    env: node
+    rootDir: packages/backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+    healthCheckPath: /api/v1/health
+    plan: free
+

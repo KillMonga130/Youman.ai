@@ -61,7 +61,18 @@ async function startServer(): Promise<void> {
         apiVersion: 'v1',
         websocket: 'enabled',
         wsPath: '/ws',
+        corsOrigins: config.corsOrigins.length > 0 
+          ? config.corsOrigins.join(', ') 
+          : 'none configured',
+        corsOriginsCount: config.corsOrigins.length,
       });
+      
+      // Warn if CORS origins are not configured properly in production
+      if (config.isProduction && config.corsOrigins.length === 0) {
+        logger.warn('⚠️  CORS_ORIGINS is empty in production! API requests may be blocked.');
+      } else if (config.isProduction && config.corsOrigins.length === 1 && config.corsOrigins[0].includes('localhost')) {
+        logger.warn('⚠️  CORS_ORIGINS only includes localhost in production! Add your production frontend URL.');
+      }
     });
 
     // Graceful shutdown handling

@@ -1,7 +1,7 @@
 /**
  * LLM Inference Service
- * Provides integration with OpenAI GPT, Anthropic Claude, and Google Gemini for text humanization
- * Phase 1: Quick win LLM API integration
+ * Provides integration with AWS Bedrock (primary), OpenAI GPT, Anthropic Claude, and Google Gemini for text humanization
+ * AWS-native implementation prioritizing Bedrock for cost-effectiveness and enterprise integration
  */
 
 import OpenAI from 'openai';
@@ -11,8 +11,9 @@ import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { HumanizationLevel, TransformStrategy } from '../transform/types';
 import { SubscriptionTier } from '../subscription/types';
+import { invokeBedrockModel, getBedrockModel, listBedrockModels, type BedrockInvokeOptions } from './bedrock.service';
 
-export type LLMProvider = 'openai' | 'anthropic' | 'gemini';
+export type LLMProvider = 'bedrock' | 'openai' | 'anthropic' | 'gemini';
 
 export interface LLMInferenceOptions {
   provider?: LLMProvider;
@@ -43,6 +44,7 @@ export class LLMInferenceService {
   private anthropicClient: Anthropic | null = null;
   private geminiClient: GoogleGenerativeAI | null = null;
   private enabledProviders: Set<LLMProvider> = new Set();
+  private bedrockEnabled: boolean = false;
 
   constructor() {
     this.initializeClients();
@@ -50,9 +52,22 @@ export class LLMInferenceService {
 
   /**
    * Initializes LLM API clients
+   * AWS Bedrock is prioritized as it uses AWS credentials (no API keys needed)
    */
   private initializeClients(): void {
-    // Initialize OpenAI
+    // Initialize AWS Bedrock first (primary provider - uses AWS credentials)
+    try {
+      const bedrockModels = listBedrockModels();
+      if (bedrockModels.length > 0) {
+        this.bedrockEnabled = true;
+        this.enabledProviders.add('bedrock');
+        logger.info(`AWS Bedrock initialized with ${bedrockModels.length} models available`);
+      }
+    } catch (error) {
+      logger.warn('AWS Bedrock not available (will use fallback providers):', error);
+    }
+
+    // Initialize OpenAI (fallback)
     if (config.externalApis.openai) {
       try {
         this.openaiClient = new OpenAI({
@@ -65,7 +80,7 @@ export class LLMInferenceService {
       }
     }
 
-    // Initialize Anthropic
+    // Initialize Anthropic (fallback)
     if (config.externalApis.anthropic) {
       try {
         this.anthropicClient = new Anthropic({
@@ -78,7 +93,7 @@ export class LLMInferenceService {
       }
     }
 
-    // Initialize Google Gemini
+    // Initialize Google Gemini (fallback)
     if (config.externalApis.google) {
       try {
         this.geminiClient = new GoogleGenerativeAI(config.externalApis.google);
@@ -106,6 +121,7 @@ export class LLMInferenceService {
 
   /**
    * Humanizes text using LLM
+   * Prioritizes AWS Bedrock for cost-effectiveness and AWS-native integration
    */
   async humanize(
     text: string,
@@ -118,6 +134,8 @@ export class LLMInferenceService {
 
     try {
       switch (provider) {
+        case 'bedrock':
+          return await this.humanizeWithBedrock(text, model, options, startTime);
         case 'openai':
           return await this.humanizeWithOpenAI(text, model, options, startTime);
         case 'anthropic':
@@ -129,20 +147,33 @@ export class LLMInferenceService {
       }
     } catch (error) {
       logger.error(`LLM inference failed with ${provider}:`, error);
+      // Fallback to next available provider if Bedrock fails
+      if (provider === 'bedrock' && this.enabledProviders.size > 1) {
+        logger.info('Bedrock failed, falling back to alternative provider');
+        const fallbackProvider = this.selectProvider();
+        if (fallbackProvider !== 'bedrock') {
+          return this.humanize(text, { ...options, provider: fallbackProvider });
+        }
+      }
       throw error;
     }
   }
 
   /**
    * Selects the best available provider
+   * Priority: Bedrock (AWS-native, cost-effective) > OpenAI > Gemini > Anthropic
    */
   private selectProvider(preferredProvider?: LLMProvider): LLMProvider {
     if (preferredProvider && this.enabledProviders.has(preferredProvider)) {
       return preferredProvider;
     }
 
-    // Provider selection priority: OpenAI > Gemini > Anthropic
-    // Gemini is prioritized over Anthropic for better cost-effectiveness
+    // AWS Bedrock is prioritized (no API keys needed, uses AWS credentials, cost-effective)
+    if (this.enabledProviders.has('bedrock')) {
+      return 'bedrock';
+    }
+
+    // Fallback providers
     if (this.enabledProviders.has('openai')) {
       return 'openai';
     }
@@ -155,11 +186,12 @@ export class LLMInferenceService {
       return 'anthropic';
     }
 
-    throw new Error('No LLM providers available. Please configure API keys.');
+    throw new Error('No LLM providers available. Please configure AWS credentials or API keys.');
   }
 
   /**
    * Selects the appropriate model based on user tier
+   * Cost-optimized selection prioritizing Bedrock models
    */
   private selectModel(
     provider: LLMProvider,
@@ -172,26 +204,95 @@ export class LLMInferenceService {
 
     // Model selection based on tier
     switch (provider) {
+      case 'bedrock':
+        // AWS Bedrock models - cost-optimized selection
+        // Free/Basic: Claude Haiku (cheapest: $0.25/$1.25 per 1M tokens)
+        // Standard: Claude 3.5 Sonnet (balanced: $3/$15 per 1M tokens)
+        // Premium/Enterprise: Claude 3 Opus (best quality: $15/$75 per 1M tokens)
+        if (userTier === 'ENTERPRISE' || userTier === 'PROFESSIONAL') {
+          return 'claude-3-opus'; // Best quality for premium users
+        } else if (userTier === 'BASIC' || userTier === 'FREE') {
+          return 'claude-3-haiku'; // Most cost-effective
+        } else {
+          return 'claude-3-5-sonnet'; // Balanced default
+        }
       case 'openai':
         // GPT-4o is the latest and most cost-effective (50% cheaper than GPT-4 Turbo)
-        // Use it for all tiers for best balance of quality, speed, and cost
-        // Model ID: 'gpt-4o' or 'gpt-4o-2024-08-06' (with date for versioning)
-        return 'gpt-4o'; // Latest optimized model - better quality, faster, cheaper
+        return 'gpt-4o';
       case 'anthropic':
-        // Claude 3.5 Sonnet is the latest and improved version (30% faster, better quality)
-        // Use latest for all tiers for consistent quality
-        // Model ID format: 'claude-3-5-sonnet-YYYYMMDD'
-        return 'claude-3-5-sonnet-20241022'; // Latest version - better than 3.0 Sonnet
+        // Claude 3.5 Sonnet is the latest and improved version
+        return 'claude-3-5-sonnet-20241022';
       case 'gemini':
-        // Gemini 2.0 Flash is extremely cost-effective ($0.000075 per 1K tokens)
-        // Use for Basic tier or high-volume processing
-        // For Professional/Enterprise, can use Gemini 1.5 Pro for longer context
+        // Gemini 2.0 Flash is extremely cost-effective
         if (userTier === 'ENTERPRISE' || userTier === 'PROFESSIONAL') {
-          return 'gemini-1.5-pro'; // Better for complex/long documents (2M context)
+          return 'gemini-1.5-pro';
         }
-        return 'gemini-2.0-flash-exp'; // Best cost efficiency, 1M context
+        return 'gemini-2.0-flash-exp';
       default:
         throw new Error(`Unknown provider: ${provider}`);
+    }
+  }
+
+  /**
+   * Humanizes text using AWS Bedrock
+   * Primary method for AWS-native deployments
+   */
+  private async humanizeWithBedrock(
+    text: string,
+    modelId: string,
+    options: LLMInferenceOptions,
+    startTime: number
+  ): Promise<LLMInferenceResult> {
+    if (!this.bedrockEnabled) {
+      throw new Error('AWS Bedrock not available');
+    }
+
+    // Get the Bedrock model configuration
+    const bedrockModel = getBedrockModel(modelId);
+    if (!bedrockModel) {
+      throw new Error(`Bedrock model not found: ${modelId}`);
+    }
+
+    // Build the humanization prompt
+    const systemPrompt = this.buildSystemPrompt(options);
+    const userPrompt = this.buildHumanizationPrompt(text, options);
+    
+    // Combine prompts for Bedrock (some models need combined prompt)
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
+    const temperature = options.temperature ?? this.calculateTemperature(options.level);
+    const maxTokens = options.maxTokens ?? this.calculateMaxTokens(text.length);
+
+    try {
+      const result = await invokeBedrockModel({
+        modelId: bedrockModel.modelId,
+        prompt: fullPrompt,
+        maxTokens: Math.min(maxTokens, bedrockModel.maxTokens),
+        temperature,
+        region: bedrockModel.region,
+      });
+
+      const latencyMs = Date.now() - startTime;
+
+      logger.info('Bedrock humanization completed', {
+        model: bedrockModel.name,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        cost: result.estimatedCost,
+        latencyMs,
+      });
+
+      return {
+        humanizedText: result.content,
+        provider: 'bedrock',
+        model: bedrockModel.name,
+        latencyMs,
+        tokensUsed: result.inputTokens + result.outputTokens,
+        cost: result.estimatedCost,
+      };
+    } catch (error) {
+      logger.error('Bedrock humanization failed:', error);
+      throw error;
     }
   }
 

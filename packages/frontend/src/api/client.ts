@@ -1,5 +1,39 @@
 // Use environment variable for API URL, fallback to relative path for production
-const API_BASE_URL = (import.meta.env?.VITE_API_URL as string | undefined) || '/api/v1';
+// If VITE_API_URL is set, use it directly (it should NOT include /api/v1)
+// If not set, use relative path /api/v1 (works with proxy or same domain)
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env?.VITE_API_URL as string | undefined;
+  
+  if (!envUrl || envUrl.trim() === '') {
+    // No URL set - use relative path (works with vite proxy in dev or reverse proxy in prod)
+    return '/api/v1';
+  }
+  
+  // Remove trailing slashes and /api/v1 if present (we'll add it)
+  let baseUrl = envUrl.trim().replace(/\/+$/, '').replace(/\/api\/v1$/, '');
+  
+  // Ensure it's a valid URL format
+  if (!baseUrl.startsWith('http://') && !baseUrl.startsWith('https://')) {
+    console.warn('VITE_API_URL should start with http:// or https://. Using relative path instead.');
+    return '/api/v1';
+  }
+  
+  // Append /api/v1 to the base URL
+  return `${baseUrl}/api/v1`;
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Log API URL in development for debugging
+if (import.meta.env.DEV) {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+  const envUrl = import.meta.env?.VITE_API_URL as string | undefined;
+  if (envUrl) {
+    console.log('   From VITE_API_URL:', envUrl);
+  } else {
+    console.log('   Using relative path (proxy mode)');
+  }
+}
 
 interface ApiError {
   message: string;
