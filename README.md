@@ -1,4 +1,4 @@
-# AI Humanizer
+# AI Humanizer - Complete Documentation
 
 <div align="center">
 
@@ -11,6 +11,8 @@
 [![React](https://img.shields.io/badge/React-18-blue?logo=react)](https://reactjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-1675%20Passing-brightgreen)](packages/backend)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](docker-compose.yml)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-Ready-blue?logo=kubernetes)](k8s/)
 
 **© 2024 Mubvafhi Mueletshedzi Moses | Software ID: AIH-2024-MMM-001**
 
@@ -18,489 +20,302 @@
 
 ---
 
-## 📋 Table of Contents
+## 🚀 Quick Start
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Architecture](#-architecture)
-- [Tech Stack](#-tech-stack)
-- [Getting Started](#-getting-started)
-- [Configuration](#-configuration)
-- [API Documentation](#-api-documentation)
-- [Deployment](#-deployment)
-- [Testing](#-testing)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
-- [License](#-license)
+Get up and running in 5 minutes:
 
----
+```bash
+# Clone and start with Docker
+git clone https://github.com/yourusername/ai-humanizer.git
+cd ai-humanizer
+docker-compose up -d --build
 
-## 🎯 Overview
+# Access the app
+# Frontend: http://localhost:3000
+# Backend: http://localhost:3001
+# API Docs: http://localhost:3001/api/docs
+```
 
-AI Humanizer is an enterprise-grade platform that transforms AI-generated text into natural, human-like content while preserving meaning and context. Built with modern technologies and designed for scalability, it offers comprehensive text transformation capabilities with real-time collaboration features.
-
-### Key Capabilities
-
-- **AI Detection & Bypass**: Detect AI-generated content and transform it to pass AI detection tools
-- **Multi-Language Support**: Process text in 50+ languages with automatic detection
-- **Real-Time Collaboration**: WebSocket-powered collaborative editing with operational transforms
-- **Enterprise Security**: MFA, role-based access control, and comprehensive audit logging
-- **Cloud Integrations**: Connect with Google Drive, Dropbox, OneDrive, and AWS S3
-- **Advanced Analytics**: Track usage, performance metrics, and content quality scores
+📖 **[Full Quick Start Guide →](docs/PART_4_INSTALLATION.md#quick-start-guide)**
 
 ---
 
-## ✨ Features
+## 📚 Documentation Structure
 
-### Core Text Processing
-| Feature | Description |
-|---------|-------------|
-| **AI Detection** | Multi-model detection with confidence scoring |
-| **Humanization** | Transform AI text with adjustable intensity levels |
-| **Tone Adjustment** | Modify text tone (formal, casual, professional, etc.) |
-| **Grammar Correction** | Advanced grammar and style improvements |
-| **Plagiarism Check** | Detect and highlight potential plagiarism |
-| **SEO Optimization** | Optimize content for search engines |
+This documentation is organized into **10 comprehensive parts**, each in its own file for easy navigation:
 
-### Content Transformation
-| Feature | Description |
-|---------|-------------|
-| **Summarization** | Generate concise summaries of long content |
-| **Expansion** | Expand brief content with relevant details |
-| **Translation** | Translate between 50+ languages |
-| **Simplification** | Reduce reading complexity |
-| **Formalization** | Convert casual text to formal style |
-| **Repurposing** | Adapt content for different platforms |
+### 📖 Core Documentation
+
+| Part | Document | Description |
+|------|----------|-------------|
+| **Part 1** | [Introduction & Overview](docs/PART_1_INTRODUCTION.md) | What is AI Humanizer, use cases, key capabilities |
+| **Part 2** | [Features & Capabilities](docs/PART_2_FEATURES.md) | Complete feature list with detailed descriptions |
+| **Part 3** | [Architecture & Technology](docs/PART_3_ARCHITECTURE.md) | System architecture, tech stack, data flow |
+| **Part 4** | [Installation & Setup](docs/PART_4_INSTALLATION.md) | Installation guides for all environments |
+| **Part 5** | [Configuration](docs/PART_5_CONFIGURATION.md) | Environment variables, database, AI services |
+| **Part 6** | [API Documentation](docs/PART_6_API_DOCS.md) | Complete API reference with examples |
+| **Part 7** | [Development Guide](docs/PART_7_DEVELOPMENT.md) | Developer workflow, code style, testing |
+| **Part 8** | [Deployment & Operations](docs/PART_8_DEPLOYMENT.md) | Production deployment, monitoring, scaling |
+| **Part 9** | [User Guide](docs/PART_9_USER_GUIDE.md) | End-user documentation and tutorials |
+| **Part 10** | [Additional Resources](docs/PART_10_RESOURCES.md) | Contributing, license, support, roadmap |
+
+### 🔧 Specialized Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Complete API Reference](docs/API_REFERENCE.md) | Detailed API endpoint documentation |
+| [Security Guide](docs/SECURITY.md) | Security best practices and configuration |
+| [Performance Guide](docs/PERFORMANCE.md) | Performance optimization and tuning |
+| [Database Schema](docs/DATABASE_SCHEMA.md) | Complete database schema documentation |
+| [AI Models Guide](LLM_SELECTION_GUIDE.md) | AI model selection and configuration |
+
+### 📋 Quick Reference
+
+| Document | Description |
+|----------|-------------|
+| [Quick Start](QUICK_START.md) | 5-minute setup guide |
+| [Testing Guide](TESTING_GUIDE.md) | How to run and write tests |
+| [Test Data](TEST_DATA.md) | Test data and scenarios |
+| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+
+---
+
+## 🎯 What is AI Humanizer?
+
+**AI Humanizer** is an enterprise-grade, full-stack platform that transforms AI-generated text into natural, human-like content while preserving meaning, context, and intent. Built with modern technologies and designed for scalability.
+
+### Key Highlights
+
+- ✅ **Multiple AI Models**: OpenAI GPT-4, Claude, AWS Bedrock, Google Gemini
+- ✅ **Real-Time Collaboration**: WebSocket-powered collaborative editing
+- ✅ **Enterprise Security**: MFA, RBAC, audit logging, data encryption
+- ✅ **Advanced Analytics**: Usage tracking, performance metrics, quality scores
+- ✅ **Cloud Integrations**: Google Drive, Dropbox, OneDrive, AWS S3
+- ✅ **White-Label Support**: Fully customizable branding
+- ✅ **Comprehensive API**: RESTful API with full documentation
+
+📖 **[Read Full Introduction →](docs/PART_1_INTRODUCTION.md)**
+
+---
+
+## ✨ Key Features
+
+### Core Capabilities
+
+- **AI Detection & Bypass**: Multi-model detection with intelligent transformation
+- **Text Humanization**: 5 intensity levels with multiple strategies
+- **Tone Adjustment**: Formal, casual, professional, academic, creative
+- **Multi-Language**: Support for 50+ languages with auto-detection
+- **Version Control**: Full document history with branching
+- **Real-Time Collaboration**: Live editing with presence indicators
 
 ### Enterprise Features
-| Feature | Description |
-|---------|-------------|
-| **Multi-Factor Auth** | TOTP-based two-factor authentication |
-| **Team Collaboration** | Real-time document editing with presence |
-| **Version Control** | Full document history with branching |
-| **White-Label** | Customizable branding for resellers |
-| **API Access** | RESTful API with comprehensive documentation |
-| **Webhooks** | Event-driven integrations |
 
-### Infrastructure
-| Feature | Description |
-|---------|-------------|
-| **Auto-Scaling** | Kubernetes HPA for dynamic scaling |
-| **Disaster Recovery** | Automated backups and failover |
-| **CDN Integration** | Global content delivery |
-| **Monitoring** | Prometheus metrics and Grafana dashboards |
-| **Feature Flags** | Gradual rollouts and A/B testing |
+- **Multi-Factor Authentication**: TOTP-based 2FA with backup codes
+- **Role-Based Access Control**: Granular permissions
+- **Audit Logging**: Comprehensive activity tracking
+- **White-Label**: Customizable branding
+- **API Access**: RESTful API with webhooks
+- **Analytics Dashboard**: Usage statistics and insights
+
+📖 **[See All Features →](docs/PART_2_FEATURES.md)**
 
 ---
 
 ## 🏗 Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Load Balancer                           │
-│                    (Nginx Ingress Controller)                   │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        │                     │                     │
-        ▼                     ▼                     ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│   Frontend    │    │   Backend     │    │   WebSocket   │
-│   (React)     │    │   (Express)   │    │   Server      │
-│   Port: 3000  │    │   Port: 8080  │    │   Port: 8080  │
-└───────────────┘    └───────┬───────┘    └───────────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        │                    │                    │
-        ▼                    ▼                    ▼
-┌───────────────┐    ┌───────────────┐    ┌───────────────┐
-│  PostgreSQL   │    │   MongoDB     │    │    Redis      │
-│  (Primary DB) │    │  (Documents)  │    │   (Cache)     │
-│   Port: 5432  │    │   Port: 27017 │    │   Port: 6379  │
-└───────────────┘    └───────────────┘    └───────────────┘
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Frontend   │    │   Backend     │    │   WebSocket  │
+│   (React)    │    │  (Express)    │    │   Server     │
+└──────┬───────┘    └───────┬───────┘    └──────────────┘
+       │                    │
+       └──────────┬─────────┘
+                  │
+    ┌─────────────┼─────────────┐
+    │             │             │
+    ▼             ▼             ▼
+┌─────────┐  ┌─────────┐  ┌─────────┐
+│PostgreSQL│  │ MongoDB │  │  Redis  │
+└─────────┘  └─────────┘  └─────────┘
 ```
 
-### Data Flow
-
-1. **Request Processing**: Client requests → Load Balancer → API Gateway
-2. **Authentication**: JWT validation → Rate limiting → Request routing
-3. **Business Logic**: Service layer → Database operations → Response
-4. **Real-Time**: WebSocket connections → Operational transforms → Sync
+📖 **[Full Architecture Details →](docs/PART_3_ARCHITECTURE.md)**
 
 ---
 
-## 🛠 Tech Stack
+## 🛠 Technology Stack
 
 ### Frontend
-- **Framework**: React 18 with TypeScript
-- **State Management**: Zustand
-- **Styling**: Tailwind CSS
-- **API Client**: Axios with React Query
-- **Real-Time**: Socket.io Client
+- React 18 + TypeScript
+- Tailwind CSS
+- Zustand (State Management)
+- React Query (Server State)
+- Vite (Build Tool)
 
 ### Backend
-- **Runtime**: Node.js 18+
-- **Framework**: Express.js
-- **Language**: TypeScript 5.3
-- **ORM**: Prisma (PostgreSQL) + Mongoose (MongoDB)
-- **Caching**: Redis with ioredis
-- **WebSocket**: Socket.io
+- Node.js 18+ + Express
+- TypeScript 5.3
+- Prisma (PostgreSQL ORM)
+- Mongoose (MongoDB ODM)
+- Redis (Caching)
 
-### Databases
-- **PostgreSQL**: User data, subscriptions, analytics
-- **MongoDB**: Documents, versions, collaboration data
-- **Redis**: Session cache, rate limiting, real-time sync
+### AI/ML
+- OpenAI API (GPT-4, GPT-3.5)
+- Anthropic API (Claude 3)
+- AWS Bedrock
+- Google Gemini
 
-### Infrastructure
-- **Containerization**: Docker & Docker Compose
-- **Orchestration**: Kubernetes with Kustomize
-- **CI/CD**: GitHub Actions
-- **Monitoring**: Prometheus + Grafana
-- **Logging**: Structured JSON logging
+📖 **[Complete Tech Stack →](docs/PART_3_ARCHITECTURE.md#technology-stack)**
 
 ---
 
-## 🚀 Getting Started
+## 📦 Installation
 
-### Prerequisites
+### Docker (Recommended)
 
-- Node.js 18.0.0 or higher
-- npm 9.0.0 or higher
-- Docker & Docker Compose
-- PostgreSQL 15+
-- MongoDB 6+
-- Redis 7+
-
-### Quick Start
-
-1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/ai-humanizer.git
-cd ai-humanizer
+docker-compose up -d --build
 ```
 
-2. **Install dependencies**
+### Local Development
+
 ```bash
 npm install
-```
-
-3. **Set up environment variables**
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-4. **Start databases with Docker**
-```bash
-docker-compose up -d postgres mongodb redis
-```
-
-5. **Run database migrations**
-```bash
-cd packages/backend
-npx prisma migrate dev
-npx prisma db seed
-```
-
-6. **Start development servers**
-```bash
-# From root directory
+cd packages/backend && npx prisma migrate dev
 npm run dev
 ```
 
-7. **Access the application**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8080
-- API Docs: http://localhost:8080/api/docs
-
-### Docker Deployment
-
-```bash
-# Build and start all services
-docker-compose up -d --build
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
+📖 **[Detailed Installation Guide →](docs/PART_4_INSTALLATION.md)**
 
 ---
 
-## ⚙️ Configuration
+## 🔌 API Documentation
 
-### Environment Variables
+Interactive API documentation available at:
+- **Development**: http://localhost:3001/api/docs
+- **Production**: https://your-domain.com/api/docs
 
-Create a `.env` file in the root directory:
-
-```env
-# Server Configuration
-NODE_ENV=development
-PORT=8080
-API_VERSION=v1
-
-# Database - PostgreSQL
-DATABASE_URL=postgresql://user:password@localhost:5432/ai_humanizer
-
-# Database - MongoDB
-MONGODB_URI=mongodb://localhost:27017/ai_humanizer
-
-# Database - Redis
-REDIS_URL=redis://localhost:6379
-
-# Authentication
-JWT_SECRET=your-super-secret-jwt-key
-JWT_EXPIRES_IN=7d
-REFRESH_TOKEN_EXPIRES_IN=30d
-
-# AI Services
-OPENAI_API_KEY=sk-your-openai-key
-ANTHROPIC_API_KEY=your-anthropic-key
-
-# Cloud Storage
-AWS_ACCESS_KEY_ID=your-aws-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret
-AWS_S3_BUCKET=ai-humanizer-storage
-AWS_REGION=us-east-1
-
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-DROPBOX_APP_KEY=your-dropbox-key
-DROPBOX_APP_SECRET=your-dropbox-secret
-
-# Email (SMTP)
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-email@example.com
-SMTP_PASS=your-email-password
-
-# Stripe (Payments)
-STRIPE_SECRET_KEY=sk_test_your-stripe-key
-STRIPE_WEBHOOK_SECRET=whsec_your-webhook-secret
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# Feature Flags
-ENABLE_AI_DETECTION=true
-ENABLE_COLLABORATION=true
-ENABLE_ANALYTICS=true
-```
-
-### Kubernetes Configuration
-
-See `k8s/README.md` for detailed Kubernetes deployment instructions.
-
----
-
-## 📚 API Documentation
-
-### Authentication
+### Quick API Example
 
 ```bash
-# Register
-POST /api/v1/auth/register
-{
-  "email": "user@example.com",
-  "password": "securePassword123",
-  "name": "John Doe"
-}
-
-# Login
-POST /api/v1/auth/login
-{
-  "email": "user@example.com",
-  "password": "securePassword123"
-}
-
-# Response
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "refreshToken": "eyJhbGciOiJIUzI1NiIs...",
-  "user": { "id": "...", "email": "...", "name": "..." }
-}
+# Humanize text
+curl -X POST http://localhost:3001/api/v1/transformations/humanize \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "AI-generated text...",
+    "level": 3,
+    "strategy": "professional"
+  }'
 ```
 
-### Text Processing
-
-```bash
-# Detect AI Content
-POST /api/v1/detection/analyze
-Authorization: Bearer <token>
-{
-  "text": "Your text to analyze...",
-  "models": ["gpt", "claude", "gemini"]
-}
-
-# Humanize Text
-POST /api/v1/transform/humanize
-Authorization: Bearer <token>
-{
-  "text": "AI-generated text...",
-  "level": "medium",
-  "preserveFormatting": true
-}
-
-# Adjust Tone
-POST /api/v1/tone/adjust
-Authorization: Bearer <token>
-{
-  "text": "Your text...",
-  "targetTone": "professional"
-}
-```
-
-### Full API Reference
-
-Access the interactive Swagger documentation at:
-- Development: http://localhost:8080/api/docs
-- Production: https://your-domain.com/api/docs
-
----
-
-## 🚢 Deployment
-
-### Production Checklist
-
-- [ ] Set `NODE_ENV=production`
-- [ ] Configure secure JWT secrets
-- [ ] Set up SSL/TLS certificates
-- [ ] Configure database connection pooling
-- [ ] Enable rate limiting
-- [ ] Set up monitoring and alerting
-- [ ] Configure backup schedules
-- [ ] Review security headers
-
-### Kubernetes Deployment
-
-```bash
-# Apply base configuration
-kubectl apply -k k8s/
-
-# Apply production overlay
-kubectl apply -k k8s/overlays/production/
-
-# Check deployment status
-kubectl get pods -n ai-humanizer
-```
-
-### CI/CD Pipeline
-
-The project includes GitHub Actions workflows for:
-- **CI**: Linting, testing, and building on every PR
-- **CD**: Automatic deployment to staging/production
-- **Release**: Semantic versioning and changelog generation
+📖 **[Complete API Reference →](docs/PART_6_API_DOCS.md)**  
+📖 **[Detailed API Endpoints →](docs/API_REFERENCE.md)**
 
 ---
 
 ## 🧪 Testing
 
-### Running Tests
-
 ```bash
 # Run all tests
 npm test
 
-# Run backend tests only
-cd packages/backend && npm test
-
-# Run frontend tests only
-cd packages/frontend && npm test
-
 # Run with coverage
 npm test -- --coverage
 
-# Run specific test file
+# Run specific test
 npm test -- packages/backend/src/auth/auth.test.ts
 ```
 
-### Test Statistics
+- **Total Tests**: 1,675+
+- **Test Files**: 57+
+- **Coverage**: Comprehensive
 
-- **Total Tests**: 1,675
-- **Test Files**: 57
-- **Coverage**: Comprehensive unit and integration tests
-
-### Test Categories
-
-- Unit tests for all services
-- Integration tests for API endpoints
-- Property-based tests for core algorithms
-- E2E tests for critical user flows
+📖 **[Testing Guide →](TESTING_GUIDE.md)**
 
 ---
 
-## 📁 Project Structure
+## 🚢 Deployment
 
+### Docker
+
+```bash
+docker-compose up -d
 ```
-ai-humanizer/
-├── .github/                    # GitHub Actions workflows
-│   └── workflows/
-│       ├── ci.yml              # Continuous Integration
-│       ├── cd.yml              # Continuous Deployment
-│       └── release.yml         # Release automation
-├── docs/                       # Documentation
-│   ├── DEVELOPER_GUIDE.md
-│   ├── USER_GUIDE.md
-│   └── TROUBLESHOOTING.md
-├── k8s/                        # Kubernetes manifests
-│   ├── overlays/
-│   │   ├── development/
-│   │   └── production/
-│   ├── backend-deployment.yaml
-│   ├── frontend-deployment.yaml
-│   └── ...
-├── packages/
-│   ├── backend/                # Express.js API server
-│   │   ├── prisma/             # Database schema & migrations
-│   │   ├── src/
-│   │   │   ├── api/            # API gateway & middleware
-│   │   │   ├── auth/           # Authentication & authorization
-│   │   │   ├── detection/      # AI detection service
-│   │   │   ├── transform/      # Text transformation
-│   │   │   ├── collaboration/  # Real-time collaboration
-│   │   │   ├── monitoring/     # Metrics & logging
-│   │   │   └── ...
-│   │   └── package.json
-│   ├── frontend/               # React application
-│   │   ├── src/
-│   │   │   ├── components/     # UI components
-│   │   │   ├── pages/          # Page components
-│   │   │   ├── context/        # React contexts
-│   │   │   ├── hooks/          # Custom hooks
-│   │   │   ├── api/            # API client
-│   │   │   └── store/          # State management
-│   │   └── package.json
-│   └── shared/                 # Shared types & utilities
-├── docker-compose.yml          # Docker Compose configuration
-├── package.json                # Root package.json
-├── tsconfig.base.json          # Base TypeScript config
-├── LICENSE                     # MIT License
-├── OWNERSHIP.md                # Ownership declaration
-└── README.md                   # This file
+
+### Kubernetes
+
+```bash
+kubectl apply -k k8s/overlays/production/
 ```
+
+📖 **[Complete Deployment Guide →](docs/PART_8_DEPLOYMENT.md)**
+
+---
+
+## 📖 Documentation Index
+
+### By Role
+
+**👨‍💻 Developers**
+- [Development Guide](docs/PART_7_DEVELOPMENT.md)
+- [API Documentation](docs/PART_6_API_DOCS.md)
+- [Architecture](docs/PART_3_ARCHITECTURE.md)
+- [Testing Guide](TESTING_GUIDE.md)
+
+**👥 End Users**
+- [User Guide](docs/PART_9_USER_GUIDE.md)
+- [Quick Start](QUICK_START.md)
+- [Troubleshooting](docs/TROUBLESHOOTING.md)
+
+**🔧 DevOps**
+- [Deployment Guide](docs/PART_8_DEPLOYMENT.md)
+- [Configuration](docs/PART_5_CONFIGURATION.md)
+- [Performance Guide](docs/PERFORMANCE.md)
+- [Security Guide](docs/SECURITY.md)
+
+**📊 Product Managers**
+- [Features Overview](docs/PART_2_FEATURES.md)
+- [Introduction](docs/PART_1_INTRODUCTION.md)
+- [Roadmap](docs/PART_10_RESOURCES.md#roadmap)
+
+### By Topic
+
+**Getting Started**
+- [Quick Start](QUICK_START.md)
+- [Installation Guide](docs/PART_4_INSTALLATION.md)
+- [Configuration](docs/PART_5_CONFIGURATION.md)
+
+**Development**
+- [Development Guide](docs/PART_7_DEVELOPMENT.md)
+- [API Reference](docs/API_REFERENCE.md)
+- [Database Schema](docs/DATABASE_SCHEMA.md)
+
+**Operations**
+- [Deployment](docs/PART_8_DEPLOYMENT.md)
+- [Security](docs/SECURITY.md)
+- [Performance](docs/PERFORMANCE.md)
+- [Monitoring](docs/PART_8_DEPLOYMENT.md#monitoring--logging)
+
+**Features**
+- [Features Overview](docs/PART_2_FEATURES.md)
+- [User Guide](docs/PART_9_USER_GUIDE.md)
+- [AI Models](LLM_SELECTION_GUIDE.md)
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these steps:
+We welcome contributions! Please see our contributing guidelines:
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Write tests
+5. Submit a pull request
 
-### Development Guidelines
-
-- Follow TypeScript best practices
-- Write tests for new features
-- Update documentation as needed
-- Follow the existing code style
-- Use conventional commits
+📖 **[Contributing Guide →](docs/PART_10_RESOURCES.md#contributing)**
 
 ---
 
@@ -517,16 +332,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Email: mubvafhimoses813@gmail.com
 - Software ID: AIH-2024-MMM-001
 
-This software is the exclusive intellectual property of Mubvafhi Mueletshedzi Moses. 
+This software is the exclusive intellectual property of Mubvafhi Mueletshedzi Moses.  
 See [OWNERSHIP.md](OWNERSHIP.md) for complete ownership declaration.
 
 ---
 
-## 🙏 Acknowledgments
+## 📞 Support
 
-- OpenAI for GPT models
-- Anthropic for Claude
-- The open-source community
+- **Documentation**: See `docs/` directory
+- **Issues**: GitHub Issues
+- **Email**: mubvafhimoses813@gmail.com
+- **Troubleshooting**: [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 
 ---
 
@@ -535,5 +351,7 @@ See [OWNERSHIP.md](OWNERSHIP.md) for complete ownership declaration.
 **Built with ❤️ by Mubvafhi Mueletshedzi Moses**
 
 © 2024 All Rights Reserved | Software ID: AIH-2024-MMM-001
+
+[⬆ Back to Top](#-ai-humanizer---complete-documentation)
 
 </div>

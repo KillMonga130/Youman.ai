@@ -1,37 +1,36 @@
 /**
- * AI Humanizer Design System - Theme Configuration
- * WCAG AAA Compliant Design Tokens
- * NO PURPLE - Uses blue, gray, green, amber, red, teal
+ * Youman.ai Design System - Cyberpunk Theme Configuration
+ * Sci-Fi Theme with Glowing Effects
  */
 
 export const colors = {
-  // Primary - Blue (main brand color)
+  // Primary - Cyan (cyberpunk glow)
   primary: {
-    50: '#eff6ff',
-    100: '#dbeafe',
-    200: '#bfdbfe',
-    300: '#93c5fd',
-    400: '#60a5fa',
-    500: '#3b82f6',
-    600: '#2563eb',
-    700: '#1d4ed8',
-    800: '#1e40af',
-    900: '#1e3a8a',
-    950: '#172554',
+    50: '#ecfeff',
+    100: '#cffafe',
+    200: '#a5f3fc',
+    300: '#67e8f9',
+    400: '#22d3ee',
+    500: '#06b6d4',
+    600: '#0891b2',
+    700: '#0e7490',
+    800: '#155e75',
+    900: '#164e63',
+    950: '#083344',
   },
-  // Gray - Neutral tones
+  // Gray - Cyberpunk Dark
   gray: {
-    50: '#f8fafc',
-    100: '#f1f5f9',
-    200: '#e2e8f0',
-    300: '#cbd5e1',
-    400: '#94a3b8',
-    500: '#64748b',
-    600: '#475569',
-    700: '#334155',
-    800: '#1e293b',
-    900: '#0f172a',
-    950: '#020617',
+    50: '#1a1a1a',
+    100: '#2a2a2a',
+    200: '#3a3a3a',
+    300: '#4a4a4a',
+    400: '#5a5a5a',
+    500: '#6a6a6a',
+    600: '#7a7a7a',
+    700: '#8a8a8a',
+    800: '#0a0a0a',
+    900: '#050505',
+    950: '#000000',
   },
   // Success - Green
   success: {
@@ -75,26 +74,40 @@ export const colors = {
     900: '#7f1d1d',
     950: '#450a0a',
   },
-  // Accent - Teal
+  // Accent - Bright Cyan/White (cyberpunk glow)
+  accent: {
+    50: '#ffffff',
+    100: '#f0ffff',
+    200: '#e0ffff',
+    300: '#b0ffff',
+    400: '#80ffff',
+    500: '#00ffff',
+    600: '#00e6e6',
+    700: '#00cccc',
+    800: '#00b3b3',
+    900: '#009999',
+    950: '#006666',
+  },
+  // Teal - Cyberpunk variant
   teal: {
-    50: '#f0fdfa',
-    100: '#ccfbf1',
-    200: '#99f6e4',
-    300: '#5eead4',
-    400: '#2dd4bf',
-    500: '#14b8a6',
-    600: '#0d9488',
-    700: '#0f766e',
-    800: '#115e59',
-    900: '#134e4a',
-    950: '#042f2e',
+    50: '#ecfeff',
+    100: '#cffafe',
+    200: '#a5f3fc',
+    300: '#67e8f9',
+    400: '#22d3ee',
+    500: '#06b6d4',
+    600: '#0891b2',
+    700: '#0e7490',
+    800: '#155e75',
+    900: '#164e63',
+    950: '#083344',
   },
 } as const;
 
 export const typography = {
   fontFamily: {
-    sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-    mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'monospace'],
+    sans: ['Orbitron', 'Rajdhani', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+    mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'Consolas', 'Monaco', 'monospace'],
   },
   fontSize: {
     xs: '0.75rem',     // 12px

@@ -26,6 +26,7 @@ export interface UserSettings {
   defaultStrategy: 'casual' | 'professional' | 'academic' | 'auto';
   defaultLanguage: string;
   darkMode: boolean;
+  cyberpunkTheme: boolean;
   autoSave: boolean;
   accessibility: AccessibilitySettings;
 }
@@ -93,6 +94,7 @@ export const useAppStore = create<AppState>()(
         defaultStrategy: 'auto',
         defaultLanguage: 'en',
         darkMode: false,
+        cyberpunkTheme: true, // Default to cyberpunk theme
         autoSave: true,
         accessibility: {
           highContrast: false,

@@ -7,12 +7,14 @@ import { Button, Input, Alert } from '../components/ui';
 
 export function Login(): JSX.Element {
   const navigate = useNavigate();
-  const { setUser } = useAppStore();
+  const { setUser, settings } = useAppStore();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
+  const isCyberpunk = settings.cyberpunkTheme;
 
   const loginMutation = useLogin();
   const registerMutation = useRegister();
@@ -59,12 +61,42 @@ export function Login(): JSX.Element {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="max-w-md w-full space-y-8">
+    <div className={`min-h-screen flex items-center justify-center px-4 relative overflow-hidden ${
+      isCyberpunk ? 'bg-black' : 'bg-white dark:bg-black'
+    }`}>
+      {isCyberpunk && (
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute inset-0" style={{
+            background: `radial-gradient(circle at 20% 50%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
+                          radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.1) 0%, transparent 50%)`
+          }} />
+        </div>
+      )}
+      <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">AI Humanizer</h1>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            {isLogin ? 'Sign in to your account' : 'Create a new account'}
+          {!logoError && (
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/images/logo-1.png" 
+                alt="Youman.ai Logo" 
+                className={`h-16 w-auto object-contain ${
+                  isCyberpunk ? 'glow-cyan' : ''
+                }`}
+                onError={() => setLogoError(true)}
+              />
+            </div>
+          )}
+          <h1 className={`text-4xl font-bold text-gradient mb-2 ${
+            isCyberpunk 
+              ? 'text-glow-white font-sans' 
+              : 'font-serif tracking-wide'
+          }`}>Youman.ai</h1>
+          <p className={`mt-2 text-sm ${
+            isCyberpunk 
+              ? 'text-cyan-400/80 font-mono' 
+              : 'text-gray-600 dark:text-gray-400 font-sans tracking-widest uppercase'
+          }`}>
+            {isLogin ? 'SIGN IN TO YOUR ACCOUNT' : 'CREATE A NEW ACCOUNT'}
           </p>
         </div>
 
@@ -144,9 +176,13 @@ export function Login(): JSX.Element {
                 setIsLogin(!isLogin);
                 setError(null);
               }}
-              className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+              className={`text-sm hover:underline ${
+                isCyberpunk 
+                  ? 'text-cyan-400 hover:text-cyan-300 font-mono' 
+                  : 'text-black dark:text-white hover:text-gray-600 dark:hover:text-gray-400 font-sans tracking-wide'
+              }`}
             >
-              {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
+              {isLogin ? "DON'T HAVE AN ACCOUNT? SIGN UP" : 'ALREADY HAVE AN ACCOUNT? SIGN IN'}
             </button>
           </div>
         </div>

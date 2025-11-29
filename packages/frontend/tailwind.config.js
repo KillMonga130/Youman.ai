@@ -5,33 +5,47 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary - Blue (main brand color)
+        // Primary - Cyan (cyberpunk glow)
         primary: {
-          50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          950: '#172554',
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#22d3ee',
+          500: '#06b6d4',
+          600: '#0891b2',
+          700: '#0e7490',
+          800: '#155e75',
+          900: '#164e63',
+          950: '#083344',
         },
-        // Gray - Neutral tones
+        // Gray - Cyberpunk Dark
         gray: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
+          50: '#1a1a1a',
+          100: '#2a2a2a',
+          200: '#3a3a3a',
+          300: '#4a4a4a',
+          400: '#5a5a5a',
+          500: '#6a6a6a',
+          600: '#7a7a7a',
+          700: '#8a8a8a',
+          800: '#0a0a0a',
+          900: '#050505',
+          950: '#000000',
+        },
+        // Cyan for cyberpunk accents
+        cyan: {
+          50: '#ecfeff',
+          100: '#cffafe',
+          200: '#a5f3fc',
+          300: '#67e8f9',
+          400: '#22d3ee',
+          500: '#06b6d4',
+          600: '#0891b2',
+          700: '#0e7490',
+          800: '#155e75',
+          900: '#164e63',
+          950: '#083344',
         },
         // Success - Green
         success: {
@@ -75,19 +89,19 @@ export default {
           900: '#7f1d1d',
           950: '#450a0a',
         },
-        // Accent - Purple
+        // Accent - Bright Cyan/White (cyberpunk glow)
         accent: {
-          50: '#faf5ff',
-          100: '#f3e8ff',
-          200: '#e9d5ff',
-          300: '#d8b4fe',
-          400: '#c084fc',
-          500: '#a855f7',
-          600: '#9333ea',
-          700: '#7e22ce',
-          800: '#6b21a8',
-          900: '#581c87',
-          950: '#3b0764',
+          50: '#ffffff',
+          100: '#f0ffff',
+          200: '#e0ffff',
+          300: '#b0ffff',
+          400: '#80ffff',
+          500: '#00ffff',
+          600: '#00e6e6',
+          700: '#00cccc',
+          800: '#00b3b3',
+          900: '#009999',
+          950: '#006666',
         },
         // Accent - Teal
         teal: {
@@ -105,8 +119,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', 'monospace'],
+        sans: ['Orbitron', 'Rajdhani', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'Consolas', 'Monaco', 'monospace'],
       },
       fontSize: {
         // WCAG AAA compliant font sizes (minimum 16px for body text)

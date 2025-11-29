@@ -45,7 +45,7 @@ const queryClient = new QueryClient({
 
 function LoadingScreen(): JSX.Element {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
+    <div className="min-h-screen flex items-center justify-center bg-black">
       <Spinner size="lg" />
     </div>
   );
@@ -82,11 +82,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }): JSX.Elemen
 }
 
 function AppContent(): JSX.Element {
-  const darkMode = useAppStore(state => state.settings.darkMode);
+  const { darkMode, cyberpunkTheme } = useAppStore(state => state.settings);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
-  }, [darkMode]);
+    document.documentElement.classList.toggle('cyberpunk-theme', cyberpunkTheme);
+    document.documentElement.classList.toggle('professional-theme', !cyberpunkTheme);
+  }, [darkMode, cyberpunkTheme]);
 
   return (
     <KeyboardShortcutsProvider>

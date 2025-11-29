@@ -5,28 +5,55 @@
 @tailwind utilities;
 
 /* ============================================
-   Modern Design System 2024
-   Premium UI with Glassmorphism & Gradients
+   Youman.ai - Cyberpunk Design System 2024
+   Sci-Fi Theme with Glowing Effects
    ============================================ */
 
 :root {
-  /* Modern Color Palette */
-  --color-primary-50: #f0f9ff;
-  --color-primary-100: #e0f2fe;
-  --color-primary-200: #bae6fd;
-  --color-primary-300: #7dd3fc;
-  --color-primary-400: #38bdf8;
-  --color-primary-500: #0ea5e9;
-  --color-primary-600: #0284c7;
-  --color-primary-700: #0369a1;
-  --color-primary-800: #075985;
-  --color-primary-900: #0c4a6e;
-  --color-primary-950: #082f49;
+  /* ============================================
+     CYBERPUNK THEME - 3 Color Palette
+     Primary: Electric Cyan (#00FFFF)
+     Secondary: Pure White (#FFFFFF)
+     Base: Deep Black (#000000)
+     ============================================ */
+  --cyberpunk-primary: #00FFFF;      /* Electric Cyan - Main accent */
+  --cyberpunk-secondary: #FFFFFF;    /* Pure White - Highlights */
+  --cyberpunk-base: #000000;         /* Deep Black - Background */
+  
+  --cyberpunk-primary-dark: #00CCCC; /* Darker cyan for hover */
+  --cyberpunk-primary-light: #66FFFF; /* Lighter cyan for glow */
+  --cyberpunk-gray: #1A1A1A;         /* Dark gray for subtle elements */
 
-  /* Accent Colors - Teal for enterprise palette */
-  --color-accent-500: #14b8a6;
-  --color-accent-600: #0d9488;
-  --color-accent-700: #0f766e;
+  /* ============================================
+     PROFESSIONAL THEME - 3 Color Palette
+     Primary: Pure Black (#000000)
+     Secondary: Pure White (#FFFFFF)
+     Accent: Charcoal Gray (#4A4A4A)
+     ============================================ */
+  --professional-primary: #000000;    /* Pure Black */
+  --professional-secondary: #FFFFFF;   /* Pure White */
+  --professional-accent: #4A4A4A;     /* Charcoal Gray for borders/details */
+  
+  --professional-gray-light: #F5F5F5; /* Light gray for subtle backgrounds */
+  --professional-gray-dark: #2A2A2A;   /* Dark gray for dark mode */
+
+  /* Legacy color support */
+  --color-primary-50: #ecfeff;
+  --color-primary-100: #cffafe;
+  --color-primary-200: #a5f3fc;
+  --color-primary-300: #67e8f9;
+  --color-primary-400: #22d3ee;
+  --color-primary-500: #06b6d4;
+  --color-primary-600: #0891b2;
+  --color-primary-700: #0e7490;
+  --color-primary-800: #155e75;
+  --color-primary-900: #164e63;
+  --color-primary-950: #083344;
+
+  /* Accent Colors - Bright Cyan/White for cyberpunk glow */
+  --color-accent-500: #00ffff;
+  --color-accent-600: #00e6e6;
+  --color-accent-700: #00cccc;
 
   /* Success */
   --color-success-50: #f0fdf4;
@@ -44,27 +71,28 @@
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
 
-  /* Gray Scale - Modern */
-  --color-gray-50: #fafafa;
-  --color-gray-100: #f5f5f5;
-  --color-gray-200: #e5e5e5;
-  --color-gray-300: #d4d4d4;
-  --color-gray-400: #a3a3a3;
-  --color-gray-500: #737373;
-  --color-gray-600: #525252;
-  --color-gray-700: #404040;
-  --color-gray-800: #262626;
-  --color-gray-900: #171717;
-  --color-gray-950: #0a0a0a;
+  /* Gray Scale - Cyberpunk Dark */
+  --color-gray-50: #1a1a1a;
+  --color-gray-100: #2a2a2a;
+  --color-gray-200: #3a3a3a;
+  --color-gray-300: #4a4a4a;
+  --color-gray-400: #5a5a5a;
+  --color-gray-500: #6a6a6a;
+  --color-gray-600: #7a7a7a;
+  --color-gray-700: #8a8a8a;
+  --color-gray-800: #0a0a0a;
+  --color-gray-900: #050505;
+  --color-gray-950: #000000;
 
-  /* Gradients - Enterprise Professional Palette */
-  --gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  --gradient-accent: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
-  --gradient-success: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-  --gradient-warm: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  --gradient-cool: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-  --gradient-teal: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
-  --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  /* Gradients - Cyberpunk Glow Palette */
+  --gradient-primary: linear-gradient(135deg, #00ffff 0%, #0891b2 100%);
+  --gradient-accent: linear-gradient(135deg, #ffffff 0%, #00ffff 100%);
+  --gradient-success: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  --gradient-warm: linear-gradient(135deg, #ffaa00 0%, #ff6600 100%);
+  --gradient-cool: linear-gradient(135deg, #00ffff 0%, #0066ff 100%);
+  --gradient-teal: linear-gradient(135deg, #00ffff 0%, #00cccc 100%);
+  --gradient-glass: linear-gradient(135deg, rgba(0, 255, 255, 0.1) 0%, rgba(0, 255, 255, 0.05) 100%);
+  --gradient-glow: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(0, 255, 255, 0.6) 100%);
 
   /* Shadows - Modern & Layered */
   --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -73,13 +101,14 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-  --shadow-glow-lg: 0 0 40px rgba(99, 102, 241, 0.4);
+  --shadow-glow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(0, 255, 255, 0.3);
+  --shadow-glow-lg: 0 0 40px rgba(255, 255, 255, 0.6), 0 0 80px rgba(0, 255, 255, 0.4);
+  --shadow-glow-white: 0 0 30px rgba(255, 255, 255, 0.8), 0 0 60px rgba(255, 255, 255, 0.4);
 
-  /* Glassmorphism */
-  --glass-bg: rgba(255, 255, 255, 0.1);
-  --glass-border: rgba(255, 255, 255, 0.2);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  /* Glassmorphism - Cyberpunk */
+  --glass-bg: rgba(0, 0, 0, 0.4);
+  --glass-border: rgba(0, 255, 255, 0.3);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 255, 0.2);
 
   /* Spacing */
   --spacing-unit: 4px;
@@ -93,9 +122,14 @@
   --radius-3xl: 2rem;
   --radius-full: 9999px;
 
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
+  /* Typography - Cyberpunk */
+  --font-sans: 'Orbitron', 'Rajdhani', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', Consolas, Monaco, monospace;
+  
+  /* Typography - Professional */
+  --font-professional-serif: 'Playfair Display', 'Crimson Text', 'Source Serif Pro', Georgia, serif;
+  --font-professional-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-professional-mono: 'Courier New', Consolas, Monaco, monospace;
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -105,9 +139,9 @@
 }
 
 .dark {
-  --glass-bg: rgba(0, 0, 0, 0.2);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  --glass-bg: rgba(0, 0, 0, 0.6);
+  --glass-border: rgba(0, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 255, 255, 0.3);
 }
 
 /* ============================================
@@ -128,12 +162,64 @@
   }
 
   body {
-    @apply bg-gradient-to-br from-gray-50 via-white to-gray-100;
-    @apply dark:from-gray-950 dark:via-gray-900 dark:to-gray-950;
+    @apply bg-white;
+    @apply dark:bg-gray-950;
     @apply text-gray-900 dark:text-gray-100;
+    font-family: var(--font-professional-sans);
+    line-height: 1.7;
+    min-height: 100vh;
+    letter-spacing: 0.01em;
+  }
+
+  /* Professional theme styles */
+  .professional-theme body {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+    font-family: var(--font-professional-sans);
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+  }
+
+  .professional-theme.dark body {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+  }
+
+  /* Professional Typography */
+  .professional-theme h1,
+  .professional-theme h2,
+  .professional-theme h3,
+  .professional-theme h4,
+  .professional-theme h5,
+  .professional-theme h6 {
+    font-family: var(--font-professional-serif);
+    @apply text-black dark:text-white;
+    @apply font-semibold tracking-wide;
+    letter-spacing: 0.05em;
+  }
+
+  .professional-theme h1 {
+    @apply text-4xl;
+    letter-spacing: 0.1em;
+  }
+
+  .professional-theme h2 {
+    @apply text-3xl;
+    letter-spacing: 0.08em;
+  }
+
+  .professional-theme h3 {
+    @apply text-2xl;
+    letter-spacing: 0.06em;
+  }
+
+  /* Cyberpunk theme styles */
+  .cyberpunk-theme body {
+    background-color: var(--cyberpunk-base);
+    color: var(--cyberpunk-secondary);
     font-family: var(--font-sans);
     line-height: 1.6;
-    min-height: 100vh;
+    letter-spacing: 0;
   }
 
   /* Smooth scrolling */
@@ -143,7 +229,27 @@
 
   /* Selection */
   ::selection {
-    @apply bg-primary-500/30 text-primary-900 dark:text-primary-100;
+    @apply bg-gray-900 text-white;
+  }
+
+  .dark ::selection {
+    @apply bg-white text-gray-900;
+  }
+
+  .professional-theme ::selection {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+  }
+
+  .professional-theme.dark ::selection {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+  }
+
+  .cyberpunk-theme ::selection {
+    background-color: var(--cyberpunk-primary);
+    color: var(--cyberpunk-base);
+    text-shadow: 0 0 10px var(--cyberpunk-primary);
   }
 }
 
@@ -163,6 +269,18 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
 
+  /* Cyberpunk Glass Card */
+  .cyberpunk-theme .glass-card {
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--cyberpunk-primary);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 255, 255, 0.2);
+  }
+  
+  .cyberpunk-theme .glass-card:hover {
+    border-color: var(--cyberpunk-primary-light);
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.3);
+  }
+
   /* Modern Card */
   .card {
     @apply bg-white dark:bg-gray-800/90;
@@ -171,6 +289,43 @@
     @apply shadow-lg hover:shadow-2xl;
     @apply transition-all duration-300;
     @apply backdrop-blur-sm;
+  }
+
+  /* Professional Card */
+  .professional-theme .card {
+    background-color: var(--professional-secondary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    box-shadow: none;
+    transition: all 0.2s;
+  }
+
+  .professional-theme.dark .card {
+    background-color: var(--professional-primary);
+    border-color: var(--professional-secondary);
+  }
+
+  .professional-theme .card:hover {
+    border-color: var(--professional-accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .professional-theme.dark .card:hover {
+    border-color: var(--professional-accent);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1);
+  }
+
+  /* Cyberpunk Card */
+  .cyberpunk-theme .card {
+    background-color: rgba(0, 0, 0, 0.8);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.3;
+  }
+  
+  .cyberpunk-theme .card:hover {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 0.6;
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.3);
   }
 
   .card-hover {
@@ -214,12 +369,97 @@
     @apply border border-primary-700/20;
   }
 
+  /* Professional Primary Button */
+  .professional-theme .btn-primary {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    box-shadow: none;
+    transition: all 0.2s;
+  }
+
+  .professional-theme.dark .btn-primary {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+    border-color: var(--professional-secondary);
+  }
+
+  .professional-theme .btn-primary:hover {
+    background-color: var(--professional-accent);
+    border-color: var(--professional-accent);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .professional-theme.dark .btn-primary:hover {
+    background-color: var(--professional-accent);
+    border-color: var(--professional-accent);
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+  }
+
+  /* Cyberpunk Primary Button */
+  .cyberpunk-theme .btn-primary {
+    background: linear-gradient(135deg, var(--cyberpunk-primary) 0%, var(--cyberpunk-primary-dark) 100%);
+    color: var(--cyberpunk-base);
+    border: 1px solid var(--cyberpunk-primary);
+    font-weight: 700;
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.3);
+  }
+  
+  .cyberpunk-theme .btn-primary:hover {
+    background: linear-gradient(135deg, var(--cyberpunk-primary-light) 0%, var(--cyberpunk-primary) 100%);
+    box-shadow: 0 0 30px var(--cyberpunk-secondary), 0 0 60px var(--cyberpunk-primary);
+  }
+
   .btn-secondary {
     @apply bg-gray-100 dark:bg-gray-800;
     @apply text-gray-900 dark:text-gray-100;
     @apply hover:bg-gray-200 dark:hover:bg-gray-700;
     @apply border border-gray-300 dark:border-gray-600;
     @apply shadow-sm;
+  }
+
+  .professional-theme .btn-secondary {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+    border: 2px solid var(--professional-accent);
+    border-radius: 0;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    box-shadow: none;
+    transition: all 0.2s;
+  }
+
+  .professional-theme.dark .btn-secondary {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+    border-color: var(--professional-accent);
+  }
+
+  .professional-theme .btn-secondary:hover {
+    border-color: var(--professional-primary);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .professional-theme.dark .btn-secondary:hover {
+    border-color: var(--professional-secondary);
+    box-shadow: 0 2px 8px rgba(255, 255, 255, 0.15);
+  }
+
+  .cyberpunk-theme .btn-secondary {
+    background-color: var(--cyberpunk-gray);
+    color: var(--cyberpunk-secondary);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.3;
+  }
+  
+  .cyberpunk-theme .btn-secondary:hover {
+    background-color: rgba(26, 26, 26, 0.8);
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 0.6;
+    box-shadow: 0 0 15px var(--cyberpunk-primary);
   }
 
   .btn-outline {
@@ -231,11 +471,61 @@
     @apply hover:text-primary-600 dark:hover:text-primary-400;
   }
 
+  .professional-theme .btn-outline {
+    background-color: transparent;
+    color: var(--professional-primary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    box-shadow: none;
+    transition: all 0.2s;
+  }
+
+  .professional-theme.dark .btn-outline {
+    color: var(--professional-secondary);
+    border-color: var(--professional-secondary);
+  }
+
+  .professional-theme .btn-outline:hover {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+  }
+
+  .professional-theme.dark .btn-outline:hover {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+  }
+
+  .cyberpunk-theme .btn-outline {
+    background-color: transparent;
+    color: var(--cyberpunk-primary);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.5;
+  }
+  
+  .cyberpunk-theme .btn-outline:hover {
+    background-color: rgba(0, 255, 255, 0.1);
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 1;
+    color: var(--cyberpunk-secondary);
+    box-shadow: 0 0 15px var(--cyberpunk-primary);
+  }
+
   .btn-ghost {
     @apply bg-transparent;
     @apply text-gray-600 dark:text-gray-400;
     @apply hover:bg-gray-100 dark:hover:bg-gray-800;
     @apply rounded-lg;
+  }
+
+  .cyberpunk-theme .btn-ghost {
+    @apply text-cyan-400/70 dark:text-cyan-300/80;
+    @apply hover:bg-cyan-500/10 dark:hover:bg-cyan-500/20;
+  }
+  
+  .cyberpunk-theme .btn-ghost:hover {
+    @apply text-cyan-300;
   }
 
   .btn-icon {
@@ -308,6 +598,64 @@
     @apply shadow-sm;
   }
 
+  /* Professional Input */
+  .professional-theme .input {
+    background-color: var(--professional-secondary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    color: var(--professional-primary);
+    font-family: var(--font-professional-sans);
+  }
+
+  .professional-theme .input::placeholder {
+    color: var(--professional-accent);
+    opacity: 0.6;
+  }
+
+  .professional-theme.dark .input {
+    background-color: var(--professional-primary);
+    border-color: var(--professional-secondary);
+    color: var(--professional-secondary);
+  }
+
+  .professional-theme.dark .input::placeholder {
+    color: var(--professional-accent);
+    opacity: 0.6;
+  }
+
+  .professional-theme .input:focus {
+    border-color: var(--professional-accent);
+    box-shadow: none;
+    outline: none;
+  }
+
+  /* Cyberpunk Input */
+  .cyberpunk-theme .input {
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.3;
+    color: var(--cyberpunk-secondary);
+    opacity: 0.9;
+  }
+
+  .cyberpunk-theme .input::placeholder {
+    color: var(--cyberpunk-primary);
+    opacity: 0.5;
+  }
+
+  .cyberpunk-theme .input:hover {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 0.6;
+  }
+  
+  .cyberpunk-theme .input:focus {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 1;
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.2);
+    outline: none;
+  }
+
   .input-error {
     @apply border-error-500 dark:border-error-400;
     @apply focus:ring-error-500 focus:border-error-500;
@@ -320,6 +668,22 @@
 
   .label {
     @apply block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2;
+  }
+
+  .professional-theme .label {
+    color: var(--professional-primary);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+  }
+
+  .professional-theme.dark .label {
+    color: var(--professional-secondary);
+  }
+
+  .cyberpunk-theme .label {
+    @apply text-cyan-300 dark:text-cyan-200;
   }
 
   .label-required::after {
@@ -355,6 +719,64 @@
     @apply shadow-sm;
   }
 
+  /* Professional Textarea */
+  .professional-theme .textarea {
+    background-color: var(--professional-secondary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    color: var(--professional-primary);
+    font-family: var(--font-professional-sans);
+  }
+
+  .professional-theme .textarea::placeholder {
+    color: var(--professional-accent);
+    opacity: 0.6;
+  }
+
+  .professional-theme.dark .textarea {
+    background-color: var(--professional-primary);
+    border-color: var(--professional-secondary);
+    color: var(--professional-secondary);
+  }
+
+  .professional-theme.dark .textarea::placeholder {
+    color: var(--professional-accent);
+    opacity: 0.6;
+  }
+
+  .professional-theme .textarea:focus {
+    border-color: var(--professional-accent);
+    box-shadow: none;
+    outline: none;
+  }
+
+  /* Cyberpunk Textarea */
+  .cyberpunk-theme .textarea {
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.3;
+    color: var(--cyberpunk-secondary);
+    opacity: 0.9;
+  }
+
+  .cyberpunk-theme .textarea::placeholder {
+    color: var(--cyberpunk-primary);
+    opacity: 0.5;
+  }
+
+  .cyberpunk-theme .textarea:hover {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 0.6;
+  }
+  
+  .cyberpunk-theme .textarea:focus {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 1;
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.2);
+    outline: none;
+  }
+
   /* Modern Select */
   .select {
     @apply w-full px-4 py-3;
@@ -383,6 +805,55 @@
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%9ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
   }
 
+  /* Professional Select */
+  .professional-theme .select {
+    background-color: var(--professional-secondary);
+    border: 2px solid var(--professional-primary);
+    border-radius: 0;
+    color: var(--professional-primary);
+    font-family: var(--font-professional-sans);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23000000' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
+  .professional-theme.dark .select {
+    background-color: var(--professional-primary);
+    border-color: var(--professional-secondary);
+    color: var(--professional-secondary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
+  .professional-theme .select:hover {
+    border-color: var(--professional-accent);
+  }
+
+  .professional-theme .select:focus {
+    border-color: var(--professional-accent);
+    box-shadow: none;
+    outline: none;
+  }
+
+  /* Cyberpunk Select */
+  .cyberpunk-theme .select {
+    background-color: rgba(0, 0, 0, 0.6);
+    border: 1px solid var(--cyberpunk-primary);
+    border-opacity: 0.3;
+    color: var(--cyberpunk-secondary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2300ffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  }
+
+  .cyberpunk-theme .select:hover {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 0.6;
+  }
+  
+  .cyberpunk-theme .select:focus {
+    border-color: var(--cyberpunk-primary);
+    border-opacity: 1;
+    background-color: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 20px var(--cyberpunk-primary), 0 0 40px rgba(0, 255, 255, 0.2);
+    outline: none;
+  }
+
   /* Modern Sidebar */
   .sidebar-nav-item {
     @apply flex items-center gap-3 px-4 py-3;
@@ -394,6 +865,40 @@
     @apply font-medium;
   }
 
+  .professional-theme .sidebar-nav-item {
+    border-radius: 0;
+    color: var(--professional-primary);
+    font-family: var(--font-professional-sans);
+    letter-spacing: 0.05em;
+    border-left: 4px solid transparent;
+    transition: all 0.2s;
+  }
+
+  .professional-theme.dark .sidebar-nav-item {
+    color: var(--professional-secondary);
+  }
+
+  .professional-theme .sidebar-nav-item:hover {
+    background-color: var(--professional-gray-light);
+    border-left-color: var(--professional-primary);
+  }
+
+  .professional-theme.dark .sidebar-nav-item:hover {
+    background-color: var(--professional-gray-dark);
+    border-left-color: var(--professional-secondary);
+  }
+
+  .cyberpunk-theme .sidebar-nav-item {
+    color: var(--cyberpunk-primary);
+    opacity: 0.8;
+  }
+  
+  .cyberpunk-theme .sidebar-nav-item:hover {
+    background-color: rgba(0, 255, 255, 0.1);
+    border-left: 2px solid var(--cyberpunk-primary);
+    opacity: 1;
+  }
+
   .sidebar-nav-item-active {
     @apply bg-gradient-to-r from-primary-500 to-primary-600;
     @apply text-white shadow-lg shadow-primary-500/50;
@@ -401,12 +906,71 @@
     @apply font-semibold;
   }
 
-  /* Gradient Text - Professional Blue */
+  .professional-theme .sidebar-nav-item-active {
+    background-color: var(--professional-primary);
+    color: var(--professional-secondary);
+    box-shadow: none;
+    border-left: 4px solid var(--professional-primary);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  .professional-theme.dark .sidebar-nav-item-active {
+    background-color: var(--professional-secondary);
+    color: var(--professional-primary);
+    border-left-color: var(--professional-secondary);
+  }
+
+  .cyberpunk-theme .sidebar-nav-item-active {
+    background: linear-gradient(135deg, var(--cyberpunk-primary) 0%, var(--cyberpunk-primary-dark) 100%);
+    color: var(--cyberpunk-base);
+    box-shadow: 0 0 20px var(--cyberpunk-primary), inset 0 0 20px rgba(255, 255, 255, 0.1);
+  }
+
+  .cyberpunk-theme .sidebar-nav-item-active:hover {
+    background: linear-gradient(135deg, var(--cyberpunk-primary-light) 0%, var(--cyberpunk-primary) 100%);
+  }
+
+  /* Gradient Text */
   .text-gradient {
     @apply bg-gradient-to-r from-primary-600 via-primary-700 to-primary-600;
     @apply bg-clip-text text-transparent;
     @apply bg-[length:200%_auto];
     animation: gradient-shift 3s ease infinite;
+  }
+
+  /* Professional Gradient Text */
+  .professional-theme .text-gradient {
+    background: linear-gradient(135deg, var(--professional-primary) 0%, var(--professional-accent) 50%, var(--professional-primary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-family: var(--font-professional-serif);
+    animation: none;
+  }
+
+  .professional-theme.dark .text-gradient {
+    background: linear-gradient(135deg, var(--professional-secondary) 0%, var(--professional-accent) 50%, var(--professional-secondary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Cyberpunk Gradient Text */
+  .cyberpunk-theme .text-gradient {
+    background: linear-gradient(135deg, var(--cyberpunk-secondary) 0%, var(--cyberpunk-primary-light) 50%, var(--cyberpunk-primary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px var(--cyberpunk-primary));
+  }
+  
+  .cyberpunk-theme .text-glow {
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.8), 0 0 20px rgba(0, 255, 255, 0.5);
+  }
+  
+  .cyberpunk-theme .text-glow-white {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 1), 0 0 20px rgba(255, 255, 255, 0.6);
   }
 
   @keyframes gradient-shift {
@@ -455,32 +1019,36 @@
     @apply border border-warning-200 dark:border-warning-800;
   }
 
-  /* Progress */
+  /* Progress - Cyberpunk */
   .progress {
-    @apply w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+    @apply w-full h-2 bg-black/60 dark:bg-black/80 rounded-full overflow-hidden;
+    @apply border border-cyan-500/30;
   }
 
   .progress-bar {
-    @apply h-full bg-gradient-to-r from-primary-500 to-primary-600 rounded-full;
+    @apply h-full bg-gradient-to-r from-cyan-500 to-cyan-600 rounded-full;
     @apply transition-all duration-500 ease-out;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.6);
   }
 
-  /* Spinner */
+  /* Spinner - Cyberpunk */
   .spinner {
-    @apply animate-spin rounded-full border-2 border-gray-300 border-t-primary-600;
+    @apply animate-spin rounded-full border-2 border-cyan-500/30 border-t-cyan-400;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
   }
 
-  /* Modal */
+  /* Modal - Cyberpunk */
   .modal {
     @apply relative z-50 w-full;
-    @apply bg-white dark:bg-gray-800;
+    @apply bg-black/90 dark:bg-black/95;
     @apply rounded-2xl shadow-2xl;
-    @apply border border-gray-200/50 dark:border-gray-700/50;
+    @apply border border-cyan-500/40 dark:border-cyan-400/50;
     @apply animate-fade-in;
+    box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), 0 0 80px rgba(0, 255, 255, 0.2);
   }
 
   .modal-overlay {
-    @apply fixed inset-0 bg-black/60 backdrop-blur-sm;
+    @apply fixed inset-0 bg-black/80 backdrop-blur-sm;
     @apply animate-fade-in;
   }
 
@@ -551,13 +1119,21 @@
     background: var(--gradient-cool);
   }
 
-  /* Glow Effects */
+  /* Glow Effects - Cyberpunk */
   .glow {
     box-shadow: var(--shadow-glow);
   }
 
   .glow-lg {
     box-shadow: var(--shadow-glow-lg);
+  }
+  
+  .glow-white {
+    box-shadow: var(--shadow-glow-white);
+  }
+  
+  .glow-cyan {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.6), 0 0 40px rgba(0, 255, 255, 0.4);
   }
 
   /* Smooth Animations */

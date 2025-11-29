@@ -1,5 +1,6 @@
 import { Home, FileText, Settings, LogOut, Menu, X, BarChart2, Clock, Search, Sparkles, LayoutTemplate, FlaskConical, Shield, Brain, type LucideIcon } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { useAppStore } from '../../store';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../../api/client';
@@ -29,9 +30,11 @@ const allNavItems: NavItem[] = [
 export function Sidebar(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
-  const { sidebarOpen, setSidebarOpen, user, setUser } = useAppStore();
+  const { sidebarOpen, setSidebarOpen, user, setUser, settings } = useAppStore();
   const queryClient = useQueryClient();
   const { data: isAdmin = false } = useIsAdmin();
+  const [logoError, setLogoError] = useState(false);
+  const isCyberpunk = settings.cyberpunkTheme;
 
   // Filter nav items based on admin status
   const navItems = allNavItems.filter(item => !item.adminOnly || isAdmin);
@@ -69,20 +72,71 @@ export function Sidebar(): JSX.Element {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 glass-card border-r border-gray-200/50 dark:border-gray-700/50 transform transition-all duration-300 ease-out lg:translate-x-0 ${
+        className={`fixed top-0 left-0 z-50 h-full w-64 glass-card border-r transform transition-all duration-300 ease-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{
+          borderRight: isCyberpunk 
+            ? '1px solid rgba(0, 255, 255, 0.3)' 
+            : '2px solid var(--professional-primary)'
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200/50 dark:border-gray-700/50">
+          <div 
+            className="flex items-center justify-between p-6 border-b"
+            style={{
+              borderBottom: isCyberpunk 
+                ? '1px solid rgba(0, 255, 255, 0.3)' 
+                : '2px solid var(--professional-primary)'
+            }}
+          >
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-12 h-12 bg-gradient-to-br from-primary-600 to-primary-700 rounded-xl flex items-center justify-center shadow-lg shadow-primary-500/50 group-hover:shadow-xl group-hover:shadow-primary-500/60 group-hover:scale-105 transition-all">
-                <span className="text-white font-bold text-base">AH</span>
+              <div 
+                className={`w-12 h-12 flex items-center justify-center group-hover:scale-105 transition-all overflow-hidden ${
+                  isCyberpunk 
+                    ? 'glow-cyan rounded-xl' 
+                    : 'rounded-none border-2'
+                }`}
+                style={isCyberpunk 
+                  ? { background: 'linear-gradient(135deg, #00FFFF 0%, #00CCCC 100%)' }
+                  : { backgroundColor: 'var(--professional-primary)', borderColor: 'var(--professional-primary)' }
+                }
+              >
+                {!logoError ? (
+                  <img 
+                    src="/images/logo-1.png" 
+                    alt="Youman.ai Logo" 
+                    className="w-full h-full object-contain"
+                    onError={() => setLogoError(true)}
+                  />
+                ) : (
+                  <span 
+                    className={`font-bold text-base ${
+                      isCyberpunk 
+                        ? 'font-mono' 
+                        : 'font-serif'
+                    }`}
+                    style={isCyberpunk 
+                      ? { color: 'var(--cyberpunk-base)' }
+                      : { color: 'var(--professional-secondary)' }
+                    }
+                  >Y</span>
+                )}
               </div>
               <div>
-                <span className="font-bold text-xl text-gradient">AI Humanizer</span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Premium Edition</p>
+                <span className={`font-bold text-xl text-gradient ${
+                  isCyberpunk 
+                    ? 'font-sans text-glow' 
+                    : 'font-serif tracking-wide'
+                }`}>Youman.ai</span>
+                <p className={`text-xs font-medium ${
+                  isCyberpunk 
+                    ? 'font-mono text-cyan-400/70' 
+                    : 'font-sans tracking-widest uppercase text-gray-600 dark:text-gray-400'
+                }`}>
+                  {isCyberpunk ? 'CYBERPUNK EDITION' : 'PROFESSIONAL EDITION'}
+                </p>
               </div>
             </Link>
             <button
@@ -115,23 +169,78 @@ export function Sidebar(): JSX.Element {
           </nav>
 
           {/* User section */}
-          <div className="p-4 border-t border-gray-200/50 dark:border-gray-700/50">
+          <div 
+            className="p-4 border-t"
+            style={{
+              borderTop: isCyberpunk 
+                ? '1px solid rgba(0, 255, 255, 0.3)' 
+                : '2px solid var(--professional-primary)'
+            }}
+          >
             {user ? (
-              <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+              <div 
+                className={`flex items-center justify-between p-4 backdrop-blur-sm border-2 ${
+                  isCyberpunk 
+                    ? 'rounded-xl' 
+                    : 'rounded-none'
+                }`}
+                style={isCyberpunk 
+                  ? { 
+                      backgroundColor: 'rgba(0, 0, 0, 0.6)', 
+                      borderColor: 'rgba(0, 255, 255, 0.3)' 
+                    }
+                  : { 
+                      backgroundColor: 'var(--professional-secondary)', 
+                      borderColor: 'var(--professional-primary)' 
+                    }
+                }
+              >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md shadow-primary-500/30">
-                    <span className="text-white font-bold text-sm">{user.name.charAt(0).toUpperCase()}</span>
+                  <div 
+                    className={`w-11 h-11 flex items-center justify-center flex-shrink-0 ${
+                      isCyberpunk 
+                        ? 'glow-cyan rounded-full' 
+                        : 'rounded-none border-2'
+                    }`}
+                    style={isCyberpunk 
+                      ? { background: 'linear-gradient(135deg, #00FFFF 0%, #00CCCC 100%)' }
+                      : { backgroundColor: 'var(--professional-primary)', borderColor: 'var(--professional-primary)' }
+                    }
+                  >
+                    <span 
+                      className={`font-bold text-sm ${
+                        isCyberpunk 
+                          ? 'font-mono' 
+                          : 'font-serif'
+                      }`}
+                      style={isCyberpunk 
+                        ? { color: 'var(--cyberpunk-base)' }
+                        : { color: 'var(--professional-secondary)' }
+                      }
+                    >{user.name.charAt(0).toUpperCase()}</span>
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-bold text-sm truncate text-gray-900 dark:text-white">{user.name}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate font-medium">
+                    <p className={`font-bold text-sm truncate ${
+                      isCyberpunk 
+                        ? 'text-cyan-100' 
+                        : 'text-black dark:text-white font-sans'
+                    }`}>{user.name}</p>
+                    <p className={`text-xs truncate font-medium ${
+                      isCyberpunk 
+                        ? 'text-cyan-400/70 font-mono' 
+                        : 'text-gray-600 dark:text-gray-400 font-sans tracking-wide'
+                    }`}>
                       {user.email}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="p-2.5 text-gray-500 hover:text-error-600 dark:hover:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 rounded-lg transition-all flex-shrink-0 hover:scale-110"
+                  className={`p-2.5 hover:text-error-400 hover:bg-error-900/20 rounded-lg transition-all flex-shrink-0 hover:scale-110 ${
+                    isCyberpunk 
+                      ? 'text-cyan-400/70 hover:glow' 
+                      : 'text-gray-500 dark:text-gray-400 hover:bg-error-50 dark:hover:bg-error-900/20'
+                  }`}
                   title="Logout"
                 >
                   <LogOut className="w-4 h-4" />
