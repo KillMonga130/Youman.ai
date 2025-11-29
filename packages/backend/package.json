@@ -73,7 +73,7 @@
     "@types/ioredis": "^4.28.10",
     "@types/jsonwebtoken": "^9.0.5",
     "@types/mongoose": "^5.11.96",
-    "@types/natural": "^5.1.5",
+    "@types/natural": "^6.0.1",
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^7.0.4",
     "@types/qrcode": "^1.5.6",
