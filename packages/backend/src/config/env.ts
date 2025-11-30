@@ -42,9 +42,16 @@ const envSchema = z.object({
   AWS_REGION: z.string().default('us-east-1'),
   AWS_BEDROCK_ENABLED: z.string().transform(val => val === 'true').default('true'),
 
-  // Stripe
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Paystack
+  PAYSTACK_SECRET_KEY: z.string().optional(),
+  PAYSTACK_PUBLIC_KEY: z.string().optional(),
+  PAYSTACK_WEBHOOK_SECRET: z.string().optional(),
+
+  // OAuth for Authentication (Google, GitHub)
+  GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+  GITHUB_OAUTH_CLIENT_ID: z.string().optional(),
+  GITHUB_OAUTH_CLIENT_SECRET: z.string().optional(),
 
   // Cloud Storage (Google Drive, Dropbox, OneDrive)
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -112,9 +119,21 @@ export const config = {
     bedrockEnabled: env.AWS_BEDROCK_ENABLED,
   },
 
-  stripe: {
-    secretKey: env.STRIPE_SECRET_KEY,
-    webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+  paystack: {
+    secretKey: env.PAYSTACK_SECRET_KEY,
+    publicKey: env.PAYSTACK_PUBLIC_KEY,
+    webhookSecret: env.PAYSTACK_WEBHOOK_SECRET,
+  },
+
+  oauth: {
+    google: {
+      clientId: env.GOOGLE_OAUTH_CLIENT_ID,
+      clientSecret: env.GOOGLE_OAUTH_CLIENT_SECRET,
+    },
+    github: {
+      clientId: env.GITHUB_OAUTH_CLIENT_ID,
+      clientSecret: env.GITHUB_OAUTH_CLIENT_SECRET,
+    },
   },
 
   cloudStorage: {

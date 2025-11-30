@@ -92,9 +92,50 @@ async function main() {
 
   console.log(`✅ Created ${templates.length} default templates`);
 
+  // Create admin user (always create, not just in development)
+  const adminPasswordHash = await bcrypt.hash('admin123456', 12);
+  
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'mubvafhimoses813@gmail.com' },
+    update: {
+      // Update password if it doesn't exist (for existing users)
+      passwordHash: adminPasswordHash,
+    },
+    create: {
+      email: 'mubvafhimoses813@gmail.com',
+      passwordHash: adminPasswordHash,
+      firstName: 'Admin',
+      lastName: 'User',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      subscription: {
+        create: {
+          tier: SubscriptionTier.ENTERPRISE,
+          status: SubscriptionStatus.ACTIVE,
+          monthlyWordLimit: 1000000,
+          monthlyApiCallLimit: 10000,
+          storageLimit: BigInt(100 * 1024 * 1024 * 1024), // 100GB
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      },
+      preferences: {
+        create: {
+          defaultLevel: 3,
+          defaultStrategy: 'auto',
+          defaultLanguage: 'en',
+          autoSaveEnabled: true,
+          darkModeEnabled: false,
+        },
+      },
+    },
+  });
+
+  console.log(`✅ Created/updated admin user: ${adminUser.email} (password: admin123456)`);
+
   // Create a demo user for development
   if (process.env.NODE_ENV === 'development') {
-    const demoPasswordHash = await bcrypt.hash('demo123456', 10);
+    const demoPasswordHash = await bcrypt.hash('demo123456', 12);
     
     const demoUser = await prisma.user.upsert({
       where: { email: 'demo@example.com' },
@@ -129,7 +170,7 @@ async function main() {
       },
     });
 
-    console.log(`✅ Created demo user: ${demoUser.email}`);
+    console.log(`✅ Created demo user: ${demoUser.email} (password: demo123456)`);
   }
 
   console.log('🎉 Database seed completed successfully!');

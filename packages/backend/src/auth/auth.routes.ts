@@ -12,11 +12,13 @@ import {
   refreshAccessToken,
   updateUser,
   changePassword,
+  deleteAccount,
   AuthError,
 } from './auth.service';
 import { authenticate } from './auth.middleware';
 import { registerSchema, loginSchema, refreshTokenSchema, AuthMetadata } from './types';
 import { logger } from '../utils/logger';
+import { getOAuthUrl, authenticateOAuth, OAuthProvider } from './oauth.service';
 
 const router = Router();
 
@@ -307,6 +309,149 @@ router.post('/change-password', authenticate, (async (req: Request, res: Respons
     logger.error('Change password error:', error);
     res.status(500).json({
       error: 'Failed to change password',
+      code: 'INTERNAL_ERROR',
+    });
+  }
+}) as unknown as Router);
+
+/**
+ * DELETE /auth/account
+ * Permanently delete user account
+ */
+router.delete('/account', authenticate, (async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      res.status(401).json({
+        error: 'Not authenticated',
+        code: 'NOT_AUTHENTICATED',
+      });
+      return;
+    }
+
+    const { password } = req.body;
+
+    await deleteAccount(req.user.id, password);
+
+    res.status(200).json({
+      message: 'Account deleted successfully',
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      const statusCode = error.code === 'INVALID_PASSWORD' || error.code === 'PASSWORD_REQUIRED' ? 400 : 401;
+      res.status(statusCode).json({
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+    logger.error('Delete account error:', error);
+    res.status(500).json({
+      error: 'Failed to delete account',
+      code: 'INTERNAL_ERROR',
+    });
+  }
+}) as unknown as Router);
+
+// ============================================
+// OAuth Routes
+// ============================================
+
+/**
+ * GET /auth/oauth/:provider
+ * Get OAuth authorization URL
+ */
+router.get('/oauth/:provider', (async (req: Request, res: Response) => {
+  try {
+    const provider = req.params.provider.toUpperCase() as OAuthProvider;
+    
+    if (!Object.values(OAuthProvider).includes(provider)) {
+      res.status(400).json({
+        error: 'Invalid OAuth provider',
+        code: 'INVALID_PROVIDER',
+      });
+      return;
+    }
+
+    const redirectUri = req.query.redirect_uri as string;
+    if (!redirectUri) {
+      res.status(400).json({
+        error: 'Redirect URI is required',
+        code: 'MISSING_REDIRECT_URI',
+      });
+      return;
+    }
+
+    const state = req.query.state as string || require('crypto').randomBytes(32).toString('hex');
+    const url = getOAuthUrl(provider, redirectUri, state);
+
+    res.json({
+      url,
+      state,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      res.status(400).json({
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+    logger.error('OAuth URL error:', error);
+    res.status(500).json({
+      error: 'Failed to generate OAuth URL',
+      code: 'INTERNAL_ERROR',
+    });
+  }
+}) as unknown as Router);
+
+/**
+ * POST /auth/oauth/:provider/callback
+ * Handle OAuth callback
+ */
+router.post('/oauth/:provider/callback', (async (req: Request, res: Response) => {
+  try {
+    const provider = req.params.provider.toUpperCase() as OAuthProvider;
+    
+    if (!Object.values(OAuthProvider).includes(provider)) {
+      res.status(400).json({
+        error: 'Invalid OAuth provider',
+        code: 'INVALID_PROVIDER',
+      });
+      return;
+    }
+
+    const { code, redirect_uri, state } = req.body;
+
+    if (!code || !redirect_uri) {
+      res.status(400).json({
+        error: 'Code and redirect URI are required',
+        code: 'VALIDATION_ERROR',
+      });
+      return;
+    }
+
+    const metadata: AuthMetadata = {
+      ipAddress: req.ip ?? req.socket.remoteAddress ?? undefined,
+      userAgent: req.get('user-agent') ?? undefined,
+    };
+
+    const result = await authenticateOAuth(provider, code, redirect_uri, metadata);
+
+    res.status(200).json({
+      message: 'OAuth authentication successful',
+      ...result,
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      res.status(401).json({
+        error: error.message,
+        code: error.code,
+      });
+      return;
+    }
+    logger.error('OAuth callback error:', error);
+    res.status(500).json({
+      error: 'OAuth authentication failed',
       code: 'INTERNAL_ERROR',
     });
   }

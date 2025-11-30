@@ -390,6 +390,67 @@ class ApiClient {
     });
   }
 
+  async deleteAccount(password?: string): Promise<{ message: string }> {
+    return this.request('/auth/account', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+  }
+
+  // OAuth
+  async getOAuthUrl(provider: 'GOOGLE' | 'GITHUB', redirectUri: string): Promise<{ url: string; state: string }> {
+    return this.request(`/auth/oauth/${provider.toLowerCase()}?redirect_uri=${encodeURIComponent(redirectUri)}`, {
+      method: 'GET',
+    }, false);
+  }
+
+  async oauthCallback(provider: 'GOOGLE' | 'GITHUB', code: string, redirectUri: string): Promise<{ 
+    message: string;
+    user: { 
+      id: string; 
+      email: string; 
+      firstName: string | null;
+      lastName: string | null;
+    };
+    tokens: {
+      accessToken: string;
+      refreshToken: string;
+    };
+  }> {
+    const response = await this.request<{ 
+      message: string;
+      user: { 
+        id: string; 
+        email: string; 
+        firstName: string | null;
+        lastName: string | null;
+      };
+      tokens: {
+        accessToken: string;
+        refreshToken: string;
+      };
+    }>('/auth/oauth/' + provider.toLowerCase() + '/callback', {
+      method: 'POST',
+      body: JSON.stringify({ code, redirect_uri: redirectUri }),
+    }, false);
+
+    if (response.tokens?.accessToken) {
+      this.setToken(response.tokens.accessToken);
+      if (response.tokens.refreshToken) {
+        localStorage.setItem('refresh_token', response.tokens.refreshToken);
+      }
+    }
+
+    return {
+      ...response,
+      user: {
+        ...response.user,
+        name: [response.user.firstName, response.user.lastName].filter(Boolean).join(' ') || response.user.email,
+      },
+      token: response.tokens.accessToken,
+    } as any;
+  }
+
   async getSubscription(): Promise<{
     subscription: {
       id: string;
@@ -2120,7 +2181,7 @@ class ApiClient {
     });
   }
 
-  async getPerformanceMetrics(variationId: string): Promise<{
+  async getABTestPerformanceMetrics(variationId: string): Promise<{
     success: boolean;
     data: {
       variationId: string;
@@ -3140,7 +3201,7 @@ class ApiClient {
   // DevOps Features - Performance Optimization
   // ============================================
 
-  async getPerformanceMetrics(): Promise<{
+  async getSystemPerformanceMetrics(): Promise<{
     averageResponseTime: number;
     p95ResponseTime: number;
     p99ResponseTime: number;
@@ -3525,7 +3586,7 @@ class ApiClient {
     });
   }
 
-  async getABTests(status?: string): Promise<Array<{
+  async getModelABTests(status?: string): Promise<Array<{
     id: string;
     name: string;
     status: string;
@@ -3537,7 +3598,7 @@ class ApiClient {
     return this.request(`/ml-models/ab-tests${query}`);
   }
 
-  async getABTest(testId: string): Promise<{
+  async getModelABTest(testId: string): Promise<{
     id: string;
     name: string;
     status: string;
@@ -3549,7 +3610,7 @@ class ApiClient {
     return this.request(`/ml-models/ab-tests/${testId}`);
   }
 
-  async createABTest(data: {
+  async createModelABTest(data: {
     name: string;
     modelIds: string[];
     trafficAllocation: Record<string, number>;
@@ -3570,7 +3631,7 @@ class ApiClient {
     });
   }
 
-  async startABTest(testId: string): Promise<{
+  async startModelABTest(testId: string): Promise<{
     success: boolean;
     testId: string;
     status: string;
@@ -3578,7 +3639,7 @@ class ApiClient {
     return this.request(`/ml-models/ab-tests/${testId}/start`, { method: 'POST' });
   }
 
-  async stopABTest(testId: string): Promise<{
+  async stopModelABTest(testId: string): Promise<{
     success: boolean;
     testId: string;
     status: string;

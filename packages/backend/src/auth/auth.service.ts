@@ -172,6 +172,16 @@ export async function register(
     data: { lastLoginAt: new Date() },
   });
 
+  // Create FREE subscription for new user
+  try {
+    const { createSubscription } = await import('../subscription/subscription.service');
+    await createSubscription(user.id, { tier: 'FREE' });
+    logger.info('Free subscription created for new user', { userId: user.id });
+  } catch (error) {
+    // Log error but don't fail registration
+    logger.warn('Failed to create subscription for new user', { userId: user.id, error });
+  }
+
   logger.info('User registered successfully', { userId: user.id, email: user.email });
 
   return {
@@ -202,6 +212,11 @@ export async function login(
   // Check if user is deleted
   if (user.deletedAt) {
     throw new AuthError('Account has been deleted', 'ACCOUNT_DELETED');
+  }
+
+  // Check if user has a password (OAuth users don't have passwords)
+  if (!user.passwordHash) {
+    throw new AuthError('This account uses OAuth login. Please sign in with Google or GitHub.', 'OAUTH_ACCOUNT');
   }
 
   // Verify password
@@ -407,6 +422,11 @@ export async function changePassword(
     throw new AuthError('User not found', 'USER_NOT_FOUND');
   }
 
+  // OAuth users don't have passwords
+  if (!user.passwordHash) {
+    throw new AuthError('OAuth users cannot change password. Use OAuth login instead.', 'OAUTH_ACCOUNT');
+  }
+
   // Verify current password
   const isValidPassword = await verifyPassword(currentPassword, user.passwordHash);
   if (!isValidPassword) {
@@ -435,6 +455,59 @@ export async function getUserById(userId: string): Promise<AuthUser | null> {
   }
 
   return toAuthUser(user);
+}
+
+/**
+ * Permanently delete user account
+ * This will:
+ * 1. Log out all sessions
+ * 2. Cancel Paystack subscription if active
+ * 3. Permanently delete the user and all related data (cascade)
+ */
+export async function deleteAccount(userId: string, password?: string): Promise<void> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { subscription: true },
+  });
+
+  if (!user) {
+    throw new AuthError('User not found', 'USER_NOT_FOUND');
+  }
+
+  // If user has a password, verify it before deletion
+  if (user.passwordHash && password) {
+    const isValidPassword = await verifyPassword(password, user.passwordHash);
+    if (!isValidPassword) {
+      throw new AuthError('Invalid password', 'INVALID_PASSWORD');
+    }
+  } else if (user.passwordHash && !password) {
+    // User has password but didn't provide it
+    throw new AuthError('Password required to delete account', 'PASSWORD_REQUIRED');
+  }
+
+  // Log out all sessions
+  await logoutAll(userId);
+
+  // Cancel Paystack subscription if active
+  if (user.subscription?.paystackSubscriptionId) {
+    try {
+      const { cancelSubscription } = await import('../subscription/subscription.service');
+      await cancelSubscription(userId, {
+        cancelAtPeriodEnd: false,
+        reason: 'Account deletion',
+      });
+    } catch (error) {
+      // Log error but continue with deletion
+      logger.warn('Failed to cancel subscription during account deletion', { userId, error });
+    }
+  }
+
+  // Permanently delete user (cascade will handle related data)
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  logger.info('Account permanently deleted', { userId, email: user.email });
 }
 
 /**

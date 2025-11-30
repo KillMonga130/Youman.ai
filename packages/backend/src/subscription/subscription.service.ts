@@ -6,15 +6,15 @@
  * Requirements: 86 - Billing and invoice management
  */
 
-import Stripe from 'stripe';
 import { prisma } from '../database/prisma';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
+import { paystackClient } from './paystack.client';
 import {
   SubscriptionTier,
   SubscriptionStatus,
   TIER_LIMITS,
-  STRIPE_PRICE_IDS,
+  PAYSTACK_PLAN_CODES,
   type CreateSubscriptionInput,
   type UpdateSubscriptionInput,
   type CancelSubscriptionInput,
@@ -27,15 +27,8 @@ import {
   type UpgradePreview,
   type TierLimits,
   type SerializableTierLimits,
+  type PaystackWebhookEvent,
 } from './types';
-
-// ============================================
-// Stripe Client Initialization
-// ============================================
-
-const stripe = config.stripe.secretKey
-  ? new Stripe(config.stripe.secretKey)
-  : null;
 
 // ============================================
 // Error Classes
@@ -80,8 +73,8 @@ function toSubscriptionResponse(subscription: {
   userId: string;
   tier: string;
   status: string;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
+  paystackCustomerId: string | null;
+  paystackSubscriptionId: string | null;
   monthlyWordLimit: number;
   monthlyApiCallLimit: number;
   storageLimit: bigint;
@@ -99,8 +92,8 @@ function toSubscriptionResponse(subscription: {
     userId: subscription.userId,
     tier,
     status: subscription.status as SubscriptionStatus,
-    stripeCustomerId: subscription.stripeCustomerId,
-    stripeSubscriptionId: subscription.stripeSubscriptionId,
+    paystackCustomerId: subscription.paystackCustomerId,
+    paystackSubscriptionId: subscription.paystackSubscriptionId,
     limits: toSerializableLimits(limits),
     currentPeriodStart: subscription.currentPeriodStart,
     currentPeriodEnd: subscription.currentPeriodEnd,
@@ -138,42 +131,44 @@ export async function createSubscription(
     throw new SubscriptionError('User already has a subscription', 'SUBSCRIPTION_EXISTS');
   }
 
-  let stripeCustomerId: string | null = null;
-  let stripeSubscriptionId: string | null = null;
+  let paystackCustomerId: string | null = null;
+  let paystackSubscriptionId: string | null = null;
+  let paystackAuthorizationCode: string | null = null;
 
-  // Create Stripe customer and subscription for paid tiers
-  if (tier !== SubscriptionTier.FREE && stripe) {
+  // Create Paystack customer and subscription for paid tiers
+  if (tier !== SubscriptionTier.FREE && paystackClient) {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new SubscriptionError('User not found', 'USER_NOT_FOUND');
     }
 
-    // Create Stripe customer
-    const customer = await stripe.customers.create({
-      email: user.email,
-      metadata: { userId },
-    });
-    stripeCustomerId = customer.id;
+    // Check if customer already exists
+    let customer = await paystackClient.getCustomer(user.email);
+    
+    if (!customer) {
+      // Create Paystack customer
+      customer = await paystackClient.createCustomer({
+        email: user.email,
+        first_name: user.firstName || undefined,
+        last_name: user.lastName || undefined,
+        metadata: { userId },
+      });
+    }
+    
+    paystackCustomerId = customer.customer_code;
 
-    // Create subscription if payment method provided
+    // Create subscription if authorization code provided
     if (input?.paymentMethodId) {
-      await stripe.paymentMethods.attach(input.paymentMethodId, {
-        customer: customer.id,
-      });
-
-      await stripe.customers.update(customer.id, {
-        invoice_settings: { default_payment_method: input.paymentMethodId },
-      });
-
-      const priceId = STRIPE_PRICE_IDS[tier];
-      if (priceId) {
-        const stripeSubscription = await stripe.subscriptions.create({
-          customer: customer.id,
-          items: [{ price: priceId }],
-          payment_behavior: 'default_incomplete',
-          expand: ['latest_invoice.payment_intent'],
+      paystackAuthorizationCode = input.paymentMethodId;
+      const planCode = PAYSTACK_PLAN_CODES[tier];
+      
+      if (planCode) {
+        const paystackSubscription = await paystackClient.createSubscription({
+          customer: customer.customer_code,
+          plan: planCode,
+          authorization: paystackAuthorizationCode,
         });
-        stripeSubscriptionId = stripeSubscription.id;
+        paystackSubscriptionId = paystackSubscription.subscription_code;
       }
     }
   }
@@ -183,8 +178,9 @@ export async function createSubscription(
       userId,
       tier,
       status: 'ACTIVE',
-      stripeCustomerId,
-      stripeSubscriptionId,
+      paystackCustomerId,
+      paystackSubscriptionId,
+      paystackAuthorizationCode,
       monthlyWordLimit: limits.monthlyWordLimit,
       monthlyApiCallLimit: limits.monthlyApiCallLimit,
       storageLimit: limits.storageLimit,
@@ -233,29 +229,19 @@ export async function updateSubscription(
   const newTier = input.tier;
   const newLimits = TIER_LIMITS[newTier];
 
-  // Handle Stripe subscription update for paid tiers
-  if (stripe && subscription.stripeSubscriptionId) {
-    const priceId = STRIPE_PRICE_IDS[newTier];
+  // Handle Paystack subscription update for paid tiers
+  if (paystackClient && subscription.paystackSubscriptionId) {
+    const planCode = PAYSTACK_PLAN_CODES[newTier];
     
     if (newTier === SubscriptionTier.FREE) {
-      // Cancel Stripe subscription when downgrading to free
-      await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
-    } else if (priceId) {
-      // Update Stripe subscription
-      const stripeSubscription = await stripe.subscriptions.retrieve(
-        subscription.stripeSubscriptionId
-      );
-      
-      const subscriptionItem = stripeSubscription.items.data[0];
-      if (subscriptionItem) {
-        await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-          items: [{
-            id: subscriptionItem.id,
-            price: priceId,
-          }],
-          proration_behavior: 'create_prorations',
-        });
-      }
+      // Cancel Paystack subscription when downgrading to free
+      await paystackClient.cancelSubscription(subscription.paystackSubscriptionId);
+    } else if (planCode && subscription.paystackAuthorizationCode) {
+      // Update Paystack subscription
+      await paystackClient.updateSubscription(subscription.paystackSubscriptionId, {
+        plan: planCode,
+        authorization: subscription.paystackAuthorizationCode,
+      });
     }
   }
 
@@ -289,14 +275,14 @@ export async function cancelSubscription(
     throw new SubscriptionError('Subscription not found', 'SUBSCRIPTION_NOT_FOUND');
   }
 
-  // Cancel Stripe subscription
-  if (stripe && subscription.stripeSubscriptionId) {
+  // Cancel Paystack subscription
+  if (paystackClient && subscription.paystackSubscriptionId) {
     if (input.cancelAtPeriodEnd) {
-      await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      });
+      // Paystack doesn't have a direct "cancel at period end" option
+      // We'll handle this by setting the flag and letting the webhook handle it
+      // For now, we'll just mark it in our database
     } else {
-      await stripe.subscriptions.cancel(subscription.stripeSubscriptionId);
+      await paystackClient.cancelSubscription(subscription.paystackSubscriptionId);
     }
   }
 
@@ -450,51 +436,43 @@ export async function getBillingDashboard(userId: string): Promise<BillingDashbo
   let invoices: InvoiceSummary[] = [];
   let paymentMethods: PaymentMethodSummary[] = [];
 
-  // Fetch Stripe data if available
-  if (stripe && subscription.stripeCustomerId) {
+  // Fetch Paystack data if available
+  if (paystackClient && subscription.paystackCustomerId) {
     try {
-      // Get invoices
-      const stripeInvoices = await stripe.invoices.list({
-        customer: subscription.stripeCustomerId,
-        limit: 10,
-      });
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user) {
+        // Get transactions (Paystack uses transactions instead of invoices)
+        const transactions = await paystackClient.getTransactions(user.email, 10);
+        
+        invoices = transactions
+          .filter(tx => tx.status === 'success')
+          .map(tx => ({
+            id: tx.reference,
+            amount: tx.amount / 100, // Convert from kobo to naira
+            currency: tx.currency.toUpperCase(),
+            status: tx.status,
+            periodStart: new Date(tx.created_at),
+            periodEnd: new Date(tx.created_at), // Paystack doesn't have period end in transactions
+            paidAt: tx.paid_at ? new Date(tx.paid_at) : new Date(tx.created_at),
+            invoiceUrl: null, // Paystack doesn't provide invoice URLs in transactions
+          }));
 
-      invoices = stripeInvoices.data.map(inv => ({
-        id: inv.id,
-        amount: inv.amount_due / 100,
-        currency: inv.currency,
-        status: inv.status ?? 'unknown',
-        periodStart: new Date(inv.period_start * 1000),
-        periodEnd: new Date(inv.period_end * 1000),
-        paidAt: inv.status_transitions?.paid_at 
-          ? new Date(inv.status_transitions.paid_at * 1000) 
-          : null,
-        invoiceUrl: inv.hosted_invoice_url ?? null,
-      }));
-
-      // Get payment methods
-      const stripePaymentMethods = await stripe.paymentMethods.list({
-        customer: subscription.stripeCustomerId,
-        type: 'card',
-      });
-
-      const customer = await stripe.customers.retrieve(subscription.stripeCustomerId);
-      const defaultPaymentMethodId = 
-        typeof customer !== 'string' && !customer.deleted
-          ? (customer.invoice_settings?.default_payment_method as string | null)
-          : null;
-
-      paymentMethods = stripePaymentMethods.data.map(pm => ({
-        id: pm.id,
-        type: pm.type,
-        brand: pm.card?.brand ?? null,
-        last4: pm.card?.last4 ?? null,
-        expiryMonth: pm.card?.exp_month ?? null,
-        expiryYear: pm.card?.exp_year ?? null,
-        isDefault: pm.id === defaultPaymentMethodId,
-      }));
+        // Get payment methods from authorization data
+        if (transactions.length > 0 && transactions[0].authorization) {
+          const auth = transactions[0].authorization;
+          paymentMethods = [{
+            id: auth.authorization_code,
+            type: 'card',
+            brand: auth.brand,
+            last4: auth.last4,
+            expiryMonth: parseInt(auth.exp_month),
+            expiryYear: parseInt(auth.exp_year),
+            isDefault: true,
+          }];
+        }
+      }
     } catch (error) {
-      logger.error('Failed to fetch Stripe data', { error, userId });
+      logger.error('Failed to fetch Paystack data', { error, userId });
     }
   }
 
@@ -520,35 +498,26 @@ export async function getUpgradePreview(
   let proratedAmount = 0;
   let newMonthlyAmount = 0;
 
-  // Calculate prorated amount from Stripe if available
-  if (stripe && subscription.stripeSubscriptionId) {
-    const priceId = STRIPE_PRICE_IDS[newTier];
-    if (priceId) {
+  // Calculate prorated amount from Paystack if available
+  if (paystackClient) {
+    const planCode = PAYSTACK_PLAN_CODES[newTier];
+    if (planCode) {
       try {
-        const stripeSubscription = await stripe.subscriptions.retrieve(
-          subscription.stripeSubscriptionId
-        );
-
-        const subscriptionItem = stripeSubscription.items.data[0];
-        if (subscriptionItem) {
-          const preview = await stripe.invoices.createPreview({
-            customer: subscription.stripeCustomerId!,
-            subscription: subscription.stripeSubscriptionId,
-            subscription_details: {
-              items: [{
-                id: subscriptionItem.id,
-                price: priceId,
-              }],
-            },
-          });
-
-          proratedAmount = preview.amount_due / 100;
+        const plans = await paystackClient.getPlans();
+        const plan = plans.find(p => p.plan_code === planCode);
+        if (plan) {
+          newMonthlyAmount = plan.amount / 100; // Convert from kobo to naira
+          // Paystack doesn't have a prorated preview API, so we'll estimate
+          // based on remaining days in the current period
+          const now = new Date();
+          const daysRemaining = Math.ceil(
+            (subscription.currentPeriodEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          const daysInMonth = 30; // Approximate
+          proratedAmount = (newMonthlyAmount * daysRemaining) / daysInMonth;
         }
-
-        const price = await stripe.prices.retrieve(priceId);
-        newMonthlyAmount = (price.unit_amount ?? 0) / 100;
       } catch (error) {
-        logger.error('Failed to get upgrade preview from Stripe', { error, userId });
+        logger.error('Failed to get upgrade preview from Paystack', { error, userId });
       }
     }
   }
@@ -567,62 +536,67 @@ export async function getUpgradePreview(
 }
 
 // ============================================
-// Stripe Webhook Handlers
+// Paystack Webhook Handlers
 // ============================================
 
 /**
- * Handle Stripe webhook events
+ * Handle Paystack webhook events
  */
-export async function handleStripeWebhook(
-  event: Stripe.Event
+export async function handlePaystackWebhook(
+  event: PaystackWebhookEvent
 ): Promise<void> {
-  switch (event.type) {
-    case 'customer.subscription.updated': {
-      const subscription = event.data.object as Stripe.Subscription;
+  switch (event.event) {
+    case 'subscription.create':
+    case 'subscription.update':
+    case 'subscription.enable':
+    case 'subscription.disable': {
+      const subscription = event.data as any;
       await handleSubscriptionUpdated(subscription);
       break;
     }
-    case 'customer.subscription.deleted': {
-      const subscription = event.data.object as Stripe.Subscription;
+    case 'subscription.not_renew': {
+      const subscription = event.data as any;
       await handleSubscriptionDeleted(subscription);
       break;
     }
-    case 'invoice.payment_succeeded': {
-      const invoice = event.data.object as Stripe.Invoice;
-      await handlePaymentSucceeded(invoice);
+    case 'charge.success':
+    case 'subscription.create': {
+      const transaction = event.data as any;
+      await handlePaymentSucceeded(transaction);
       break;
     }
-    case 'invoice.payment_failed': {
-      const invoice = event.data.object as Stripe.Invoice;
-      await handlePaymentFailed(invoice);
+    case 'charge.failed':
+    case 'subscription.failed': {
+      const transaction = event.data as any;
+      await handlePaymentFailed(transaction);
       break;
     }
     default:
-      logger.debug('Unhandled Stripe event', { type: event.type });
+      logger.debug('Unhandled Paystack event', { type: event.event });
   }
 }
 
-async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription): Promise<void> {
+async function handleSubscriptionUpdated(paystackSubscription: any): Promise<void> {
   const subscription = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: stripeSubscription.id },
+    where: { paystackSubscriptionId: paystackSubscription.subscription_code },
   });
 
   if (!subscription) {
-    logger.warn('Subscription not found for Stripe subscription', { 
-      stripeSubscriptionId: stripeSubscription.id 
+    logger.warn('Subscription not found for Paystack subscription', { 
+      paystackSubscriptionId: paystackSubscription.subscription_code 
     });
     return;
   }
 
   let status: SubscriptionStatus;
-  switch (stripeSubscription.status) {
+  switch (paystackSubscription.status) {
     case 'active':
       status = SubscriptionStatus.ACTIVE;
       break;
-    case 'past_due':
+    case 'non-renewing':
       status = SubscriptionStatus.PAST_DUE;
       break;
-    case 'canceled':
+    case 'cancelled':
       status = SubscriptionStatus.CANCELED;
       break;
     case 'paused':
@@ -632,12 +606,12 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
       status = SubscriptionStatus.ACTIVE;
   }
 
-  // Get period dates from subscription items or use current period
-  const periodStart = stripeSubscription.items.data[0]?.current_period_start 
-    ? new Date(stripeSubscription.items.data[0].current_period_start * 1000)
+  // Get period dates from Paystack subscription
+  const periodStart = paystackSubscription.start 
+    ? new Date(paystackSubscription.start * 1000)
     : getCurrentPeriod().start;
-  const periodEnd = stripeSubscription.items.data[0]?.current_period_end
-    ? new Date(stripeSubscription.items.data[0].current_period_end * 1000)
+  const periodEnd = paystackSubscription.next_payment_date
+    ? new Date(paystackSubscription.next_payment_date)
     : getCurrentPeriod().end;
 
   await prisma.subscription.update({
@@ -646,7 +620,7 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
       status,
       currentPeriodStart: periodStart,
       currentPeriodEnd: periodEnd,
-      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+      cancelAtPeriodEnd: paystackSubscription.status === 'non-renewing',
     },
   });
 
@@ -656,9 +630,9 @@ async function handleSubscriptionUpdated(stripeSubscription: Stripe.Subscription
   });
 }
 
-async function handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription): Promise<void> {
+async function handleSubscriptionDeleted(paystackSubscription: any): Promise<void> {
   const subscription = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: stripeSubscription.id },
+    where: { paystackSubscriptionId: paystackSubscription.subscription_code },
   });
 
   if (!subscription) {
@@ -673,7 +647,8 @@ async function handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription
     data: {
       tier: SubscriptionTier.FREE,
       status: SubscriptionStatus.CANCELED,
-      stripeSubscriptionId: null,
+      paystackSubscriptionId: null,
+      paystackAuthorizationCode: null,
       monthlyWordLimit: freeLimits.monthlyWordLimit,
       monthlyApiCallLimit: freeLimits.monthlyApiCallLimit,
       storageLimit: freeLimits.storageLimit,
@@ -685,15 +660,13 @@ async function handleSubscriptionDeleted(stripeSubscription: Stripe.Subscription
   });
 }
 
-async function handlePaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
-  const subscriptionId = typeof invoice.parent?.subscription_details?.subscription === 'string'
-    ? invoice.parent.subscription_details.subscription
-    : null;
+async function handlePaymentSucceeded(transaction: any): Promise<void> {
+  const subscriptionCode = transaction.subscription?.subscription_code || transaction.subscription_code;
   
-  if (!subscriptionId) return;
+  if (!subscriptionCode) return;
 
   const subscription = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subscriptionId },
+    where: { paystackSubscriptionId: subscriptionCode },
   });
 
   if (!subscription) return;
@@ -715,15 +688,13 @@ async function handlePaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
   });
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice): Promise<void> {
-  const subscriptionId = typeof invoice.parent?.subscription_details?.subscription === 'string'
-    ? invoice.parent.subscription_details.subscription
-    : null;
+async function handlePaymentFailed(transaction: any): Promise<void> {
+  const subscriptionCode = transaction.subscription?.subscription_code || transaction.subscription_code;
   
-  if (!subscriptionId) return;
+  if (!subscriptionCode) return;
 
   const subscription = await prisma.subscription.findUnique({
-    where: { stripeSubscriptionId: subscriptionId },
+    where: { paystackSubscriptionId: subscriptionCode },
   });
 
   if (!subscription) return;

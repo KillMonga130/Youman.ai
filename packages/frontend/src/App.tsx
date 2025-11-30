@@ -1,153 +1,67 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, lazy, Suspense } from 'react';
-import { Layout } from './components/Layout';
-import { Login } from './pages';
-import { ThemeProvider, Spinner } from './components/ui';
-import { useAppStore } from './store';
-import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
+import { 
+  Dashboard, 
+  Editor, 
+  Comparison, 
+  Settings, 
+  History, 
+  Analytics, 
+  Search, 
+  Login,
+  Advanced,
+  Templates,
+  ABTesting,
+  Admin,
+  ModelManagement
+} from './pages';
+import { Layout } from './components/Layout/Layout';
 import { AccessibilityProvider } from './context/AccessibilityContext';
-import { useCurrentUser } from './api/hooks';
+import { KeyboardShortcutsProvider } from './context/KeyboardShortcutsContext';
+import { SearchProvider } from './context/SearchContext';
 
-// Lazy load modals
-const KeyboardShortcutsModal = lazy(() =>
-  import('./components/KeyboardShortcutsModal').then(m => ({ default: m.KeyboardShortcutsModal }))
-);
-const ShortcutFeedback = lazy(() =>
-  import('./components/ShortcutFeedback').then(m => ({ default: m.ShortcutFeedback }))
-);
-
-// Lazy load pages
-const Dashboard = lazy(() => import('./pages').then(m => ({ default: m.Dashboard })));
-const Editor = lazy(() => import('./pages').then(m => ({ default: m.Editor })));
-const Comparison = lazy(() => import('./pages').then(m => ({ default: m.Comparison })));
-const Settings = lazy(() => import('./pages').then(m => ({ default: m.Settings })));
-const History = lazy(() => import('./pages').then(m => ({ default: m.History })));
-const Analytics = lazy(() => import('./pages').then(m => ({ default: m.Analytics })));
-const Search = lazy(() => import('./pages').then(m => ({ default: m.Search })));
-const Advanced = lazy(() => import('./pages').then(m => ({ default: m.Advanced })));
-const Templates = lazy(() => import('./pages').then(m => ({ default: m.Templates })));
-const ABTesting = lazy(() => import('./pages').then(m => ({ default: m.ABTesting })));
-const Admin = lazy(() => import('./pages').then(m => ({ default: m.Admin })));
-const ModelManagement = lazy(() => import('./pages').then(m => ({ default: m.ModelManagement })));
-
+// Create a React Query client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5,
-      gcTime: 10 * 60 * 1000,
       retry: 1,
       refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
     },
   },
 });
 
-function LoadingScreen(): JSX.Element {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-black">
-      <Spinner size="lg" />
-    </div>
-  );
-}
-
-function ProtectedRoute({ children }: { children: React.ReactNode }): JSX.Element {
-  const user = useAppStore(state => state.user);
-  const setUser = useAppStore(state => state.setUser);
-  const { data, isLoading, error, isError } = useCurrentUser();
-
-  // Update user in store when API returns user data
-  useEffect(() => {
-    if (data?.user && !user) {
-      setUser(data.user);
-    }
-  }, [data?.user, user, setUser]);
-
-  // Show loading while fetching
-  if (isLoading) {
-    return <LoadingScreen />;
-  }
-
-  // If we have a user (from store or API), allow access
-  if (user || data?.user) {
-    return <>{children}</>;
-  }
-
-  // Only redirect if there's an error or no user after loading completes
-  if (isError || error || (!isLoading && !user && !data?.user)) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <LoadingScreen />;
-}
-
-function AppContent(): JSX.Element {
-  const { darkMode, cyberpunkTheme } = useAppStore(state => state.settings);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-    document.documentElement.classList.toggle('cyberpunk-theme', cyberpunkTheme);
-    document.documentElement.classList.toggle('professional-theme', !cyberpunkTheme);
-  }, [darkMode, cyberpunkTheme]);
-
-  return (
-    <KeyboardShortcutsProvider>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/*"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <a href="#main-content" className="skip-link">
-                  Skip to main content
-                </a>
-                <Suspense fallback={<LoadingScreen />}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/editor" element={<Editor />} />
-                    <Route path="/editor/:id" element={<Editor />} />
-                    <Route path="/templates" element={<Templates />} />
-                    <Route path="/ab-testing" element={<ABTesting />} />
-                    <Route path="/comparison" element={<Comparison />} />
-                    <Route path="/history" element={<History />} />
-                    <Route path="/analytics" element={<Analytics />} />
-                    <Route path="/search" element={<Search />} />
-                    <Route path="/advanced" element={<Advanced />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/settings/cloud-callback" element={<Settings />} />
-                    <Route path="/admin" element={<Admin />} />
-                    <Route path="/models" element={<ModelManagement />} />
-                  </Routes>
-                </Suspense>
-              </Layout>
-              <Suspense fallback={null}>
-                <KeyboardShortcutsModal />
-                <ShortcutFeedback />
-              </Suspense>
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </KeyboardShortcutsProvider>
-  );
-}
-
-function App(): JSX.Element {
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="system">
+      <BrowserRouter>
         <AccessibilityProvider>
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <AppContent />
-          </BrowserRouter>
+          <KeyboardShortcutsProvider>
+            <SearchProvider>
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/login" element={<Login />} />
+                  <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
+                  <Route path="/editor" element={<Layout><Editor /></Layout>} />
+                  <Route path="/editor/:id" element={<Layout><Editor /></Layout>} />
+                  <Route path="/comparison" element={<Layout><Comparison /></Layout>} />
+                  <Route path="/comparison/:id" element={<Layout><Comparison /></Layout>} />
+                  <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                  <Route path="/history" element={<Layout><History /></Layout>} />
+                  <Route path="/history/:id" element={<Layout><History /></Layout>} />
+                  <Route path="/analytics" element={<Layout><Analytics /></Layout>} />
+                  <Route path="/search" element={<Layout><Search /></Layout>} />
+                  <Route path="/advanced" element={<Layout><Advanced /></Layout>} />
+                  <Route path="/templates" element={<Layout><Templates /></Layout>} />
+                  <Route path="/ab-testing" element={<Layout><ABTesting /></Layout>} />
+                  <Route path="/admin" element={<Layout><Admin /></Layout>} />
+                  <Route path="/models" element={<Layout><ModelManagement /></Layout>} />
+                <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              </Routes>
+            </SearchProvider>
+          </KeyboardShortcutsProvider>
         </AccessibilityProvider>
-      </ThemeProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

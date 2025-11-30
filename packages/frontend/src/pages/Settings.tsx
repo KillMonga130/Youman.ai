@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, RotateCcw, User, Lock, CreditCard, CheckCircle, Cloud, Shield, FileText, Loader2, X, ArrowRight } from 'lucide-react';
+import { Save, RotateCcw, User, Lock, CreditCard, CheckCircle, Cloud, Shield, FileText, Loader2, X, ArrowRight, Trash2, AlertTriangle } from 'lucide-react';
 import { useAppStore, UserSettings } from '../store';
 import { KeyboardShortcutsSettings } from '../components/KeyboardShortcutsSettings';
 import { AccessibilitySettings } from '../components/AccessibilitySettings';
@@ -103,6 +103,11 @@ export function Settings(): JSX.Element {
     };
   } | null>(null);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  
+  // Account deletion state
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // API hooks
   const { data: currentUserData, isLoading: isLoadingUser } = useCurrentUser();
@@ -1623,6 +1628,117 @@ export function Settings(): JSX.Element {
           </div>
         </div>
       )}
+
+      {/* Danger Zone - Account Deletion */}
+      <div className="card animate-slide-up border-2 border-red-200 dark:border-red-900/50">
+        <div className="p-6 border-b border-red-200/50 dark:border-red-900/30 bg-gradient-to-r from-red-50/30 to-transparent dark:from-red-900/10">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-red-500 to-red-600 shadow-lg">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Danger Zone</h2>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Delete Account</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </p>
+            
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="btn bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Account
+              </button>
+            ) : (
+              <div className="space-y-4 p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-900/50">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-900 dark:text-red-100 mb-1">
+                      Are you absolutely sure?
+                    </p>
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-4">
+                      This will permanently delete your account, all projects, data, and subscriptions. 
+                      This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Only show password field if user might have a password (not OAuth-only) */}
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-gray-900 dark:text-white">
+                    {user?.email ? 'Enter your password to confirm' : 'Confirm account deletion'}
+                  </label>
+                  <input
+                    type="password"
+                    value={deletePassword}
+                    onChange={(e) => setDeletePassword(e.target.value)}
+                    className="input w-full"
+                    placeholder={user?.email ? "Enter your password" : "Type DELETE to confirm"}
+                    autoComplete="current-password"
+                  />
+                  {!user?.email && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      OAuth users: Type "DELETE" to confirm
+                    </p>
+                  )}
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setDeletePassword('');
+                    }}
+                    className="btn btn-outline flex-1"
+                    disabled={isDeleting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('This will permanently delete your account. Are you absolutely sure?')) {
+                        return;
+                      }
+                      
+                      setIsDeleting(true);
+                      try {
+                        await apiClient.deleteAccount(deletePassword || undefined);
+                        // Clear local storage and redirect to login
+                        localStorage.clear();
+                        window.location.href = '/login';
+                      } catch (error: any) {
+                        console.error('Failed to delete account:', error);
+                        alert(error?.error || error?.message || 'Failed to delete account. Please try again.');
+                        setIsDeleting(false);
+                      }
+                    }}
+                    disabled={isDeleting}
+                    className="btn bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700 flex-1 flex items-center justify-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4" />
+                        Yes, Delete My Account
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

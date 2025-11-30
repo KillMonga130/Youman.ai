@@ -7,7 +7,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
-import Stripe from 'stripe';
+import * as crypto from 'crypto';
 import { config } from '../config/env';
 import { authenticate } from '../auth/auth.middleware';
 import { logger } from '../utils/logger';
@@ -20,7 +20,7 @@ import {
   checkQuota,
   getBillingDashboard,
   getUpgradePreview,
-  handleStripeWebhook,
+  handlePaystackWebhook,
   trackUsage,
   SubscriptionError,
 } from './subscription.service';
@@ -270,36 +270,46 @@ router.get(
 );
 
 // ============================================
-// Stripe Webhook Endpoint
+// Paystack Webhook Endpoint
 // ============================================
 
 /**
  * POST /subscription/webhook
- * Handle Stripe webhook events
+ * Handle Paystack webhook events
  */
 router.post(
   '/webhook',
   async (req: Request, res: Response, next: NextFunction) => {
-    const sig = req.headers['stripe-signature'] as string;
-
-    if (!config.stripe.webhookSecret || !config.stripe.secretKey) {
-      logger.warn('Stripe webhook received but Stripe is not configured');
-      res.status(400).json({ error: 'Stripe not configured' });
+    if (!config.paystack.webhookSecret || !config.paystack.secretKey) {
+      logger.warn('Paystack webhook received but Paystack is not configured');
+      res.status(400).json({ error: 'Paystack not configured' });
       return;
     }
 
     try {
-      const stripe = new Stripe(config.stripe.secretKey);
-      const event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        config.stripe.webhookSecret
-      );
+      // Verify webhook signature
+      const signature = req.headers['x-paystack-signature'] as string;
+      if (!signature) {
+        logger.warn('Missing Paystack webhook signature');
+        res.status(400).json({ error: 'Missing signature' });
+        return;
+      }
 
-      await handleStripeWebhook(event);
+      const hash = crypto
+        .createHmac('sha512', config.paystack.webhookSecret!)
+        .update(JSON.stringify(req.body))
+        .digest('hex');
+
+      if (hash !== signature) {
+        logger.warn('Invalid Paystack webhook signature');
+        res.status(400).json({ error: 'Invalid signature' });
+        return;
+      }
+
+      await handlePaystackWebhook(req.body);
       res.json({ received: true });
     } catch (error) {
-      logger.error('Stripe webhook error', { error });
+      logger.error('Paystack webhook error', { error });
       res.status(400).json({ error: 'Webhook error' });
     }
   }

@@ -18,7 +18,7 @@ datasource db {
 model User {
   id                String    @id @default(uuid())
   email             String    @unique
-  passwordHash      String    @map("password_hash")
+  passwordHash      String?   @map("password_hash") // Optional for OAuth users
   firstName         String?   @map("first_name")
   lastName          String?   @map("last_name")
   avatarUrl         String?   @map("avatar_url")
@@ -31,6 +31,12 @@ model User {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   deletedAt         DateTime? @map("deleted_at")
+  
+  // OAuth fields
+  oauthProvider     String?   @map("oauth_provider") // GOOGLE, GITHUB, null for email/password
+  oauthProviderId   String?   @map("oauth_provider_id") // Provider's user ID
+  oauthAccessToken  String?   @map("oauth_access_token")
+  oauthRefreshToken String?   @map("oauth_refresh_token")
 
   // Relations
   subscription      Subscription?
@@ -186,8 +192,9 @@ model Subscription {
   userId                String    @unique @map("user_id")
   tier                  SubscriptionTier @default(FREE)
   status                SubscriptionStatus @default(ACTIVE)
-  stripeCustomerId      String?   @unique @map("stripe_customer_id")
-  stripeSubscriptionId  String?   @unique @map("stripe_subscription_id")
+  paystackCustomerId    String?   @unique @map("paystack_customer_id")
+  paystackSubscriptionId String?  @unique @map("paystack_subscription_id")
+  paystackAuthorizationCode String? @map("paystack_authorization_code")
   monthlyWordLimit      Int       @map("monthly_word_limit")
   monthlyApiCallLimit   Int       @map("monthly_api_call_limit")
   storageLimit          BigInt    @map("storage_limit") // in bytes
@@ -199,7 +206,7 @@ model Subscription {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([stripeCustomerId])
+  @@index([paystackCustomerId])
   @@map("subscriptions")
 }
 

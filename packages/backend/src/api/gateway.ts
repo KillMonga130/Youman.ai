@@ -39,6 +39,8 @@ import {
   strictRateLimiter,
   relaxedRateLimiter,
 } from './middleware/rate-limiter';
+import { requireSubscription } from '../subscription/subscription.middleware';
+import { authenticate } from '../auth/auth.middleware';
 import { 
   combinedLogger, 
   errorLogger 
@@ -186,24 +188,24 @@ function mountApiRoutes(app: Express): void {
   // Health check for API
   apiRouter.get('/health', relaxedRateLimiter, createHealthCheckHandler());
 
-  // Projects routes (standard rate limiting)
-  apiRouter.use('/projects', standardRateLimiter, projectRouter);
+  // Projects routes (standard rate limiting + auth + subscription required)
+  apiRouter.use('/projects', standardRateLimiter, authenticate, requireSubscription, projectRouter);
   
-  // Version control routes (standard rate limiting)
+  // Version control routes (standard rate limiting + auth + subscription required)
   // Requirements: 16 - Save drafts and revisions with version history
-  apiRouter.use('/versions', standardRateLimiter, versionRouter);
+  apiRouter.use('/versions', standardRateLimiter, authenticate, requireSubscription, versionRouter);
   
-  // Branch routes (standard rate limiting)
+  // Branch routes (standard rate limiting + auth + subscription required)
   // Requirements: 56 - Branching system with merge conflict resolution
-  apiRouter.use('/branches', standardRateLimiter, branchRouter);
+  apiRouter.use('/branches', standardRateLimiter, authenticate, requireSubscription, branchRouter);
   
-  // Storage routes (standard rate limiting)
+  // Storage routes (standard rate limiting + auth + subscription required)
   // Requirements: 12, 15, 63 - Document storage with S3 and MongoDB
-  apiRouter.use('/storage', standardRateLimiter, storageRouter);
+  apiRouter.use('/storage', standardRateLimiter, authenticate, requireSubscription, storageRouter);
   
-  // Collaboration routes (standard rate limiting)
+  // Collaboration routes (standard rate limiting + auth + subscription required)
   // Requirements: 21 - Collaborate with team members on projects
-  apiRouter.use('/collaboration', standardRateLimiter, collaborationRouter);
+  apiRouter.use('/collaboration', standardRateLimiter, authenticate, requireSubscription, collaborationRouter);
   
   // Subscription routes (standard rate limiting)
   // Requirements: 20 - Subscription tiers with different capabilities
@@ -384,7 +386,7 @@ function mountApiRoutes(app: Express): void {
 
   // Transformations routes (standard rate limiting)
   // Requirements: 2.1, 2.2, 2.3, 2.4 - Text humanization API
-  apiRouter.use('/transformations', standardRateLimiter, transformRouter);
+  apiRouter.use('/transformations', standardRateLimiter, authenticate, requireSubscription, transformRouter);
   
   // Placeholder routes for future services
   // These will be implemented in subsequent tasks
@@ -392,16 +394,16 @@ function mountApiRoutes(app: Express): void {
   // Analytics routes (relaxed rate limiting - read-heavy)
   apiRouter.use('/analytics', relaxedRateLimiter, createPlaceholderRouter('analytics'));
   
-  // Detection routes (standard rate limiting)
+  // Detection routes (standard rate limiting + subscription required)
   // Requirements: 26 - Real-time AI detection testing
-  apiRouter.use('/detection', standardRateLimiter, detectionRouter);
+  apiRouter.use('/detection', standardRateLimiter, authenticate, requireSubscription, detectionRouter);
   
   // Users routes (standard rate limiting)
   apiRouter.use('/users', standardRateLimiter, createPlaceholderRouter('users'));
   
-  // Templates routes (relaxed rate limiting)
+  // Templates routes (relaxed rate limiting + subscription required)
   // Requirements: 25 - Template system with presets and custom templates
-  apiRouter.use('/templates', relaxedRateLimiter, templateRoutes);
+  apiRouter.use('/templates', relaxedRateLimiter, authenticate, requireSubscription, templateRoutes);
 
   // Mount API router
   app.use(API_PREFIX, apiRouter);

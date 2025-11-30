@@ -41,28 +41,30 @@ export function Sidebar(): JSX.Element {
 
   const handleLogout = async (): Promise<void> => {
     try {
-      // Clear tokens via API client
       await apiClient.logout();
-      
-      // Clear user from store
       setUser(null);
-      
-      // Clear all React Query cache
       queryClient.clear();
-      
-      // Navigate to login page
       navigate('/login', { replace: true });
     } catch (error) {
-      // Even if logout fails, clear local state
       setUser(null);
       queryClient.clear();
       navigate('/login', { replace: true });
     }
   };
 
+  // Precomputed styles
+  const sidebarBorderRight = isCyberpunk
+    ? '1px solid rgba(0, 255, 255, 0.3)'
+    : '2px solid var(--professional-primary)';
+  const headerBorderBottom = isCyberpunk
+    ? '1px solid rgba(0, 255, 255, 0.3)'
+    : '2px solid var(--professional-primary)';
+  const userSectionBorderTop = isCyberpunk
+    ? '1px solid rgba(0, 255, 255, 0.3)'
+    : '2px solid var(--professional-primary)';
+
   return (
     <>
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-fade-in"
@@ -70,26 +72,16 @@ export function Sidebar(): JSX.Element {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed top-0 left-0 z-50 h-full w-64 glass-card border-r transform transition-all duration-300 ease-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{
-          borderRight: isCyberpunk 
-            ? '1px solid rgba(0, 255, 255, 0.3)' 
-            : '2px solid var(--professional-primary)'
-        }}
+        style={{ borderRight: sidebarBorderRight }}
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
           <div 
             className="flex items-center justify-between p-6 border-b"
-            style={{
-              borderBottom: isCyberpunk 
-                ? '1px solid rgba(0, 255, 255, 0.3)' 
-                : '2px solid var(--professional-primary)'
-            }}
+            style={{ borderBottom: headerBorderBottom }}
           >
             <Link to="/" className="flex items-center gap-3 group">
               <div 
@@ -147,7 +139,6 @@ export function Sidebar(): JSX.Element {
             </button>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto scrollbar-modern">
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
@@ -165,17 +156,11 @@ export function Sidebar(): JSX.Element {
                 </Link>
               );
             })}
-
           </nav>
 
-          {/* User section */}
           <div 
             className="p-4 border-t"
-            style={{
-              borderTop: isCyberpunk 
-                ? '1px solid rgba(0, 255, 255, 0.3)' 
-                : '2px solid var(--professional-primary)'
-            }}
+            style={{ borderTop: userSectionBorderTop }}
           >
             {user ? (
               <div 
@@ -217,20 +202,20 @@ export function Sidebar(): JSX.Element {
                         ? { color: 'var(--cyberpunk-base)' }
                         : { color: 'var(--professional-secondary)' }
                       }
-                    >{user.name.charAt(0).toUpperCase()}</span>
+                    >{(user?.name ?? user?.email ?? 'U').charAt(0).toUpperCase()}</span>
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className={`font-bold text-sm truncate ${
                       isCyberpunk 
                         ? 'text-cyan-100' 
                         : 'text-black dark:text-white font-sans'
-                    }`}>{user.name}</p>
+                    }`}>{user?.name ?? user?.email ?? 'User'}</p>
                     <p className={`text-xs truncate font-medium ${
                       isCyberpunk 
                         ? 'text-cyan-400/70 font-mono' 
                         : 'text-gray-600 dark:text-gray-400 font-sans tracking-wide'
                     }`}>
-                      {user.email}
+                      {user?.email ?? ''}
                     </p>
                   </div>
                 </div>
@@ -258,7 +243,6 @@ export function Sidebar(): JSX.Element {
         </div>
       </aside>
 
-      {/* Mobile menu button */}
       <button
         onClick={() => setSidebarOpen(true)}
         className="fixed top-4 left-4 z-30 p-3 glass-card rounded-xl shadow-lg hover:shadow-xl transition-all lg:hidden"

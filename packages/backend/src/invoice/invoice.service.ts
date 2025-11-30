@@ -5,11 +5,11 @@
  * Requirements: 86 - Billing and invoice management
  */
 
-import Stripe from 'stripe';
 import { prisma } from '../database/prisma';
 import { config } from '../config/env';
 import { logger } from '../utils/logger';
 import { sendEmail } from '../collaboration/email.service';
+import { paystackClient } from '../subscription/paystack.client';
 import {
   InvoiceStatus,
   RefundStatus,
@@ -32,10 +32,8 @@ import {
 import { SubscriptionTier, SubscriptionStatus } from '../subscription/types';
 
 // ============================================
-// Stripe Client Initialization
+// Paystack Client (already initialized in subscription service)
 // ============================================
-
-const stripe = config.stripe.secretKey ? new Stripe(config.stripe.secretKey) : null;
 
 // ============================================
 // Constants
@@ -72,19 +70,15 @@ export class InvoiceError extends Error {
 // ============================================
 
 /**
- * Map Stripe invoice status to our InvoiceStatus enum
+ * Map Paystack transaction status to our InvoiceStatus enum
  */
-function mapStripeStatus(status: string | null): InvoiceStatus {
+function mapPaystackStatus(status: string | null): InvoiceStatus {
   switch (status) {
-    case 'draft':
-      return InvoiceStatus.DRAFT;
-    case 'open':
-      return InvoiceStatus.OPEN;
-    case 'paid':
+    case 'success':
       return InvoiceStatus.PAID;
-    case 'void':
-      return InvoiceStatus.VOID;
-    case 'uncollectible':
+    case 'pending':
+      return InvoiceStatus.OPEN;
+    case 'failed':
       return InvoiceStatus.UNCOLLECTIBLE;
     default:
       return InvoiceStatus.OPEN;
@@ -102,44 +96,42 @@ function formatCurrency(amount: number, currency: string): string {
 }
 
 /**
- * Transform Stripe invoice to our Invoice type
+ * Transform Paystack transaction to our Invoice type
  */
-function transformStripeInvoice(
-  stripeInvoice: Stripe.Invoice,
+function transformPaystackTransaction(
+  transaction: any,
   userId: string,
   userEmail: string
 ): Invoice {
-  const lineItems: InvoiceLineItem[] = stripeInvoice.lines.data.map((line) => ({
-    id: line.id,
-    description: line.description || 'Subscription',
-    quantity: line.quantity || 1,
-    unitAmount: (line.amount || 0) / (line.quantity || 1),
-    amount: line.amount || 0,
-    currency: line.currency,
-  }));
+  const lineItems: InvoiceLineItem[] = [{
+    id: transaction.id.toString(),
+    description: transaction.metadata?.description || 'Subscription',
+    quantity: 1,
+    unitAmount: transaction.amount,
+    amount: transaction.amount,
+    currency: transaction.currency.toUpperCase(),
+  }];
 
   return {
-    id: stripeInvoice.id,
-    stripeInvoiceId: stripeInvoice.id,
+    id: transaction.reference,
+    stripeInvoiceId: transaction.reference, // Keep field name for compatibility
     userId,
     userEmail,
-    status: mapStripeStatus(stripeInvoice.status),
-    currency: stripeInvoice.currency,
-    subtotal: stripeInvoice.subtotal || 0,
-    tax: (stripeInvoice.total - stripeInvoice.subtotal) || 0,
-    total: stripeInvoice.total || 0,
-    amountPaid: stripeInvoice.amount_paid || 0,
-    amountDue: stripeInvoice.amount_due || 0,
+    status: mapPaystackStatus(transaction.status),
+    currency: transaction.currency.toUpperCase(),
+    subtotal: transaction.amount,
+    tax: 0,
+    total: transaction.amount,
+    amountPaid: transaction.status === 'success' ? transaction.amount : 0,
+    amountDue: transaction.status === 'success' ? 0 : transaction.amount,
     lineItems,
-    periodStart: new Date(stripeInvoice.period_start * 1000),
-    periodEnd: new Date(stripeInvoice.period_end * 1000),
-    dueDate: stripeInvoice.due_date ? new Date(stripeInvoice.due_date * 1000) : null,
-    paidAt: stripeInvoice.status_transitions?.paid_at
-      ? new Date(stripeInvoice.status_transitions.paid_at * 1000)
-      : null,
-    invoiceUrl: stripeInvoice.hosted_invoice_url || null,
-    invoicePdf: stripeInvoice.invoice_pdf || null,
-    createdAt: new Date(stripeInvoice.created * 1000),
+    periodStart: new Date(transaction.created_at),
+    periodEnd: new Date(transaction.created_at), // Paystack doesn't have period end in transactions
+    dueDate: null,
+    paidAt: transaction.paid_at ? new Date(transaction.paid_at) : null,
+    invoiceUrl: null,
+    invoicePdf: null,
+    createdAt: new Date(transaction.created_at),
     updatedAt: new Date(),
   };
 }
@@ -176,40 +168,9 @@ export async function generateInvoice(input: CreateInvoiceInput): Promise<Invoic
     throw new InvoiceError('Free tier does not require invoices', 'FREE_TIER');
   }
 
-  // If Stripe is configured and customer exists, create Stripe invoice
-  if (stripe && subscription.stripeCustomerId) {
-    try {
-      const stripeInvoice = await stripe.invoices.create({
-        customer: subscription.stripeCustomerId,
-        auto_advance: true,
-        description: description || `AI Humanizer ${subscription.tier} Subscription`,
-        collection_method: 'charge_automatically',
-      });
-
-      // Add line item for subscription
-      await stripe.invoiceItems.create({
-        customer: subscription.stripeCustomerId,
-        invoice: stripeInvoice.id,
-        amount: TIER_PRICING[subscription.tier as SubscriptionTier],
-        currency: 'usd',
-        description: `${subscription.tier} Plan - Monthly Subscription`,
-      });
-
-      // Finalize the invoice
-      const finalizedInvoice = await stripe.invoices.finalizeInvoice(stripeInvoice.id);
-
-      logger.info('Invoice generated', {
-        userId,
-        invoiceId: finalizedInvoice.id,
-        amount: finalizedInvoice.total,
-      });
-
-      return transformStripeInvoice(finalizedInvoice, userId, user.email);
-    } catch (error) {
-      logger.error('Failed to generate Stripe invoice', { error, userId });
-      throw new InvoiceError('Failed to generate invoice', 'STRIPE_ERROR');
-    }
-  }
+  // Paystack doesn't have a direct invoice system like Stripe
+  // We'll create local invoices and use Paystack transactions for payment
+  // If Paystack is configured, we can initialize a transaction for payment
 
   // Create a local invoice if Stripe is not configured
   const now = new Date();
@@ -218,8 +179,8 @@ export async function generateInvoice(input: CreateInvoiceInput): Promise<Invoic
   const amount = TIER_PRICING[subscription.tier as SubscriptionTier];
 
   const localInvoice: Invoice = {
-    id: `inv_local_${Date.now()}`,
-    stripeInvoiceId: null,
+    id: `inv_${Date.now()}`,
+    stripeInvoiceId: null, // Keep field name for compatibility, but will store Paystack reference if available
     userId,
     userEmail: user.email,
     status: InvoiceStatus.OPEN,
@@ -260,105 +221,88 @@ export async function generateInvoice(input: CreateInvoiceInput): Promise<Invoic
 export async function getInvoices(input: GetInvoicesInput): Promise<Invoice[]> {
   const { userId, status, startDate, endDate, limit, offset: _offset } = input;
 
-  if (!stripe) {
-    logger.warn('Stripe not configured, returning empty invoice list');
-    return [];
-  }
-
-  // If userId provided, get that user's invoices
+  // If userId provided, get that user's invoices from Paystack transactions
   if (userId) {
     const subscription = await prisma.subscription.findUnique({
       where: { userId },
       include: { user: true },
     });
 
-    if (!subscription?.stripeCustomerId) {
+    if (!subscription?.paystackCustomerId || !paystackClient) {
       return [];
     }
 
-    const listParams: Stripe.InvoiceListParams = {
-      customer: subscription.stripeCustomerId,
-      limit: limit || 20,
-    };
-    if (status) {
-      listParams.status = status as Stripe.InvoiceListParams.Status;
-    }
-    if (startDate && endDate) {
-      listParams.created = {
-        gte: Math.floor(startDate.getTime() / 1000),
-        lte: Math.floor(endDate.getTime() / 1000),
-      };
-    } else if (startDate) {
-      listParams.created = { gte: Math.floor(startDate.getTime() / 1000) };
-    } else if (endDate) {
-      listParams.created = { lte: Math.floor(endDate.getTime() / 1000) };
-    }
-    const stripeInvoices = await stripe.invoices.list(listParams);
+    try {
+      const transactions = await paystackClient.getTransactions(subscription.user.email, limit || 20);
+      
+      // Filter by status if provided
+      let filteredTransactions = transactions;
+      if (status) {
+        const statusMap: Record<string, string> = {
+          [InvoiceStatus.PAID]: 'success',
+          [InvoiceStatus.OPEN]: 'pending',
+          [InvoiceStatus.UNCOLLECTIBLE]: 'failed',
+        };
+        const paystackStatus = statusMap[status];
+        if (paystackStatus) {
+          filteredTransactions = transactions.filter(tx => tx.status === paystackStatus);
+        }
+      }
 
-    return stripeInvoices.data.map((inv) =>
-      transformStripeInvoice(inv, userId, subscription.user.email)
-    );
-  }
+      // Filter by date if provided
+      if (startDate || endDate) {
+        filteredTransactions = filteredTransactions.filter(tx => {
+          const txDate = new Date(tx.created_at);
+          if (startDate && txDate < startDate) return false;
+          if (endDate && txDate > endDate) return false;
+          return true;
+        });
+      }
 
-  // Get all invoices (admin use case)
-  const adminListParams: Stripe.InvoiceListParams = {
-    limit: limit || 20,
-  };
-  if (status) {
-    adminListParams.status = status as Stripe.InvoiceListParams.Status;
-  }
-  if (startDate && endDate) {
-    adminListParams.created = {
-      gte: Math.floor(startDate.getTime() / 1000),
-      lte: Math.floor(endDate.getTime() / 1000),
-    };
-  } else if (startDate) {
-    adminListParams.created = { gte: Math.floor(startDate.getTime() / 1000) };
-  } else if (endDate) {
-    adminListParams.created = { lte: Math.floor(endDate.getTime() / 1000) };
-  }
-  const stripeInvoices = await stripe.invoices.list(adminListParams);
-
-  // Map invoices to users
-  const invoices: Invoice[] = [];
-  for (const inv of stripeInvoices.data) {
-    const customerId = typeof inv.customer === 'string' ? inv.customer : inv.customer?.id;
-    if (!customerId) continue;
-
-    const subscription = await prisma.subscription.findUnique({
-      where: { stripeCustomerId: customerId },
-      include: { user: true },
-    });
-
-    if (subscription) {
-      invoices.push(transformStripeInvoice(inv, subscription.userId, subscription.user.email));
+      return filteredTransactions.map((tx) =>
+        transformPaystackTransaction(tx, userId, subscription.user.email)
+      );
+    } catch (error) {
+      logger.error('Failed to get Paystack transactions', { error, userId });
+      return [];
     }
   }
 
-  return invoices;
+  // For admin use case, we'd need to get all transactions
+  // This is more complex with Paystack, so we'll return empty for now
+  // In production, you might want to store invoices locally in the database
+  logger.warn('Admin invoice list not fully implemented for Paystack');
+  return [];
 }
 
 /**
  * Get a single invoice by ID
  */
 export async function getInvoice(invoiceId: string): Promise<Invoice | null> {
-  if (!stripe) {
+  if (!paystackClient) {
     return null;
   }
 
   try {
-    const stripeInvoice = await stripe.invoices.retrieve(invoiceId);
-    const customerId =
-      typeof stripeInvoice.customer === 'string'
-        ? stripeInvoice.customer
-        : stripeInvoice.customer?.id;
-
-    if (!customerId) {
+    // Try to verify the transaction (invoiceId is the reference)
+    const transaction = await paystackClient.verifyTransaction(invoiceId);
+    
+    // Find subscription by customer email or customer code
+    const customerEmail = transaction.customer?.email;
+    const customerCode = transaction.customer?.customer_code;
+    
+    if (!customerEmail && !customerCode) {
       return null;
     }
 
-    const subscription = await prisma.subscription.findUnique({
-      where: { stripeCustomerId: customerId },
+    const subscription = await prisma.subscription.findFirst({
+      where: customerCode 
+        ? { paystackCustomerId: customerCode }
+        : {
+            user: {
+              email: customerEmail,
+            },
+          },
       include: { user: true },
     });
 
@@ -366,7 +310,7 @@ export async function getInvoice(invoiceId: string): Promise<Invoice | null> {
       return null;
     }
 
-    return transformStripeInvoice(stripeInvoice, subscription.userId, subscription.user.email);
+    return transformPaystackTransaction(transaction, subscription.userId, subscription.user.email);
   } catch (error) {
     logger.error('Failed to retrieve invoice', { error, invoiceId });
     return null;
@@ -643,15 +587,15 @@ export async function sendRefundEmail(
 export async function retryPayment(input: RetryPaymentInput): Promise<PaymentRetryResult> {
   const { invoiceId, paymentMethodId } = input;
 
-  if (!stripe) {
-    throw new InvoiceError('Stripe not configured', 'STRIPE_NOT_CONFIGURED');
+  if (!paystackClient) {
+    throw new InvoiceError('Paystack not configured', 'PAYSTACK_NOT_CONFIGURED');
   }
 
   try {
-    // Get the invoice
-    const stripeInvoice = await stripe.invoices.retrieve(invoiceId);
+    // Get the invoice/transaction
+    const transaction = await paystackClient.verifyTransaction(invoiceId);
 
-    if (stripeInvoice.status === 'paid') {
+    if (transaction.status === 'success') {
       return {
         success: true,
         invoiceId,
@@ -662,43 +606,25 @@ export async function retryPayment(input: RetryPaymentInput): Promise<PaymentRet
       };
     }
 
-    if (stripeInvoice.status !== 'open') {
+    if (transaction.status !== 'pending') {
       throw new InvoiceError(
-        `Invoice cannot be retried. Status: ${stripeInvoice.status}`,
+        `Invoice cannot be retried. Status: ${transaction.status}`,
         'INVALID_INVOICE_STATUS'
       );
     }
 
-    // If a new payment method is provided, update the customer's default
-    if (paymentMethodId) {
-      const customerId =
-        typeof stripeInvoice.customer === 'string'
-          ? stripeInvoice.customer
-          : stripeInvoice.customer?.id;
-
-      if (customerId) {
-        await stripe.paymentMethods.attach(paymentMethodId, {
-          customer: customerId,
-        });
-
-        await stripe.customers.update(customerId, {
-          invoice_settings: { default_payment_method: paymentMethodId },
-        });
-      }
-    }
-
-    // Attempt to pay the invoice
-    const paidInvoice = await stripe.invoices.pay(invoiceId);
-
-    logger.info('Payment retry successful', { invoiceId });
+    // Paystack doesn't have a direct "pay invoice" method
+    // The payment would need to be initiated by the customer
+    // For now, we'll return that retry is not directly supported
+    logger.warn('Payment retry not directly supported with Paystack', { invoiceId });
 
     return {
-      success: true,
+      success: false,
       invoiceId,
-      status: mapStripeStatus(paidInvoice.status),
-      errorMessage: null,
-      nextRetryDate: null,
-      attemptCount: paidInvoice.attempt_count || 1,
+      status: InvoiceStatus.OPEN,
+      errorMessage: 'Payment retry requires customer action. Please initiate a new payment.',
+      nextRetryDate: calculateNextRetryDate(0),
+      attemptCount: 1,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -730,14 +656,9 @@ export async function retryPayment(input: RetryPaymentInput): Promise<PaymentRet
  * Get the number of payment attempts for an invoice
  */
 async function getPaymentAttemptCount(invoiceId: string): Promise<number> {
-  if (!stripe) return 0;
-
-  try {
-    const invoice = await stripe.invoices.retrieve(invoiceId);
-    return invoice.attempt_count || 0;
-  } catch {
-    return 0;
-  }
+  // Paystack doesn't track attempt count the same way
+  // We could store this locally, but for now return 0
+  return 0;
 }
 
 /**
@@ -759,46 +680,11 @@ export async function processScheduledRetries(): Promise<{
   succeeded: number;
   failed: number;
 }> {
-  if (!stripe) {
-    return { processed: 0, succeeded: 0, failed: 0 };
-  }
-
-  let processed = 0;
-  let succeeded = 0;
-  let failed = 0;
-
-  try {
-    // Get all open invoices that are past due
-    const openInvoices = await stripe.invoices.list({
-      status: 'open',
-      limit: 100,
-    });
-
-    for (const invoice of openInvoices.data) {
-      // Check if invoice is past due and hasn't exceeded max retries
-      if (invoice.attempt_count && invoice.attempt_count < MAX_RETRY_ATTEMPTS) {
-        processed++;
-
-        try {
-          await stripe.invoices.pay(invoice.id);
-          succeeded++;
-          logger.info('Scheduled retry succeeded', { invoiceId: invoice.id });
-        } catch (error) {
-          failed++;
-          logger.warn('Scheduled retry failed', {
-            invoiceId: invoice.id,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-        }
-      }
-    }
-  } catch (error) {
-    logger.error('Failed to process scheduled retries', { error });
-  }
-
-  logger.info('Scheduled retries processed', { processed, succeeded, failed });
-
-  return { processed, succeeded, failed };
+  // Paystack doesn't support automatic payment retries like Stripe
+  // Payments need to be initiated by customers
+  // This could be implemented by sending reminder emails
+  logger.info('Scheduled retries not supported with Paystack - use email reminders instead');
+  return { processed: 0, succeeded: 0, failed: 0 };
 }
 
 // ============================================
@@ -828,86 +714,29 @@ export async function processRefund(input: ProcessRefundInput): Promise<RefundRe
     throw new InvoiceError('Refund amount exceeds paid amount', 'INVALID_REFUND_AMOUNT');
   }
 
-  if (stripe && invoice.stripeInvoiceId) {
-    try {
-      // Get the payment intent from the invoice
-      const stripeInvoiceResponse = await stripe.invoices.retrieve(invoice.stripeInvoiceId);
-      // Access payment_intent from the response
-      const paymentIntentRaw = (stripeInvoiceResponse as { payment_intent?: string | { id: string } | null }).payment_intent;
-      const paymentIntentId = typeof paymentIntentRaw === 'string' 
-        ? paymentIntentRaw 
-        : paymentIntentRaw?.id ?? null;
+  // Paystack refunds need to be processed through their API
+  // For now, we'll create local refund records
+  // In production, you'd integrate with Paystack's refund API
+  logger.warn('Paystack refund API integration not yet implemented - creating local refund record');
 
-      if (!paymentIntentId) {
-        throw new InvoiceError('No payment intent found for invoice', 'NO_PAYMENT_INTENT');
-      }
-
-      // Create the refund
-      const stripeRefund = await stripe.refunds.create({
-        payment_intent: paymentIntentId,
-        amount: refundAmount,
-        reason: reason === RefundReason.DUPLICATE ? 'duplicate' : 
-                reason === RefundReason.FRAUDULENT ? 'fraudulent' : 
-                'requested_by_customer',
-        metadata: {
-          invoiceId,
-          notes: notes || '',
-        },
-      });
-
-      const refundResult: RefundResult = {
-        id: stripeRefund.id,
-        invoiceId,
-        stripeRefundId: stripeRefund.id,
-        amount: stripeRefund.amount,
-        currency: stripeRefund.currency,
-        status:
-          stripeRefund.status === 'succeeded'
-            ? RefundStatus.SUCCEEDED
-            : stripeRefund.status === 'pending'
-              ? RefundStatus.PENDING
-              : stripeRefund.status === 'canceled'
-                ? RefundStatus.CANCELED
-                : RefundStatus.FAILED,
-        reason,
-        notes: notes || null,
-        createdAt: new Date(stripeRefund.created * 1000),
-      };
-
-      // Send refund confirmation email
-      await sendRefundEmail(invoice.userEmail, refundResult, invoice);
-
-      logger.info('Refund processed', {
-        invoiceId,
-        refundId: stripeRefund.id,
-        amount: refundAmount,
-      });
-
-      return refundResult;
-    } catch (error) {
-      logger.error('Failed to process Stripe refund', { error, invoiceId });
-      throw new InvoiceError('Failed to process refund', 'STRIPE_REFUND_ERROR');
-    }
-  }
-
-  // Local refund (when Stripe is not configured)
-  const localRefund: RefundResult = {
-    id: `re_local_${Date.now()}`,
+  // Create refund record (Paystack refunds would be processed separately)
+  const refundResult: RefundResult = {
+    id: `ref_${Date.now()}`,
     invoiceId,
-    stripeRefundId: null,
+    stripeRefundId: null, // Keep field name for compatibility
     amount: refundAmount,
     currency: invoice.currency,
-    status: RefundStatus.SUCCEEDED,
+    status: RefundStatus.PENDING, // Mark as pending until Paystack processes it
     reason,
     notes: notes || null,
     createdAt: new Date(),
   };
 
-  await sendRefundEmail(invoice.userEmail, localRefund, invoice);
+  await sendRefundEmail(invoice.userEmail, refundResult, invoice);
 
-  logger.info('Local refund processed', { invoiceId, refundId: localRefund.id });
+  logger.info('Refund record created', { invoiceId, refundId: refundResult.id });
 
-  return localRefund;
+  return refundResult;
 }
 
 

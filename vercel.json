@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build:shared && cd packages/frontend && npm install && npm run build",
+  "buildCommand": "cd packages/frontend && npm install && npm run build",
   "outputDirectory": "packages/frontend/dist",
   "devCommand": "cd packages/frontend && npm run dev",
   "installCommand": "npm install",

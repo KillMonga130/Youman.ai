@@ -87,12 +87,12 @@ export const TIER_LIMITS: Record<SubscriptionTier, TierLimits> = {
   },
 };
 
-// Stripe Price IDs (configured in Stripe Dashboard)
-export const STRIPE_PRICE_IDS: Record<SubscriptionTier, string | null> = {
-  [SubscriptionTier.FREE]: null, // Free tier has no Stripe price
-  [SubscriptionTier.BASIC]: process.env.STRIPE_BASIC_PRICE_ID || 'price_basic',
-  [SubscriptionTier.PROFESSIONAL]: process.env.STRIPE_PROFESSIONAL_PRICE_ID || 'price_professional',
-  [SubscriptionTier.ENTERPRISE]: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_enterprise',
+// Paystack Plan Codes (configured in Paystack Dashboard)
+export const PAYSTACK_PLAN_CODES: Record<SubscriptionTier, string | null> = {
+  [SubscriptionTier.FREE]: null, // Free tier has no Paystack plan
+  [SubscriptionTier.BASIC]: process.env.PAYSTACK_BASIC_PLAN_CODE || 'PLN_basic',
+  [SubscriptionTier.PROFESSIONAL]: process.env.PAYSTACK_PROFESSIONAL_PLAN_CODE || 'PLN_professional',
+  [SubscriptionTier.ENTERPRISE]: process.env.PAYSTACK_ENTERPRISE_PLAN_CODE || 'PLN_enterprise',
 };
 
 // ============================================
@@ -149,8 +149,8 @@ export interface SubscriptionResponse {
   userId: string;
   tier: SubscriptionTier;
   status: SubscriptionStatus;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
+  paystackCustomerId: string | null;
+  paystackSubscriptionId: string | null;
   limits: SerializableTierLimits; // Use serializable version for JSON responses
   currentPeriodStart: Date;
   currentPeriodEnd: Date;
@@ -218,9 +218,9 @@ export interface UpgradePreview {
 // Webhook Event Types
 // ============================================
 
-export interface StripeWebhookEvent {
-  type: string;
+export interface PaystackWebhookEvent {
+  event: string;
   data: {
-    object: unknown;
+    [key: string]: unknown;
   };
 }
