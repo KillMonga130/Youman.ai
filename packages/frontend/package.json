@@ -35,7 +35,7 @@
     "@types/file-saver": "^2.0.7",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "@types/react-joyride": "^2.0.2",
+    "@types/react-joyride": "^2.0.5",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.22",
     "fast-check": "^4.3.0",
