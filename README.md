@@ -1,10 +1,12 @@
-# AI Humanizer - Complete Documentation
+# 🎃 The Necromancer's Quill - AI Text Resurrection
 
 <div align="center">
 
-![AI Humanizer Logo](https://img.shields.io/badge/AI-Humanizer-blue?style=for-the-badge&logo=openai)
+![The Necromancer's Quill](https://img.shields.io/badge/🎃-Necromancer's%20Quill-8b5cf6?style=for-the-badge)
 
-**Transform AI-generated text into natural, human-like content**
+**Resurrect AI text. Breathe life into the lifeless.**
+
+*A Halloween-themed AI humanizer built for Kiroween 2024*
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green?logo=node.js)](https://nodejs.org/)
@@ -80,19 +82,40 @@ This documentation is organized into **10 comprehensive parts**, each in its own
 
 ---
 
-## 🎯 What is AI Humanizer?
+## 🎃 Kiroween 2024 Submission
 
-**AI Humanizer** is an enterprise-grade, full-stack platform that transforms AI-generated text into natural, human-like content while preserving meaning, context, and intent. Built with modern technologies and designed for scalability.
+This project is a submission for the **Kiroween Hackathon** - transforming an AI humanizer into "The Necromancer's Quill," a Halloween-themed experience that resurrects "dead" AI text.
+
+### Halloween Features
+- 💀 **Resurrection Chamber** - Dashboard with spooky stats
+- 👻 **Ghost Detector** - AI detection gauge with curse levels
+- 📜 **Spell Book** - Halloween-themed templates
+- 🧪 **Potion Lab** - A/B testing with dark experiments
+- ⚰️ **The Graveyard** - History of resurrected souls
+- 🔮 **Séance** - Search through the spirit realm
+
+### Kiro Features Used
+- **Steering** - Always-on Halloween terminology mapping
+- **Specs** - Structured requirements, design, and tasks
+- **Hooks** - CSS performance and theme consistency checks
+
+📖 **[Full Submission Details →](KIROWEEN_SUBMISSION.md)**
+
+---
+
+## 🎯 What is The Necromancer's Quill?
+
+**The Necromancer's Quill** (formerly AI Humanizer) is an enterprise-grade platform that transforms AI-generated text into natural, human-like content. Now with a spooky Halloween theme that makes the resurrection ritual... *magical*.
 
 ### Key Highlights
 
-- ✅ **Multiple AI Models**: OpenAI GPT-4, Claude, AWS Bedrock, Google Gemini
-- ✅ **Real-Time Collaboration**: WebSocket-powered collaborative editing
-- ✅ **Enterprise Security**: MFA, RBAC, audit logging, data encryption
-- ✅ **Advanced Analytics**: Usage tracking, performance metrics, quality scores
-- ✅ **Cloud Integrations**: Google Drive, Dropbox, OneDrive, AWS S3
-- ✅ **White-Label Support**: Fully customizable branding
-- ✅ **Comprehensive API**: RESTful API with full documentation
+- 💀 **Multiple Soul Vessels**: OpenAI GPT-4, Claude, AWS Bedrock, Google Gemini
+- 👻 **Real-Time Collaboration**: WebSocket-powered coven editing
+- 🔒 **Enterprise Security**: MFA, RBAC, audit logging, data encryption
+- 📊 **Dark Arts Analytics**: Usage tracking, performance metrics, curse levels
+- ☁️ **Cloud Integrations**: Google Drive, Dropbox, OneDrive, AWS S3
+- 🎨 **Permanent Dark Mode**: The crypt is eternally dark
+- ♿ **WCAG AAA Accessible**: Spooky but inclusive
 
 📖 **[Read Full Introduction →](docs/PART_1_INTRODUCTION.md)**
 
