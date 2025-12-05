@@ -259,9 +259,9 @@ export function Analytics(): JSX.Element {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Analytics</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Track your humanization performance and usage
+          <h1 className="text-3xl font-display text-glow-purple">Dark Arts Stats</h1>
+          <p className="text-gray-400 mt-1">
+            Track your resurrection rituals and necromancy power
           </p>
         </div>
         <div className="flex items-center gap-3">

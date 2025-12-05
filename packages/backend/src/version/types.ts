@@ -17,6 +17,7 @@ import { z } from 'zod';
 export const createVersionSchema = z.object({
   projectId: z.string().uuid('Invalid project ID'),
   content: z.string().min(1, 'Content is required'),
+  humanizedContent: z.string().optional(),
   changesSummary: z.string().max(500, 'Summary must be less than 500 characters').optional(),
   isAutoSave: z.boolean().default(false),
   branchId: z.string().uuid('Invalid branch ID').optional(),
@@ -105,6 +106,7 @@ export interface VersionListResponse {
  */
 export interface VersionWithContent extends VersionResponse {
   content: string;
+  humanizedContent: string | null;
 }
 
 /**

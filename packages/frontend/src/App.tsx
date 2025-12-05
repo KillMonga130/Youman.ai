@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { 
@@ -13,7 +14,8 @@ import {
   Templates,
   ABTesting,
   Admin,
-  ModelManagement
+  ModelManagement,
+  HalloweenLanding
 } from './pages';
 import { Layout } from './components/Layout/Layout';
 import { AccessibilityProvider } from './context/AccessibilityContext';
@@ -32,6 +34,12 @@ const queryClient = new QueryClient({
 });
 
 function App() {
+  // The Necromancer's Quill - ALWAYS dark, no light mode exists in the crypt
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+    document.documentElement.style.colorScheme = 'dark';
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
@@ -39,7 +47,7 @@ function App() {
           <KeyboardShortcutsProvider>
             <SearchProvider>
               <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/" element={<HalloweenLanding />} />
                 <Route path="/login" element={<Login />} />
                   <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} />
                   <Route path="/editor" element={<Layout><Editor /></Layout>} />

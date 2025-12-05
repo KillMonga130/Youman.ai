@@ -217,8 +217,8 @@ export function Admin(): JSX.Element {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gradient mb-2">Admin Panel</h1>
-          <p className="text-gray-600 dark:text-gray-400">Monitor system performance and user activity</p>
+          <h1 className="text-3xl font-display text-glow-purple mb-2">Crypt Keeper</h1>
+          <p className="text-gray-400">Monitor the dark forces and soul activity</p>
         </div>
         <Button
           onClick={() => window.location.reload()}

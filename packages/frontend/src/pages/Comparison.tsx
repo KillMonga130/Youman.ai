@@ -122,9 +122,9 @@ export function Comparison(): JSX.Element {
     return (
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-bold">Compare Versions</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Compare different versions of your projects
+          <h1 className="text-3xl font-display text-glow-purple">Soul Comparison</h1>
+          <p className="text-gray-400 mt-1">
+            Compare different incarnations of your resurrected souls
           </p>
         </div>
         
@@ -240,13 +240,13 @@ export function Comparison(): JSX.Element {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">
-            {comparisonMode === 'editor' ? 'Compare Changes' : 'Compare Versions'}
+          <h1 className="text-3xl font-display text-glow-purple">
+            {comparisonMode === 'editor' ? 'Transmutation Review' : 'Soul Comparison'}
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-400 mt-1">
             {comparisonMode === 'editor' 
-              ? 'Review and selectively accept or reject changes'
-              : 'Compare different versions of your project'}
+              ? 'Review and selectively accept or reject the dark changes'
+              : 'Compare different incarnations of your soul'}
           </p>
         </div>
         <div className="flex items-center gap-2">

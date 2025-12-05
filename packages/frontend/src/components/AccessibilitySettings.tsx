@@ -75,12 +75,12 @@ export function AccessibilitySettings(): JSX.Element {
 
   return (
     <div role="region" aria-labelledby="accessibility-heading">
-      <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-        <h2 id="accessibility-heading" className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg">
+      <div className="p-6 border-b border-gray-800 flex items-center justify-between">
+        <h2 id="accessibility-heading" className="text-xl font-bold text-white flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/20">
             <Eye className="w-5 h-5 text-white" aria-hidden="true" />
           </div>
-          Accessibility
+          Spirit Sight Settings
         </h2>
         <button
           onClick={handleReset}

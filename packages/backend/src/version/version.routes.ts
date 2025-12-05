@@ -177,7 +177,16 @@ router.get('/latest/:projectId', async (req: Request, res: Response, next: NextF
       return;
     }
 
-    res.json(version);
+    // Fetch content from MongoDB to include in response
+    const versionWithContent = await getVersionWithContent(version.id, userId);
+
+    res.json({
+      id: versionWithContent.id,
+      versionNumber: versionWithContent.versionNumber,
+      content: versionWithContent.content,
+      humanizedContent: versionWithContent.humanizedContent,
+      createdAt: versionWithContent.createdAt,
+    });
   } catch (error) {
     if (error instanceof VersionError) {
       const statusCode = error.code === 'ACCESS_DENIED' ? 403 : 404;

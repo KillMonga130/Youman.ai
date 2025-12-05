@@ -1,11 +1,12 @@
-import { Plus, FileText, TrendingUp, Clock, AlertCircle, Sparkles } from 'lucide-react';
+import { Ghost, FileText, AlertCircle, Skull, FlaskConical, Zap, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { ProjectList } from '../components/ProjectList';
 import { useProjects, useUsage, useDeleteProject, useBulkDeleteProjects } from '../api/hooks';
-import { Spinner, Alert } from '../components/ui';
+import { Alert } from '../components/ui';
 import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { GhostParticles, StatCard } from '../components/Halloween';
 
 export function Dashboard(): JSX.Element {
   const queryClient = useQueryClient();
@@ -20,48 +21,48 @@ export function Dashboard(): JSX.Element {
   const wordsProcessed = usageData?.usage?.wordsProcessed || 0;
   const usageLimit = usageData?.usage?.limit || 0;
 
-  // Calculate stats from real data
+  // Calculate stats from real data - Halloween themed (Resurrection Chamber)
   const stats = useMemo(() => {
-    const totalWordCount = projects.reduce((sum, p) => sum + (p.wordCount || 0), 0);
-    // Calculate average detection score from projects that have detection scores
     const projectsWithScores = projects.filter(p => p.detectionScore !== undefined && p.detectionScore !== null);
     const avgDetectionScore = projectsWithScores.length > 0
       ? projectsWithScores.reduce((sum, p) => sum + (p.detectionScore || 0), 0) / projectsWithScores.length
       : 0;
     
-    // Get projects from this month
     const thisMonth = new Date();
     thisMonth.setDate(1);
     const thisMonthProjects = projects.filter(p => new Date(p.createdAt) >= thisMonth);
 
+    // Calculate evasion rate (inverse of detection score)
+    const evasionRate = avgDetectionScore > 0 ? 100 - avgDetectionScore : 0;
+
     return [
       { 
-        label: 'Total Projects', 
+        label: 'Souls Saved', 
         value: totalProjects.toString(), 
-        icon: FileText, 
-        gradient: 'from-blue-500 to-cyan-500',
-        bgGradient: 'from-blue-500/10 to-cyan-500/10'
+        subtitle: 'Texts resurrected',
+        icon: Skull,
+        iconColor: 'text-primary-500'
       },
       { 
-        label: 'Words Processed', 
+        label: 'Evasion Rate', 
+        value: evasionRate > 0 ? `${evasionRate.toFixed(1)}%` : 'N/A', 
+        subtitle: 'Detection bypassed',
+        icon: FlaskConical,
+        iconColor: 'text-accent-500'
+      },
+      { 
+        label: 'Necromancy Power', 
         value: wordsProcessed > 1000 ? `${(wordsProcessed / 1000).toFixed(1)}K` : wordsProcessed.toString(), 
-        icon: TrendingUp, 
-        gradient: 'from-green-500 to-emerald-500',
-        bgGradient: 'from-green-500/10 to-emerald-500/10'
+        subtitle: 'Words transmuted',
+        icon: Zap,
+        iconColor: 'text-warning-500'
       },
       { 
-        label: 'Avg Detection Score', 
-        value: avgDetectionScore > 0 ? `${avgDetectionScore.toFixed(1)}%` : 'N/A', 
-        icon: Sparkles, 
-        gradient: 'from-teal-500 to-cyan-500',
-        bgGradient: 'from-teal-500/10 to-cyan-500/10'
-      },
-      { 
-        label: 'This Month', 
+        label: 'Midnight Sessions', 
         value: thisMonthProjects.length.toString(), 
-        icon: Clock, 
-        gradient: 'from-amber-500 to-orange-500',
-        bgGradient: 'from-amber-500/10 to-orange-500/10'
+        subtitle: 'This month',
+        icon: Moon,
+        iconColor: 'text-primary-400'
       },
     ];
   }, [totalProjects, wordsProcessed, projects]);
@@ -168,117 +169,123 @@ export function Dashboard(): JSX.Element {
         </Alert>
       )}
 
-      {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-2">
+      {/* Page header - Halloween themed */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
         <div>
-          <h1 className="text-5xl font-bold text-gradient mb-3 tracking-tight">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 text-lg leading-relaxed">
-            Welcome back! Here&apos;s an overview of your projects.
+          <h1 className="text-4xl font-display text-glow-purple mb-2">Resurrection Chamber</h1>
+          <p className="text-gray-400">
+            Your souls await resurrection. Begin the ritual.
           </p>
         </div>
-        <Link to="/editor" className="btn btn-primary flex items-center gap-2 w-fit shadow-lg hover:shadow-xl hover:scale-105 transition-all">
-          <Plus className="w-5 h-5" />
-          <span>New Project</span>
+        <Link to="/editor" className="btn-resurrection flex items-center gap-2 w-fit">
+          <Ghost className="w-5 h-5" />
+          <span>Begin Ritual</span>
         </Link>
       </div>
 
-      {/* Stats grid */}
+      {/* Stats grid - Spooky stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
-          return (
-            <div 
-              key={stat.label} 
-              className="card-hover group relative overflow-hidden"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              {/* Decorative background gradient */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${stat.bgGradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-              
-              <div className="p-6 relative z-10">
-                <div className="flex items-start justify-between mb-5">
-                  <div className={`p-3.5 rounded-xl bg-gradient-to-br ${stat.gradient} shadow-lg shadow-primary-500/20 group-hover:scale-110 group-hover:shadow-xl transition-all duration-300`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-gray-600 dark:text-gray-400 mb-2 uppercase tracking-wide">{stat.label}</p>
-                  <p className="text-3xl font-bold text-gray-900 dark:text-white group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">{stat.value}</p>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.label}
+            icon={stat.icon}
+            label={stat.label}
+            value={stat.value}
+            subtitle={stat.subtitle}
+            iconColor={stat.iconColor}
+          />
+        ))}
       </div>
 
-      {/* Usage limit indicator */}
+      {/* Necromancy Power Meter */}
       {usageData && usageLimit > 0 && (
-        <div className="card p-6 animate-slide-up">
-          <div className="flex items-center justify-between mb-5">
+        <div className="card p-6 border-glow">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Usage Limit</h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                {wordsProcessed.toLocaleString()} / {usageLimit.toLocaleString()} words
+              <h3 className="text-lg font-semibold text-white mb-1 flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary-400" />
+                Necromancy Power Reserve
+              </h3>
+              <p className="text-sm text-gray-400">
+                {wordsProcessed.toLocaleString()} / {usageLimit.toLocaleString()} words transmuted
               </p>
             </div>
             <div className="text-right">
-              <p className="text-3xl font-bold text-gray-900 dark:text-white">{Math.round(usagePercentage)}%</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide font-semibold">used</p>
+              <p className={`text-2xl font-bold ${
+                usagePercentage > 90 ? 'text-glow-red' :
+                usagePercentage > 70 ? 'text-warning-400' :
+                'text-glow-green'
+              }`}>{Math.round(usagePercentage)}%</p>
             </div>
           </div>
-          <div className="relative w-full h-4 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
+          <div className="relative w-full h-4 bg-gray-800 rounded-full overflow-hidden">
             <div
-              className={`absolute top-0 left-0 h-full rounded-full bg-gradient-to-r ${
-                usagePercentage > 90 ? 'from-error-500 to-error-600' :
-                usagePercentage > 70 ? 'from-warning-500 to-warning-600' :
-                'from-success-500 to-success-600'
-              } transition-all duration-1000 shadow-lg`}
-              style={{ width: `${usagePercentage}%` }}
+              className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${
+                usagePercentage > 90 ? 'bg-gradient-to-r from-error-600 to-error-500' :
+                usagePercentage > 70 ? 'bg-gradient-to-r from-warning-600 to-warning-500' :
+                'bg-gradient-to-r from-accent-600 to-accent-500'
+              }`}
+              style={{ 
+                width: `${usagePercentage}%`,
+                boxShadow: usagePercentage > 90 
+                  ? '0 0 15px rgba(239, 68, 68, 0.5)' 
+                  : usagePercentage > 70 
+                    ? '0 0 15px rgba(249, 115, 22, 0.5)'
+                    : '0 0 15px rgba(34, 197, 94, 0.5)'
+              }}
             />
           </div>
+          {usagePercentage > 80 && (
+            <p className="text-xs text-warning-400 mt-2 animate-pulse">
+              ⚠️ Your necromancy power is running low. Rest and return at midnight.
+            </p>
+          )}
         </div>
       )}
 
-      {/* Recent projects */}
-      <div className="card animate-slide-up">
-        <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Recent Projects</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage and organize your work</p>
+      {/* The Graveyard - Recent projects */}
+      <div className="card relative overflow-hidden">
+        <GhostParticles count={4} className="opacity-30" />
+        <div className="p-6 border-b border-gray-800 relative z-10">
+          <h2 className="text-xl font-semibold text-white mb-1 flex items-center gap-2">
+            <Skull className="w-5 h-5 text-primary-400" />
+            The Graveyard
+          </h2>
+          <p className="text-sm text-gray-400">Souls awaiting resurrection or already saved</p>
         </div>
         {displayProjects.length === 0 ? (
-          <div className="p-16 text-center">
-            <div className="inline-flex p-5 rounded-2xl bg-gradient-to-br from-primary-500/10 to-primary-600/10 mb-6 shadow-lg">
-              <FileText className="w-14 h-14 text-primary-600 dark:text-primary-400" />
+          <div className="p-12 text-center relative z-10">
+            <div className="inline-flex p-4 bg-gray-800/50 rounded-lg mb-4 border border-gray-700">
+              <Ghost className="w-12 h-12 text-primary-400 animate-float-ghost" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">No projects yet</h3>
-            <p className="text-gray-500 dark:text-gray-400 mb-8 max-w-md mx-auto text-lg leading-relaxed">
-              Get started by creating your first project. Transform AI-generated content into natural, human-like text.
+            <h3 className="text-lg font-semibold text-white mb-2">The graveyard is empty</h3>
+            <p className="text-gray-400 mb-6 max-w-md mx-auto">
+              No souls to resurrect yet. Begin your first ritual to save a cursed text.
             </p>
-            <Link to="/editor" className="btn btn-primary inline-flex items-center gap-2 shadow-lg hover:shadow-xl hover:scale-105 transition-all">
-              <Plus className="w-5 h-5" />
-              <span>Create Your First Project</span>
+            <Link to="/editor" className="btn-resurrection inline-flex items-center gap-2">
+              <Ghost className="w-5 h-5" />
+              <span>Begin First Ritual</span>
             </Link>
           </div>
         ) : (
-          <ProjectList
-            projects={displayProjects}
-            onDeleteProject={handleDeleteProject}
-            onBulkOperationComplete={async (result) => {
-              // After bulk operations complete, invalidate queries to refresh the UI
-              if (result.success && result.successCount > 0) {
-                // Remove successfully deleted projects from store
-                const deletedIds = displayProjects
-                  .filter(p => !result.errors.some(e => e.id === p.id))
-                  .map(p => p.id);
-                deletedIds.forEach(id => deleteProjectFromStore(id));
-                
-                // Invalidate queries to refresh the data
-                await queryClient.invalidateQueries({ queryKey: ['projects'] });
-                await queryClient.invalidateQueries({ queryKey: ['usage'] });
-              }
-              return result;
-            }}
-          />
+          <div className="relative z-10">
+            <ProjectList
+              projects={displayProjects}
+              onDeleteProject={handleDeleteProject}
+              onBulkOperationComplete={async (result) => {
+                if (result.success && result.successCount > 0) {
+                  const deletedIds = displayProjects
+                    .filter(p => !result.errors.some(e => e.id === p.id))
+                    .map(p => p.id);
+                  deletedIds.forEach(id => deleteProjectFromStore(id));
+                  
+                  await queryClient.invalidateQueries({ queryKey: ['projects'] });
+                  await queryClient.invalidateQueries({ queryKey: ['usage'] });
+                }
+                return result;
+              }}
+            />
+          </div>
         )}
       </div>
     </div>

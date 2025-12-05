@@ -51,6 +51,7 @@ export interface IDocument extends MongoDocument {
   versionId?: string;
   type: 'original' | 'transformed' | 'draft';
   content: string;
+  humanizedContent?: string;
   contentHash: string;
   wordCount: number;
   characterCount: number;
@@ -126,6 +127,10 @@ const DocumentSchema = new Schema<IDocument>(
     content: {
       type: String,
       required: true,
+    },
+    humanizedContent: {
+      type: String,
+      required: false,
     },
     contentHash: {
       type: String,

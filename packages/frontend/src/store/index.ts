@@ -25,8 +25,6 @@ export interface UserSettings {
   defaultLevel: number;
   defaultStrategy: 'casual' | 'professional' | 'academic' | 'auto';
   defaultLanguage: string;
-  darkMode: boolean;
-  cyberpunkTheme: boolean;
   autoSave: boolean;
   accessibility: AccessibilitySettings;
 }
@@ -88,13 +86,11 @@ export const useAppStore = create<AppState>()(
       humanizedText: '',
       setHumanizedText: (text) => set({ humanizedText: text }),
       
-      // Settings
+      // Settings - The Necromancer's Quill (always dark Halloween theme)
       settings: {
         defaultLevel: 3,
         defaultStrategy: 'auto',
         defaultLanguage: 'en',
-        darkMode: false,
-        cyberpunkTheme: true, // Default to cyberpunk theme
         autoSave: true,
         accessibility: {
           highContrast: false,

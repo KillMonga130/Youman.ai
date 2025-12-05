@@ -200,7 +200,7 @@ export async function createVersion(
   userId: string,
   input: CreateVersionInput
 ): Promise<VersionResponse> {
-  const { projectId, content, changesSummary, isAutoSave, branchId } = input;
+  const { projectId, content, humanizedContent, changesSummary, isAutoSave, branchId } = input;
 
   // Verify project exists and user has access
   const project = await prisma.project.findUnique({
@@ -259,6 +259,7 @@ export async function createVersion(
     versionId: undefined, // Will be updated after version creation
     type: 'draft',
     content,
+    humanizedContent: humanizedContent || undefined,
     contentHash,
     wordCount,
     characterCount: content.length,
@@ -362,6 +363,7 @@ export async function getVersionWithContent(
   return {
     ...version,
     content: document.content,
+    humanizedContent: document.humanizedContent || null,
   };
 }
 

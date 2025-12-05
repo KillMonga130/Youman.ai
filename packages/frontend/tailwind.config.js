@@ -5,47 +5,53 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Primary - Cyan (cyberpunk glow)
+        // Primary - Ghostly Purple (Necromancer's Magic)
         primary: {
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
-          700: '#0e7490',
-          800: '#155e75',
-          900: '#164e63',
-          950: '#083344',
+          50: '#1a0a1f',
+          100: '#2d1b3d',
+          200: '#3f2c5a',
+          300: '#523d77',
+          400: '#6d4e9f',
+          500: '#8b5cf6',
+          600: '#7c3aed',
+          700: '#6d28d9',
+          800: '#5b21b6',
+          900: '#4c1d95',
+          950: '#2e1065',
         },
-        // Gray - Cyberpunk Dark
+        // Accent - Toxic Green (Life Force)
+        accent: {
+          50: '#f0fdf4',
+          100: '#dcfce7',
+          200: '#bbf7d0',
+          300: '#86efac',
+          400: '#4ade80',
+          500: '#22c55e',
+          600: '#16a34a',
+          700: '#15803d',
+          800: '#166534',
+          900: '#14532d',
+          950: '#052e16',
+        },
+        // Gray - Graveyard Darkness
         gray: {
-          50: '#1a1a1a',
-          100: '#2a2a2a',
-          200: '#3a3a3a',
-          300: '#4a4a4a',
-          400: '#5a5a5a',
-          500: '#6a6a6a',
-          600: '#7a7a7a',
-          700: '#8a8a8a',
-          800: '#0a0a0a',
-          900: '#050505',
-          950: '#000000',
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+          950: '#0a0a0f',
         },
-        // Cyan for cyberpunk accents
-        cyan: {
-          50: '#ecfeff',
-          100: '#cffafe',
-          200: '#a5f3fc',
-          300: '#67e8f9',
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
-          700: '#0e7490',
-          800: '#155e75',
-          900: '#164e63',
-          950: '#083344',
+        // Background - Deep Darkness
+        bg: {
+          primary: '#0a0a0f',
+          secondary: '#13131a',
+          card: '#1a1a24',
         },
         // Success - Green
         success: {
@@ -61,19 +67,19 @@ export default {
           900: '#14532d',
           950: '#052e16',
         },
-        // Warning - Amber
+        // Warning - Blood Orange
         warning: {
-          50: '#fffbeb',
-          100: '#fef3c7',
-          200: '#fde68a',
-          300: '#fcd34d',
-          400: '#fbbf24',
-          500: '#f59e0b',
-          600: '#d97706',
-          700: '#b45309',
-          800: '#92400e',
-          900: '#78350f',
-          950: '#451a03',
+          50: '#fff7ed',
+          100: '#ffedd5',
+          200: '#fed7aa',
+          300: '#fdba74',
+          400: '#fb923c',
+          500: '#f97316',
+          600: '#ea580c',
+          700: '#c2410c',
+          800: '#9a3412',
+          900: '#7c2d12',
+          950: '#431407',
         },
         // Error - Red
         error: {
@@ -89,38 +95,11 @@ export default {
           900: '#7f1d1d',
           950: '#450a0a',
         },
-        // Accent - Bright Cyan/White (cyberpunk glow)
-        accent: {
-          50: '#ffffff',
-          100: '#f0ffff',
-          200: '#e0ffff',
-          300: '#b0ffff',
-          400: '#80ffff',
-          500: '#00ffff',
-          600: '#00e6e6',
-          700: '#00cccc',
-          800: '#00b3b3',
-          900: '#009999',
-          950: '#006666',
-        },
-        // Accent - Teal
-        teal: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e',
-        },
       },
       fontFamily: {
-        sans: ['Orbitron', 'Rajdhani', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'Consolas', 'Monaco', 'monospace'],
+        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        display: ['Creepster', 'cursive'],
+        mono: ['Courier Prime', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       fontSize: {
         // WCAG AAA compliant font sizes (minimum 16px for body text)
@@ -141,12 +120,12 @@ export default {
         '128': '32rem',
       },
       borderRadius: {
-        'sm': '0.25rem',
-        'DEFAULT': '0.375rem',
-        'md': '0.5rem',
+        'sm': '0.5rem',
+        'DEFAULT': '0.75rem',
+        'md': '0.75rem',
         'lg': '0.75rem',
-        'xl': '1rem',
-        '2xl': '1.5rem',
+        'xl': '0.75rem',
+        '2xl': '0.75rem',
       },
       boxShadow: {
         'sm': '0 1px 2px 0 rgb(0 0 0 / 0.05)',
@@ -155,14 +134,22 @@ export default {
         'lg': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
         'xl': '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
         'inner': 'inset 0 2px 4px 0 rgb(0 0 0 / 0.05)',
-        'focus': '0 0 0 3px rgba(59, 130, 246, 0.5)',
+        'focus': '0 0 0 3px rgba(139, 92, 246, 0.5)',
         'focus-error': '0 0 0 3px rgba(239, 68, 68, 0.5)',
+        'glow-purple': '0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.3)',
+        'glow-green': '0 0 20px rgba(34, 197, 94, 0.5), 0 0 40px rgba(34, 197, 94, 0.3)',
+        'glow-red': '0 0 20px rgba(239, 68, 68, 0.5), 0 0 40px rgba(239, 68, 68, 0.3)',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',
         'spin-slow': 'spin 2s linear infinite',
+        'float-ghost': 'floatGhost 3s ease-in-out infinite',
+        'pulse-glow': 'pulseGlow 2s ease-in-out infinite',
+        'spell-circle': 'spellCircle 20s linear infinite',
+        'tombstone-rise': 'tombstoneRise 0.6s ease-out',
+        'flicker': 'flicker 2s ease-in-out infinite',
       },
       keyframes: {
         fadeIn: {
@@ -176,6 +163,36 @@ export default {
         slideDown: {
           '0%': { transform: 'translateY(-10px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        floatGhost: {
+          '0%, 100%': { transform: 'translateY(0px) rotate(0deg)' },
+          '50%': { transform: 'translateY(-20px) rotate(5deg)' },
+        },
+        pulseGlow: {
+          '0%, 100%': { 
+            textShadow: '0 0 20px rgba(139, 92, 246, 0.8), 0 0 40px rgba(139, 92, 246, 0.6)',
+          },
+          '50%': { 
+            textShadow: '0 0 30px rgba(124, 58, 237, 1), 0 0 60px rgba(124, 58, 237, 0.8)',
+          },
+        },
+        spellCircle: {
+          'from': { transform: 'rotate(0deg)' },
+          'to': { transform: 'rotate(360deg)' },
+        },
+        tombstoneRise: {
+          'from': { 
+            transform: 'translateY(100px) scale(0.8)',
+            opacity: '0',
+          },
+          'to': { 
+            transform: 'translateY(0) scale(1)',
+            opacity: '1',
+          },
+        },
+        flicker: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.8' },
         },
       },
       // WCAG AAA requires minimum touch target of 44x44px

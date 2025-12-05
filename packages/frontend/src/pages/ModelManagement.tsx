@@ -392,9 +392,9 @@ export function ModelManagement(): JSX.Element {
     <div className="container mx-auto p-6 space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-gradient mb-2">Model Management</h1>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Manage custom ML models, versions, deployments, and A/B tests
+                  <h1 className="text-3xl font-display text-glow-purple mb-2">Soul Vessels</h1>
+                  <p className="text-gray-400">
+                    Manage your necromancy vessels, versions, and dark experiments
                     {customModels.length === 0 && models.length > 0 && (
                       <span className="block text-sm text-warning-600 dark:text-warning-400 mt-1">
                         Note: LLM models (Claude, GPT, etc.) are external APIs and cannot be managed here. 

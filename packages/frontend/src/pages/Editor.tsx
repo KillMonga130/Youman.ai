@@ -869,9 +869,9 @@ export function Editor(): JSX.Element {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-8rem)]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 dark:border-primary-800 border-t-primary-600 mx-auto mb-6"></div>
-          <p className="text-gray-600 dark:text-gray-400 text-lg font-semibold">Loading project...</p>
-          <p className="text-gray-500 dark:text-gray-500 text-sm mt-2">Please wait while we fetch your project</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-800 border-t-primary-400 mx-auto mb-6" style={{ boxShadow: '0 0 20px rgba(139, 92, 246, 0.3)' }}></div>
+          <p className="text-primary-300 text-lg font-semibold">Summoning soul from the graveyard...</p>
+          <p className="text-gray-500 text-sm mt-2">The spirits are gathering your work</p>
         </div>
       </div>
     );
@@ -887,19 +887,19 @@ export function Editor(): JSX.Element {
         </Alert>
       )}
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-4 mb-6 p-5 glass-card rounded-2xl backdrop-blur-xl border border-gray-200/50 dark:border-gray-700/50">
-        {/* Project Name */}
+      {/* Ritual Controls */}
+      <div className="flex flex-wrap items-center gap-4 mb-6 p-5 bg-gray-900/80 backdrop-blur-xl rounded-2xl border border-primary-900/30">
+        {/* Soul Name */}
         <input
           type="text"
           value={projectName}
           onChange={(e) => setProjectName(e.target.value)}
-          placeholder="Project Name"
-          className="input flex-1 min-w-[200px] max-w-[300px] bg-white/90 dark:bg-gray-800/90 font-semibold"
+          placeholder="Name this soul..."
+          className="input flex-1 min-w-[200px] max-w-[300px] bg-gray-800/90 font-semibold"
         />
-        {/* Level selector */}
+        {/* Power Level */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Level:</label>
+          <label className="text-sm font-semibold text-gray-300">Power:</label>
           <select
             value={options.level}
             onChange={(e) => setOptions({ ...options, level: Number(e.target.value) })}
@@ -913,9 +913,9 @@ export function Editor(): JSX.Element {
           </select>
         </div>
 
-        {/* Strategy selector */}
+        {/* Spell Type */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Strategy:</label>
+          <label className="text-sm font-semibold text-gray-300">Spell:</label>
           <div className="relative">
             <select
               value={options.strategy}
@@ -931,9 +931,9 @@ export function Editor(): JSX.Element {
           </div>
         </div>
 
-        {/* Model selector */}
+        {/* Soul Vessel */}
         <div className="flex items-center gap-2">
-          <label className="text-sm font-semibold text-gray-700 dark:text-gray-300">Model:</label>
+          <label className="text-sm font-semibold text-gray-300">Vessel:</label>
           <div className="relative">
             <select
               value={selectedModelId || ''}
@@ -1042,32 +1042,32 @@ export function Editor(): JSX.Element {
         <button
           onClick={handleHumanize}
           disabled={!originalText.trim() || isProcessing}
-          className="btn btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Humanize Text"
-          aria-label={isProcessing ? 'Processing humanization...' : 'Humanize text'}
+          className="btn-resurrection flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Resurrect Text"
+          aria-label={isProcessing ? 'Summoning spirits...' : 'Resurrect text'}
         >
           {isProcessing ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
             <Wand2 className="w-4 h-4" />
           )}
-          {isProcessing ? 'Processing...' : 'Humanize'}
+          {isProcessing ? 'Summoning...' : 'Resurrect'}
           {!isProcessing && <ShortcutHint shortcutId="humanize" />}
         </button>
       </div>
 
-      {/* File Upload Modal */}
+      {/* Summon Document Modal */}
       {showFileUpload && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
-            <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                Upload Document
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-primary-500/30 rounded-lg shadow-2xl shadow-primary-500/10 max-w-2xl w-full mx-4 max-h-[80vh] overflow-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-800">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <span>📜</span> Summon Cursed Document
               </h2>
               <button
                 onClick={() => setShowFileUpload(false)}
-                className="btn btn-ghost btn-sm p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
-                aria-label="Close upload modal"
+                className="btn btn-ghost btn-sm p-1 text-gray-400 hover:text-primary-400 rounded"
+                aria-label="Close portal"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1084,50 +1084,54 @@ export function Editor(): JSX.Element {
         </div>
       )}
 
-      {/* Split pane editor */}
+      {/* Split pane editor - Cursed & Resurrected */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-0">
-        {/* Original text */}
-        <div className="card flex flex-col min-h-[300px] overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-gray-50 to-transparent dark:from-gray-800/50">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Original Text</h3>
-            <span className="text-sm font-semibold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-full">{wordCount} words</span>
+        {/* Cursed text (AI input) */}
+        <div className="panel-cursed flex flex-col min-h-[300px] overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-error-500/30 bg-gradient-to-r from-error-900/20 to-transparent">
+            <h3 className="text-lg font-bold text-error-300 flex items-center gap-2">
+              <span className="text-error-400">💀</span> Cursed Text
+            </h3>
+            <span className="text-sm font-semibold text-error-400 bg-error-900/30 px-3 py-1.5 rounded-full border border-error-500/30">{wordCount} words</span>
           </div>
           <textarea
             ref={originalTextareaRef}
             value={originalText}
             onChange={(e) => setOriginalText(e.target.value)}
-            placeholder="Paste your AI-generated text here..."
-            className="flex-1 p-6 resize-none bg-transparent focus:outline-none focus:ring-2 focus:ring-primary-500/20 text-gray-900 dark:text-gray-100 scrollbar-modern textarea border-0 text-base leading-relaxed"
+            placeholder="Paste your soulless AI text here to resurrect it..."
+            className="flex-1 p-6 resize-none bg-transparent focus:outline-none focus:ring-2 focus:ring-error-500/20 text-gray-100 scrollbar-modern textarea border-0 text-base leading-relaxed placeholder:text-gray-600"
             aria-label="Original text input"
           />
         </div>
 
-        {/* Humanized text */}
-        <div className="card flex flex-col min-h-[300px] overflow-hidden">
-          <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-primary-50/50 to-transparent dark:from-primary-900/20">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Humanized Text</h3>
+        {/* Resurrected text */}
+        <div className="panel-resurrected flex flex-col min-h-[300px] overflow-hidden">
+          <div className="flex items-center justify-between p-5 border-b border-accent-500/30 bg-gradient-to-r from-accent-900/20 to-transparent">
+            <h3 className="text-lg font-bold text-accent-300 flex items-center gap-2">
+              <span className="text-accent-400">✨</span> Resurrected Text
+            </h3>
             <div className="flex items-center gap-2">
               {humanizedText && (
                 <>
                   <button
                     onClick={handleCopy}
                     disabled={!humanizedText}
-                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Copy to clipboard"
-                    aria-label="Copy humanized text to clipboard"
+                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed border-accent-500/30 text-accent-300 hover:bg-accent-900/20"
+                    title="Summon to clipboard"
+                    aria-label="Copy resurrected text to clipboard"
                   >
                     <Copy className="w-4 h-4" />
-                    <span className="hidden sm:inline">Copy</span>
+                    <span className="hidden sm:inline">Summon</span>
                   </button>
                   <button
                     onClick={handleDownload}
                     disabled={!humanizedText}
-                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Download as text file"
-                    aria-label="Download humanized text"
+                    className="btn btn-outline btn-sm flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed border-accent-500/30 text-accent-300 hover:bg-accent-900/20"
+                    title="Export to mortal realm"
+                    aria-label="Download resurrected text"
                   >
                     <Download className="w-4 h-4" />
-                    <span className="hidden sm:inline">Download</span>
+                    <span className="hidden sm:inline">Export</span>
                   </button>
                 </>
               )}
@@ -1135,16 +1139,16 @@ export function Editor(): JSX.Element {
           </div>
           <div className="flex-1 p-6 overflow-auto">
             {humanizedText ? (
-              <p className="whitespace-pre-wrap text-gray-900 dark:text-gray-100 leading-relaxed text-base">{humanizedText}</p>
+              <p className="whitespace-pre-wrap text-gray-100 leading-relaxed text-base">{humanizedText}</p>
             ) : (
               <div className="flex flex-col items-center justify-center h-full">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-primary-500/10 to-primary-600/10 mb-4">
-                  <Sparkles className="w-10 h-10 text-primary-600 dark:text-primary-400" />
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-accent-500/10 to-accent-600/10 mb-4 border border-accent-500/20">
+                  <Sparkles className="w-10 h-10 text-accent-400 animate-pulse" />
                 </div>
-                <p className="text-gray-400 dark:text-gray-500 text-center text-base font-medium">
-                  Humanized text will appear here...
+                <p className="text-gray-500 text-center text-base font-medium">
+                  The resurrected text will manifest here...
                   <br />
-                  <span className="text-sm">Click "Humanize" to transform your text</span>
+                  <span className="text-sm text-gray-600">Click "Resurrect" to breathe life into your text</span>
                 </p>
               </div>
             )}
@@ -1152,50 +1156,50 @@ export function Editor(): JSX.Element {
         </div>
       </div>
 
-      {/* Progress tracking */}
+      {/* Ritual Progress */}
       {progress && (
-        <div className="mt-4 card p-4">
+        <div className="mt-4 card p-4 border-primary-500/30">
           <div className="flex items-center gap-2 mb-3">
-            <Loader2 className="w-5 h-5 text-primary-600 animate-spin" />
-            <h3 className="font-medium">Processing...</h3>
+            <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+            <h3 className="font-medium text-primary-300">Channeling spirits...</h3>
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600 dark:text-gray-400 capitalize">{progress.status}</span>
-              <span className="text-gray-600 dark:text-gray-400">{progress.progress}%</span>
+              <span className="text-gray-400 capitalize">{progress.status === 'processing' ? 'Weaving magic...' : progress.status}</span>
+              <span className="text-primary-400">{progress.progress}%</span>
             </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-primary-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress.progress}%` }}
+                className="bg-gradient-to-r from-primary-600 to-primary-400 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${progress.progress}%`, boxShadow: '0 0 10px rgba(139, 92, 246, 0.5)' }}
               />
             </div>
             {progress.chunksProcessed > 0 && (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Processed {progress.chunksProcessed} chunks
-                {progress.estimatedTimeRemaining && ` • ~${Math.ceil(progress.estimatedTimeRemaining / 1000)}s remaining`}
+              <p className="text-xs text-gray-500">
+                Souls processed: {progress.chunksProcessed}
+                {progress.estimatedTimeRemaining && ` • ~${Math.ceil(progress.estimatedTimeRemaining / 1000)}s until resurrection`}
               </p>
             )}
           </div>
         </div>
       )}
 
-      {/* Metrics panel */}
+      {/* Ghost Detector Results */}
       {metrics && (
-        <div className="mt-4 card p-4">
+        <div className="mt-4 card p-4 border-primary-500/30">
           <div className="flex items-center gap-2 mb-3">
-            <Shield className="w-5 h-5 text-green-500" />
-            <h3 className="font-medium">Transformation Metrics</h3>
+            <Shield className="w-5 h-5 text-accent-400" />
+            <h3 className="font-medium text-white">Ghost Detector Reading</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">AI Detection</p>
-              <p className={`text-xl font-semibold ${metrics.detectionScore < 20 ? 'text-green-600' : metrics.detectionScore < 50 ? 'text-amber-600' : 'text-red-600'}`}>
+              <p className="text-sm text-gray-400">Curse Level</p>
+              <p className={`text-xl font-semibold ${metrics.detectionScore < 20 ? 'text-glow-green' : metrics.detectionScore < 50 ? 'text-warning-400' : 'text-glow-red'}`}>
                 {Math.round(metrics.detectionScore)}%
               </p>
             </div>
             <div>
-              <p className="text-sm text-gray-500 dark:text-gray-400">Perplexity</p>
+              <p className="text-sm text-gray-400">Soul Complexity</p>
               <p className="text-xl font-semibold">{typeof metrics.perplexity === 'number' ? metrics.perplexity.toFixed(1) : metrics.perplexity}</p>
             </div>
             <div>

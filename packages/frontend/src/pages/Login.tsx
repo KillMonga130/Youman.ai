@@ -17,7 +17,6 @@ export function Login(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
   const [isOAuthLoading, setIsOAuthLoading] = useState(false);
-  const isCyberpunk = settings.cyberpunkTheme;
 
   const loginMutation = useLogin();
   const registerMutation = useRegister();
@@ -119,46 +118,29 @@ export function Login(): JSX.Element {
   };
 
   return (
-    <div className={`min-h-screen flex items-center justify-center px-4 relative overflow-hidden ${
-      isCyberpunk ? 'bg-black' : 'bg-white dark:bg-black'
-    }`}>
-      {isCyberpunk && (
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute inset-0" style={{
-            background: `radial-gradient(circle at 20% 50%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
-                          radial-gradient(circle at 80% 80%, rgba(0, 255, 255, 0.1) 0%, transparent 50%)`
-          }} />
-        </div>
-      )}
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gray-950 relative overflow-hidden">
+      {/* Spooky background effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary-900/20 via-transparent to-transparent pointer-events-none" />
+      
       <div className="max-w-md w-full space-y-8 relative z-10">
         <div className="text-center">
           {!logoError && (
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-6">
               <img 
                 src="/images/logo-1.png" 
-                alt="Youman.ai Logo" 
-                className={`h-16 w-auto object-contain ${
-                  isCyberpunk ? 'glow-cyan' : ''
-                }`}
+                alt="The Necromancer's Quill" 
+                className="h-16 w-auto object-contain"
                 onError={() => setLogoError(true)}
               />
             </div>
           )}
-          <h1 className={`text-4xl font-bold text-gradient mb-2 ${
-            isCyberpunk 
-              ? 'text-glow-white font-sans' 
-              : 'font-serif tracking-wide'
-          }`}>Youman.ai</h1>
-          <p className={`mt-2 text-sm ${
-            isCyberpunk 
-              ? 'text-cyan-400/80 font-mono' 
-              : 'text-gray-600 dark:text-gray-400 font-sans tracking-widest uppercase'
-          }`}>
-            {isLogin ? 'SIGN IN TO YOUR ACCOUNT' : 'CREATE A NEW ACCOUNT'}
+          <h1 className="text-3xl font-display text-glow-purple mb-2">The Necromancer's Quill</h1>
+          <p className="text-sm text-gray-400">
+            {isLogin ? 'Enter the crypt to continue your rituals' : 'Bind your soul to begin'}
           </p>
         </div>
 
-        <div className="card p-8">
+        <div className="card p-8 border-primary-900/30 bg-gray-900/80 backdrop-blur-sm">
           {error && (
             <Alert variant="error" className="mb-4">
               <AlertCircle className="w-4 h-4" />
@@ -169,8 +151,8 @@ export function Login(): JSX.Element {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Name
+                <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-1">
+                  Soul Name
                 </label>
                 <Input
                   id="name"
@@ -178,14 +160,14 @@ export function Login(): JSX.Element {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required={!isLogin}
-                  placeholder="Your name"
+                  placeholder="What shall we call you?"
                 />
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Email
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-1">
+                Spirit Address
               </label>
               <Input
                 id="email"
@@ -193,13 +175,13 @@ export function Login(): JSX.Element {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="you@example.com"
+                placeholder="your@email.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Password
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
+                Secret Incantation
               </label>
               <Input
                 id="password"
@@ -215,26 +197,26 @@ export function Login(): JSX.Element {
             <Button
               type="submit"
               variant="primary"
-              className="w-full"
+              className="w-full btn-resurrection"
               disabled={loginMutation.isPending || registerMutation.isPending || isOAuthLoading}
               leftIcon={isLogin ? <LogIn className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
             >
               {loginMutation.isPending || registerMutation.isPending
-                ? 'Please wait...'
+                ? 'Summoning...'
                 : isLogin
-                ? 'Sign In'
-                : 'Sign Up'}
+                ? 'Enter the Crypt'
+                : 'Bind Your Soul'}
             </Button>
           </form>
 
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-700" />
+                <div className="w-full border-t border-gray-700" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className={`px-2 ${isCyberpunk ? 'bg-black text-cyan-400' : 'bg-white dark:bg-black text-gray-500 dark:text-gray-400'}`}>
-                  Or continue with
+                <span className="px-2 bg-gray-900 text-gray-500">
+                  Or summon via
                 </span>
               </div>
             </div>
@@ -277,13 +259,9 @@ export function Login(): JSX.Element {
                 setIsLogin(!isLogin);
                 setError(null);
               }}
-              className={`text-sm hover:underline ${
-                isCyberpunk 
-                  ? 'text-cyan-400 hover:text-cyan-300 font-mono' 
-                  : 'text-black dark:text-white hover:text-gray-600 dark:hover:text-gray-400 font-sans tracking-wide'
-              }`}
+              className="text-sm text-primary-400 hover:text-primary-300"
             >
-              {isLogin ? "DON'T HAVE AN ACCOUNT? SIGN UP" : 'ALREADY HAVE AN ACCOUNT? SIGN IN'}
+              {isLogin ? "No soul bound yet? Create one" : 'Already bound? Enter the crypt'}
             </button>
           </div>
         </div>

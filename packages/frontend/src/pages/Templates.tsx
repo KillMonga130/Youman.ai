@@ -331,9 +331,9 @@ export function Templates(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Templates</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
-            Create, manage, and share humanization templates
+          <h1 className="text-3xl font-display text-glow-purple">Spell Book</h1>
+          <p className="text-gray-400 mt-1">
+            Create, manage, and share resurrection incantations
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -371,7 +371,7 @@ export function Templates(): JSX.Element {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search templates..."
+            placeholder="Search spells..."
             className="input pl-10 w-full"
           />
         </div>
@@ -495,7 +495,7 @@ export function Templates(): JSX.Element {
       ) : (
         <div className="text-center py-12">
           <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-500">No templates found</p>
+          <p className="text-gray-500">No spells found in the grimoire</p>
         </div>
       )}
 

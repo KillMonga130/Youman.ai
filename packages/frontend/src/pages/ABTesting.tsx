@@ -307,11 +307,11 @@ export function ABTesting(): JSX.Element {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FlaskConical className="w-6 h-6" />
-            A/B Testing
+          <h1 className="text-3xl font-display text-glow-purple flex items-center gap-2">
+            <FlaskConical className="w-6 h-6 text-warning-400" />
+            Potion Lab
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-gray-400 mt-1">
             Create and manage A/B tests to compare content variations
           </p>
         </div>

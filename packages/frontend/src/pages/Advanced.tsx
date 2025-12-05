@@ -432,9 +432,9 @@ export function Advanced(): JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Advanced Features</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Scheduling, collaboration, localization, and content repurposing
+        <h1 className="text-3xl font-display text-glow-purple">Forbidden Magic</h1>
+        <p className="text-gray-400 mt-1">
+          Scheduled rituals, coven collaboration, and dark transmutations
         </p>
       </div>
 

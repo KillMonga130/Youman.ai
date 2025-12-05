@@ -7,11 +7,11 @@ import { useCurrentUser, useUpdateUser, useChangePassword, useSubscription } fro
 import { Spinner } from '../components/ui';
 import { apiClient } from '../api/client';
 
+// The Necromancer's Quill - Default ritual settings
 const defaultSettings: UserSettings = {
   defaultLevel: 3,
   defaultStrategy: 'auto',
   defaultLanguage: 'en',
-  darkMode: false,
   autoSave: true,
   accessibility: {
     highContrast: false,
@@ -189,8 +189,8 @@ export function Settings(): JSX.Element {
     
     updateSettings(settingsToSave);
     
-    // Apply dark mode
-    document.documentElement.classList.toggle('dark', settingsToSave.darkMode);
+    // The crypt is always dark - no light mode in the Necromancer's domain
+    document.documentElement.classList.add('dark');
     
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -532,20 +532,20 @@ export function Settings(): JSX.Element {
   return (
     <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
       <div>
-        <h1 className="text-4xl font-bold text-gradient mb-2">Settings</h1>
-        <p className="text-gray-600 dark:text-gray-400 text-lg">
-          Manage your account, preferences, and subscription
+        <h1 className="text-4xl font-display text-glow-purple mb-2">Ritual Chamber</h1>
+        <p className="text-gray-400 text-lg">
+          Configure your necromancy preferences and soul bindings
         </p>
       </div>
 
-      {/* User Profile */}
-      <div className="card animate-slide-up">
-        <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-primary-50/30 to-transparent dark:from-primary-900/10">
+      {/* User Profile - Soul Identity */}
+      <div className="card animate-slide-up border-primary-900/30">
+        <div className="p-6 border-b border-gray-800 bg-gradient-to-r from-primary-900/20 to-transparent">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg">
+            <div className="p-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg shadow-primary-500/20">
               <User className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Profile</h2>
+            <h2 className="text-xl font-bold text-white">Soul Identity</h2>
           </div>
         </div>
         <div className="p-6 space-y-4">
@@ -1099,34 +1099,23 @@ export function Settings(): JSX.Element {
         </div>
       </div>
 
-      {/* Appearance */}
-      <div className="card">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="font-semibold">Appearance</h2>
+      {/* Appearance - The Crypt is Always Dark */}
+      <div className="card border-primary-900/30">
+        <div className="p-4 border-b border-gray-800">
+          <h2 className="font-semibold text-white">Appearance</h2>
         </div>
         <div className="p-4 space-y-4">
-          <label className="flex items-center justify-between">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Dark Mode</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Use dark theme for the interface
+              <p className="font-medium text-gray-200">Eternal Darkness</p>
+              <p className="text-sm text-gray-500">
+                The Necromancer's domain is forever shrouded in darkness. Light mode does not exist here.
               </p>
             </div>
-            <button
-              onClick={() =>
-                setLocalSettings({ ...localSettings, darkMode: !localSettings.darkMode })
-              }
-              className={`relative w-12 h-6 rounded-full transition-colors ${
-                localSettings.darkMode ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-600'
-              }`}
-            >
-              <span
-                className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                  localSettings.darkMode ? 'translate-x-7' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </label>
+            <span className="px-3 py-1 bg-primary-900/50 text-primary-300 rounded-full text-sm border border-primary-700/30">
+              Always Dark
+            </span>
+          </div>
         </div>
       </div>
 

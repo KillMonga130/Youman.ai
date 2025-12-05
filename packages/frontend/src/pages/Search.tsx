@@ -33,15 +33,6 @@ function SearchPageContent(): JSX.Element {
 
   const [showFilters, setShowFilters] = useState(false);
 
-  // Load saved searches on mount
-  useEffect(() => {
-    apiClient.getSavedSearches().then(data => {
-      setSavedSearches(data.savedSearches);
-    }).catch(error => {
-      console.error('Failed to load saved searches:', error);
-    });
-  }, [setSavedSearches]);
-
   // Perform search
   const performSearch = useCallback(async (searchQuery: string, page = 1) => {
     setIsSearching(true);
@@ -63,6 +54,40 @@ function SearchPageContent(): JSX.Element {
       setIsSearching(false);
     }
   }, [filters, sortBy, sortOrder, setIsSearching, setResults]);
+
+  // Load saved searches on mount
+  useEffect(() => {
+    apiClient.getSavedSearches().then(data => {
+      setSavedSearches(data.savedSearches);
+    }).catch(error => {
+      console.error('Failed to load saved searches:', error);
+    });
+  }, [setSavedSearches]);
+
+  // Load all projects on initial mount
+  useEffect(() => {
+    // Perform initial search to show all projects
+    const loadInitialProjects = async () => {
+      setIsSearching(true);
+      try {
+        const data = await apiClient.searchProjects({
+          query: '',
+          filters: {},
+          page: 1,
+          limit: 20,
+          sortBy: 'updatedAt',
+          sortOrder: 'desc',
+        });
+        setResults(data);
+      } catch (error) {
+        console.error('Failed to load initial projects:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    };
+    
+    loadInitialProjects();
+  }, [setIsSearching, setResults]);
 
   // Handle search from search bar
   const handleSearch = useCallback((searchQuery: string) => {
@@ -125,9 +150,9 @@ function SearchPageContent(): JSX.Element {
     <div className="space-y-6">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Search</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Find projects by name, content, or filters
+        <h1 className="text-3xl font-display text-glow-purple">Séance</h1>
+        <p className="text-gray-400 mt-1">
+          Commune with the spirits to find buried souls
         </p>
       </div>
 

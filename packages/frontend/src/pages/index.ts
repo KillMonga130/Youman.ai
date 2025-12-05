@@ -11,3 +11,4 @@ export { Templates } from './Templates';
 export { ABTesting } from './ABTesting';
 export { Admin } from './Admin';
 export { ModelManagement } from './ModelManagement';
+export { HalloweenLanding } from './HalloweenLanding';

@@ -29,15 +29,23 @@ function formatDate(dateString: string): string {
 
 function getStrategyBadge(strategy: string): JSX.Element {
   const colors: Record<string, string> = {
-    casual: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    professional: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-    academic: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-    auto: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+    casual: 'bg-blue-900/30 text-blue-400 border border-blue-500/30',
+    professional: 'bg-teal-900/30 text-teal-400 border border-teal-500/30',
+    academic: 'bg-amber-900/30 text-amber-400 border border-amber-500/30',
+    auto: 'bg-gray-800 text-gray-300 border border-gray-700',
+  };
+
+  // Halloween spell names
+  const spellNames: Record<string, string> = {
+    casual: 'Casual Charm',
+    professional: 'Business Hex',
+    academic: 'Scholar\'s Curse',
+    auto: 'Auto-Spell',
   };
 
   return (
     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${colors[strategy] || colors.auto}`}>
-      {strategy.charAt(0).toUpperCase() + strategy.slice(1)}
+      {spellNames[strategy] || strategy.charAt(0).toUpperCase() + strategy.slice(1)}
     </span>
   );
 }
@@ -95,9 +103,9 @@ export function History(): JSX.Element {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Version History</h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">
-          Browse and restore previous versions of your projects
+        <h1 className="text-3xl font-display text-glow-purple">The Graveyard</h1>
+        <p className="text-gray-400 mt-1">
+          Exhume past versions of your resurrected souls
         </p>
       </div>
 

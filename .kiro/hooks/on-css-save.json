@@ -1,0 +1,10 @@
+{
+  "name": "CSS Animation Performance Check",
+  "description": "Ensure CSS animations are GPU-accelerated and performant",
+  "trigger": "onFileSave",
+  "pattern": "**/*.css",
+  "action": {
+    "type": "message",
+    "content": "Verify animations use transform/opacity for GPU acceleration and include will-change hints where appropriate"
+  }
+}

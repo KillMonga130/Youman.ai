@@ -1,0 +1,10 @@
+{
+  "name": "Halloween Component Check",
+  "description": "Verify Halloween theme consistency when saving components",
+  "trigger": "onFileSave",
+  "pattern": "packages/frontend/src/components/**/*.tsx",
+  "action": {
+    "type": "message",
+    "content": "Check if this component follows Halloween theme guidelines: dark colors, spooky animations, proper accessibility"
+  }
+}
